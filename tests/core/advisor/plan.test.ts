@@ -222,6 +222,7 @@ describe("setup_plan", () => {
       name: "whisper.cpp + Whisper base model",
       size_mb: 158,
       how: { tool: "install_software", args: { id: "whisper.cpp" } },
+      install: ["whisper.cpp", "whisper-model-base"],
     });
     expect(step?.options[0]?.how.text).toContain("whisper.cpp and Whisper base model");
     // The program is there, the model is not: the model is next.
@@ -230,6 +231,7 @@ describe("setup_plan", () => {
     expect(step?.options[0]).toMatchObject({
       size_mb: 148,
       how: { args: { id: "whisper-model-base" } },
+      install: ["whisper-model-base"],
     });
     // Both: the step is met.
     step = await plan([sw("whisper.cpp", { installed: true }), model(true)]);

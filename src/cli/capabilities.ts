@@ -134,6 +134,14 @@ export async function runCapabilities(argv: string[], io: CliIo): Promise<number
           .put<{ capability: CapabilityView }>(`/api/capabilities/${enc(name)}/preference`, {
             order,
           });
+        // The daemon only checks the id's shape; a provider of a pack that is
+        // off is not listed either, so this warns instead of refusing.
+        const known = new Set(capability.providers.map((p) => p.id));
+        const unknown = order.filter((id) => !known.has(id));
+        if (unknown.length)
+          io.err(
+            `Not a provider of ${name} right now: ${unknown.join(", ")} (a typo, or its pack is off). Saved anyway.`,
+          );
         if (ctx.json) ctx.printJson(capability);
         else printProviders(io, capability);
         return EXIT_OK;

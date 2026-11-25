@@ -460,12 +460,14 @@ export async function runArtifacts(argv: string[], io: CliIo): Promise<number> {
 
 export const USAGE_HELP = `Usage: plughive usage [options]
 
-Calls and estimated cost: totals, by tool, by vendor, by capability, and by
-provider and day, with the vendors' rate-limit state.
+Calls and estimated cost: totals, by vendor, by capability and by tool, with
+the vendors' rate-limit state.
 
 Options:
-  --since DATE  only calls since this ISO date (2026-01-31 or a full timestamp)
-  --days N      only the last N days (instead of --since)
+  --since WHEN  only calls since then: an ISO date (2026-01-31, or a full
+                timestamp) or a time ago (90m, 24h, 7d, 4w)
+  --days N      only the last N days (the same as --since Nd)
+  --by-day      also the table by provider and day
   --limit N     rows by provider and day (default 500, max 2000)
 ${COMMON_HELP}`;
 
@@ -492,6 +494,22 @@ interface UsageBody {
   }[];
 }
 
+const AGO_MS: Record<string, number> = { m: 60_000, h: 3_600_000, d: 86_400_000, w: 604_800_000 };
+
+/** --since as an ISO timestamp: "7d", "24h" or "90m" ago, or a date. */
+export function sinceOf(text: string, now = Date.now()): string {
+  const m = /^(\d+(?:\.\d+)?)\s*([mhdw])$/i.exec(text.trim());
+  if (m)
+    return new Date(now - Number(m[1]) * (AGO_MS[(m[2] ?? "d").toLowerCase()] ?? 0)).toISOString();
+  const t = Date.parse(text);
+  if (Number.isNaN(t))
+    throw new CliError(
+      `--since: "${text}" is not a date (2026-01-31) or a time ago (7d, 24h)`,
+      EXIT_USAGE,
+    );
+  return new Date(t).toISOString();
+}
+
 export async function runUsage(argv: string[], io: CliIo): Promise<number> {
   if (argv.includes("-h") || argv.includes("--help")) {
     io.out(USAGE_HELP);
@@ -501,13 +519,16 @@ export async function runUsage(argv: string[], io: CliIo): Promise<number> {
     since: { type: "string" },
     days: { type: "string" },
     limit: { type: "string" },
+    "by-day": { type: "boolean" },
   });
+  if (values.days && values.since)
+    throw new CliError("give --since or --days, not both", EXIT_USAGE);
   const q = new URLSearchParams();
   if (values.days) {
     const days = Number(values.days);
     if (!(days > 0)) throw new CliError("--days must be a positive number", EXIT_USAGE);
     q.set("since", new Date(Date.now() - days * 86_400_000).toISOString());
-  } else if (values.since) q.set("since", values.since);
+  } else if (values.since) q.set("since", sinceOf(values.since));
   if (values.limit) q.set("limit", values.limit);
   const body = await ctx.api().get<UsageBody>(`/api/usage${q.size ? `?${q}` : ""}`);
   if (ctx.json) {
@@ -551,6 +572,14 @@ export async function runUsage(argv: string[], io: CliIo): Promise<number> {
     "TOOL",
     s.by_tool.map((r) => ({ ...r, name: r.tool })),
   );
+  if (values["by-day"] && body.by_provider_day.length) {
+    io.out("\nBy provider and day");
+    printTable(
+      io,
+      ["DAY", "PROVIDER", "CALLS", "ERRORS", "COST"],
+      body.by_provider_day.map((r) => [r.day, r.provider, r.calls, r.errors, usd(r.cost_usd)]),
+    );
+  }
   if (s.rate_limits.length) {
     io.out("\nRate limits");
     io.out(jsonText(s.rate_limits, 2));

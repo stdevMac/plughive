@@ -287,7 +287,7 @@ export function apiClient(baseUrl: string, token: string, timeoutMs = 10_000): A
         throw unreachable();
       }
       if (res.status === 401) {
-        throw new CliError(`the daemon on ${baseUrl} rejected the admin token`);
+        throw new ApiError(`the daemon on ${baseUrl} rejected the admin token`, 401, null, null);
       }
       if (!res.ok || !res.body) {
         let message = `HTTP ${res.status}`;
@@ -297,7 +297,7 @@ export function apiClient(baseUrl: string, token: string, timeoutMs = 10_000): A
         } catch {
           // Keep the status.
         }
-        throw new CliError(`GET ${path} failed: ${message}`);
+        throw new ApiError(`GET ${path} failed: ${message}`, res.status, null, null);
       }
       return res;
     },

@@ -104,6 +104,14 @@ export interface PlanOption {
   /** Size and approval, for an install. */
   size_mb?: number;
   needs_approval?: boolean;
+  /**
+   * For an install that install_software can do: the catalog ids still
+   * missing, in install order (whisper.cpp, then its model). Absent when the
+   * program is installed by hand (link, apt, unsupported).
+   */
+  install?: string[];
+  /** For a key: whether its pack is switched on (a key alone does not do the step). */
+  pack_enabled?: boolean;
 }
 
 export interface PlanStep {
@@ -228,6 +236,9 @@ export class SetupAdvisor {
               how,
               size_mb: sizeMb,
               needs_approval: approval,
+              ...(detectOnly || s.method === "apt"
+                ? {}
+                : { install: (missing.length ? missing : [main]).map((p) => p.id) }),
             },
             done: all.every((p) => p.installed),
           };
@@ -242,6 +253,7 @@ export class SetupAdvisor {
             option: {
               ...base,
               pack: o.pack,
+              pack_enabled: enabled,
               name: `${pack.name ?? pack.id} key`,
               how: {
                 dashboard: `/packs?pack=${encodeURIComponent(pack.id)}`,

@@ -262,6 +262,8 @@ interface PlanOption {
   needs_approval?: boolean;
   needs: string;
   pack?: string;
+  install?: string[];
+  pack_enabled?: boolean;
 }
 
 interface SetupPlan {
@@ -294,8 +296,18 @@ ${COMMON_HELP}`;
 
 /** The CLI command that does what an option's `how` describes, when there is one. */
 function cliHint(o: PlanOption): string | null {
-  if (o.needs === "install") return `plughive software install ${o.id}`;
-  if (o.needs === "key" && o.pack) return `plughive secrets set ${o.pack} ${o.id}`;
+  if (o.needs === "install") {
+    // Every part still missing (a program and its model), or the daemon's
+    // words when it is installed by hand (a download page, apt).
+    const ids = o.install ?? (o.how.tool === "install_software" ? [o.id] : []);
+    return ids.length ? ids.map((id) => `plughive software install ${id}`).join(" && ") : null;
+  }
+  if (o.needs === "key" && o.pack) {
+    const set = `plughive secrets set ${o.pack} ${o.id}`;
+    return o.pack_enabled === false
+      ? `${set} && plughive pack enable ${o.pack} --grant ${o.id}`
+      : set;
+  }
   if (o.needs === "enable_pack") return `plughive pack enable ${o.id}`;
   if (o.needs === "login")
     return `plughive mounts show ${o.id}  (then "mounts enable" or "mounts login")`;

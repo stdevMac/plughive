@@ -11,6 +11,7 @@ import {
   COMMON_HELP,
   type Ctx,
   ago,
+  confirm,
   enc,
   printFields,
   printTable,
@@ -51,7 +52,9 @@ Commands:
       --all             every status
       --limit N         at most N (default 100, max 500)
   show <apr_id>         one request: tool, provider, estimate, reason
-  approve <apr_id>      let it run; the agent retries the call once
+  approve <apr_id>      show the request, ask, then let it run; the agent retries
+                        the call once
+      -y, --yes         do not ask
   deny <apr_id>         refuse it
 
 ${COMMON_HELP}`;
@@ -81,14 +84,23 @@ function printApproval(io: CliIo, a: ApprovalView): void {
 }
 
 const decide = (verdict: "approve" | "deny", io: CliIo) => async (args: string[]) => {
-  const { positionals, ctx } = sub(
+  const { values, positionals, ctx } = sub(
     `approvals ${verdict}`,
     args,
     io,
-    {},
-    { min: 1, max: 1, usage: "<apr_id>" },
+    verdict === "approve" ? { yes: { type: "boolean", short: "y" } } : {},
+    { min: 1, max: 1, usage: verdict === "approve" ? "<apr_id> [--yes]" : "<apr_id>" },
   );
   const id = positionals[0] ?? "";
+  if (verdict === "approve") {
+    // Approving spends money or starts a program: show what, then ask.
+    const yes = (values as { yes?: boolean }).yes === true;
+    const { approval: request } = await ctx
+      .api()
+      .get<{ approval: ApprovalView }>(`/api/approvals/${enc(id)}`);
+    if (!yes) printApproval(ctx.json ? { ...io, out: io.err } : io, request);
+    await confirm(io, `\nApprove ${request.id}?`, yes);
+  }
   const { approval } = await ctx
     .api()
     .post<{ approval: ApprovalView }>(`/api/approvals/${enc(id)}/${verdict}`);

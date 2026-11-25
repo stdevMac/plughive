@@ -14,10 +14,11 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runCli } from "../../src/cli.js";
 import type { CliIo } from "../../src/cli/args.js";
-import { clean } from "../../src/cli/common.js";
+import { clean, subHelp } from "../../src/cli/common.js";
 import { runConnect } from "../../src/cli/connect.js";
 import { cursorDeeplink, cursorServerConfig } from "../../src/cli/cursor-link.js";
 import { checkHome, checkNode, checkPort } from "../../src/cli/doctor.js";
+import { sinceOf } from "../../src/cli/jobs.js";
 import { browserCommand } from "../../src/cli/open.js";
 import { isGitUrl } from "../../src/cli/pack.js";
 import { sseFrames } from "../../src/cli/raw.js";
@@ -557,6 +558,28 @@ describe("dashboard commands against a daemon", () => {
               },
             ],
           });
+        if (req.method === "GET" && url === "/api/approvals/apr_1")
+          return json(200, {
+            ok: true,
+            approval: {
+              id: "apr_1",
+              kind: "spend",
+              tool: "generate_video",
+              provider: "fal",
+              args_summary: "prompt: a cat",
+              estimate_usd: 0.5,
+              estimate_basis: null,
+              reason: "over the daily cap",
+              profile: null,
+              job_id: null,
+              status: "pending",
+              created_at: new Date().toISOString(),
+              expires_at: null,
+              decided_at: null,
+              decided_by: null,
+              url: "http://x/approvals/apr_1",
+            },
+          });
         if (req.method === "POST" && url === "/api/approvals/apr_1/approve")
           return json(200, {
             ok: true,
@@ -668,9 +691,16 @@ describe("dashboard commands against a daemon", () => {
     expect(c.stdout.join("\n")).toContain("generate_image");
   });
 
-  it("approvals approve posts with the csrf header", async () => {
+  it("approvals approve shows the request and refuses without a terminal or -y", async () => {
     const c = io();
-    expect(await runCli(["approvals", "approve", "apr_1"], c)).toBe(0);
+    expect(await runCli(["approvals", "approve", "apr_1"], c)).toBe(2);
+    expect(c.stdout.join("\n")).toContain("prompt: a cat");
+    expect(seen.some((r) => r.url === "/api/approvals/apr_1/approve")).toBe(false);
+  });
+
+  it("approvals approve -y posts with the csrf header", async () => {
+    const c = io();
+    expect(await runCli(["approvals", "approve", "apr_1", "-y"], c)).toBe(0);
     const hit = seen.find((r) => r.url === "/api/approvals/apr_1/approve");
     expect(hit?.method).toBe("POST");
     expect(hit?.csrf).toBe("1");
@@ -770,12 +800,44 @@ describe("dashboard commands against a daemon", () => {
     expect(await runCli(["api", "DELETE", "/api/jobs/x", "--data", "{}"], io())).toBe(2);
   });
 
+  it("-h after a sub-command shows only that command", async () => {
+    const c = io();
+    expect(await runCli(["jobs", "wait", "-h"], c)).toBe(0);
+    const text = c.stdout.join("\n");
+    expect(text).toContain("wait <job-id>");
+    expect(text).toContain("--timeout SEC");
+    expect(text).not.toContain("cancel <job-id>");
+  });
+
+  it("usage refuses --since with --days and takes a time ago", async () => {
+    expect(await runCli(["usage", "--since", "7d", "--days", "2"], io())).toBe(2);
+    expect(await runCli(["usage", "--since", "soon"], io())).toBe(2);
+  });
+
   it("never prints the admin token", async () => {
     const token = loadOrCreateAdminToken(home, {}).token;
     const c = io();
     await runCli(["api", "GET", "/api/nope", "--include"], c);
     await runCli(["jobs", "list", "--json"], c);
     expect([...c.stdout, ...c.stderr].join("\n")).not.toContain(token);
+  });
+});
+
+describe("usage --since", () => {
+  it("turns a time ago into a timestamp and keeps dates", () => {
+    const now = Date.parse("2026-11-25T12:00:00Z");
+    expect(sinceOf("24h", now)).toBe("2026-11-24T12:00:00.000Z");
+    expect(sinceOf("7d", now)).toBe("2026-11-18T12:00:00.000Z");
+    expect(sinceOf("2026-01-31", now)).toBe("2026-01-31T00:00:00.000Z");
+  });
+});
+
+describe("subHelp", () => {
+  it("falls back to the whole help for an unknown command", () => {
+    const help = "Usage: x\n\nCommands:\n  a    one\n      --f   flag\n  b    two\n\nend";
+    expect(subHelp("x", help, "a")).toContain("--f   flag");
+    expect(subHelp("x", help, "a")).not.toContain("two");
+    expect(subHelp("x", help, "zzz")).toBe(help);
   });
 });
 

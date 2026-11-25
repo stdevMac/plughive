@@ -1,0 +1,236 @@
+{
+  "page": {
+    "title": "Remote servers",
+    "description": "Other MCP servers whose tools pass through to your agents at the same address."
+  },
+  "addServer": {
+    "button": "Add a server"
+  },
+  "transport": {
+    "local": "Local program",
+    "remote": "Remote server"
+  },
+  "toolNames": {
+    "before": "Tool names start with "
+  },
+  "toolCount": {
+    "one": "{count} tool",
+    "other": "{count} tools"
+  },
+  "state": {
+    "waitingForSignIn": "Waiting for sign-in",
+    "needsSignIn": "Needs sign-in",
+    "notSignedIn": "Not signed in",
+    "signedIn": "Signed in",
+    "cannotConnect": "Cannot connect",
+    "needsKey": "Needs a key",
+    "connected": "Connected",
+    "connecting": "Connecting"
+  },
+  "signIn": {
+    "signedInTo": "Signed in to {name}.",
+    "signedOutOf": "Signed out of {name}.",
+    "finish": "Finish signing in on the page that opened in your browser. This page updates by itself.",
+    "refreshNeeded": "The server no longer accepts the sign-in. Connect again to keep using it.",
+    "connectHint": "Connect to sign in on the vendor's site. The tokens stay in this computer's secret store.",
+    "connect": "Connect",
+    "openAgain": "Open again",
+    "connectAria": "Connect {name}",
+    "signOut": "Sign out",
+    "signOutAria": "Sign out of {name}",
+    "badLink": "The sign-in link the daemon returned is not an http(s) address."
+  },
+  "notMountable": {
+    "setKey": "Set its key first to turn it on.",
+    "cannotEnable": "It cannot be turned on yet."
+  },
+  "toggled": {
+    "on": "{name} turned on.",
+    "off": "{name} turned off."
+  },
+  "toggle": {
+    "on": "Turn on {name}",
+    "off": "Turn off {name}"
+  },
+  "keys": {
+    "label": "Keys"
+  },
+  "docs": "Docs",
+  "remove": {
+    "label": "Remove",
+    "aria": "Remove {name}"
+  },
+  "removed": "{name} removed.",
+  "added": "{name} added.",
+  "addedDefault": "Server",
+  "fileError": {
+    "title": "Your servers file has a problem",
+    "before": "None of your own servers connect until it is fixed: "
+  },
+  "packsCard": {
+    "title": "From packs"
+  },
+  "packsList": {
+    "aria": "Servers from packs"
+  },
+  "packsEmpty": {
+    "title": "No pack offers a server",
+    "body": "Packs can bring ready-made servers. Turn on a pack on the Keys & packs page to see them here."
+  },
+  "userCard": {
+    "title": "Added by you"
+  },
+  "userList": {
+    "aria": "Servers you added"
+  },
+  "userEmpty": {
+    "title": "No servers of your own yet",
+    "before": "Add any MCP server you use, remote or a program on this computer, with ",
+    "link": "Add a server",
+    "after": " above."
+  },
+  "add": {
+    "title": "Add your own MCP server",
+    "description": "Its tools appear next to the others, named with the prefix you choose.",
+    "cancel": "Cancel",
+    "submit": "Add server",
+    "reach": {
+      "label": "How to reach it",
+      "http": "Remote server (HTTP)"
+    },
+    "fields": {
+      "name": "Name",
+      "id": "Id",
+      "prefix": "Tool prefix",
+      "url": "Server address",
+      "header": "Header (optional)",
+      "headerValue": "Header value",
+      "command": "Program",
+      "args": "Arguments"
+    },
+    "hints": {
+      "id": "Used in links and key names.",
+      "prefix": "Tools are named {prefix}_…",
+      "url": "To use a key, write ${secret:NAME} and set the key after adding.",
+      "command": "A program name on your PATH, or a full path.",
+      "args": "Separated by spaces. Use quotes to keep spaces inside one argument."
+    },
+    "examplePrefix": "prefix",
+    "placeholders": {
+      "name": "My notes server",
+      "id": "my-notes",
+      "prefix": "notes"
+    },
+    "errors": {
+      "name": "Give it a name.",
+      "id": "Use 2 to 32 lowercase letters, digits or dashes, starting with a letter.",
+      "url": "Enter an http or https address.",
+      "command": "Enter the program to start.",
+      "exists": "A server with this id already exists. Pick another id."
+    },
+    "stdioWarning": {
+      "title": "This runs a program on your computer",
+      "body": "plughive starts it with your user's permissions. Only add programs you trust."
+    }
+  },
+  "removeDialog": {
+    "title": "Remove {name}?",
+    "unnamed": "server",
+    "body": "Its tools disappear from your agents. Keys you set for it stay stored until you remove them.",
+    "keep": "Keep it",
+    "confirm": "Remove server"
+  },
+  "smart": {
+    "title": "Smart mount",
+    "summary": "Turned-on servers add about {tokens} tokens of tool definitions to your agents. Acting on the suggestions below saves about {reclaimable}.",
+    "mode": {
+      "label": "Smart mount mode",
+      "off": "Off",
+      "suggest": "Suggest",
+      "auto": "Automatic"
+    },
+    "modeHint": {
+      "off": "Nothing is checked or suggested.",
+      "suggest": "Servers and tools you have not used for a while are listed here. Nothing changes until you act on them.",
+      "auto": "Servers unused for the number of days below are parked (switched off) by themselves, once an hour. Switch one back on below at any time."
+    },
+    "idleDays": "Park after this many days unused",
+    "nothing": "Every server that is on was used recently. Nothing to change.",
+    "suggestionsAria": "Smart mount suggestions",
+    "kind": {
+      "idle": "Unused",
+      "heavy": "Costly",
+      "failing": "Not working",
+      "overlap": "Duplicate",
+      "profile_unused": "Unused in a profile",
+      "unused_tools": "Unused tools",
+      "search_mode": "Costly profile",
+      "sign_in": "Signed out",
+      "missing_key": "Key missing",
+      "failing_tool": "Tool failing"
+    },
+    "reason": {
+      "idle": {
+        "one": "Not called for {count} day.",
+        "other": "Not called for {count} days."
+      },
+      "heavy": "About {tokens} tokens of definitions for {calls} calls in 30 days.",
+      "failing": "It is on but cannot connect, so its tools never reach your agents.",
+      "overlap": "Does the same job as {with}, which got {withCalls} calls to its {calls} in 30 days.",
+      "profile_unused": "Other profiles use it; profile “{profile}” never did.",
+      "unused_tools": {
+        "one": "Profile “{profile}” never calls {count} of its tools: {tools}.",
+        "other": "Profile “{profile}” never calls {count} of its tools: {tools}."
+      },
+      "search_mode": "Every turn in profile “{profile}” carries its full tool list. Auto mode serves it through search instead.",
+      "sign_in": "It is on but signed out. Sign in again in its card below.",
+      "missing_key": "It is on but needs {secrets}. Set it in its card below.",
+      "failing_tool": "{tool} failed {percent}% of its {calls} calls this week. Check its key, sign-in or plan."
+    },
+    "lastUsed": "Last used {when}.",
+    "keep": "Always keep",
+    "park": "Park",
+    "parkAll": "Park all",
+    "parked": {
+      "one": "Parked {count} server.",
+      "other": "Parked {count} servers."
+    },
+    "parkedList": "Parked: {names}. Switch one on below to use it again.",
+    "keptList": "Never parked: {names}.",
+    "clearKeep": "Clear",
+    "builtin": "the built-in tools",
+    "saves": "Saves about {tokens} tokens a turn.",
+    "hide": "Hide",
+    "switchAuto": "Switch to auto",
+    "applied": {
+      "one": "Applied {count} change.",
+      "other": "Applied {count} changes."
+    },
+    "wake": {
+      "label": "When an agent asks for a parked tool",
+      "auto": "Switch it back on",
+      "ask": "Ask first"
+    },
+    "wakeHint": {
+      "auto": "Agents still find parked tools with search. Calling one switches its server back on by itself.",
+      "ask": "Agents still find parked tools with search, and are told to ask you before switching the server back on."
+    },
+    "changes": "Profile changes",
+    "changesAria": "Profile changes made by smart mount",
+    "change": {
+      "profile_unused": "{mount} hidden from “{profile}”",
+      "unused_tools": {
+        "one": "{count} tool of {mount} hidden from “{profile}”",
+        "other": "{count} tools of {mount} hidden from “{profile}”"
+      },
+      "search_mode": "“{profile}” switched to auto mode"
+    },
+    "undo": "Undo",
+    "undone": "Change undone.",
+    "week": "Last {days} days: {parked} parked, {woken} brought back, {hidden} hidden. Now saving about {tokens} tokens a turn.",
+    "weekUndone": {
+      "one": "{count} change undone.",
+      "other": "{count} changes undone."
+    }
+  }
+}

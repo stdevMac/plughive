@@ -1,0 +1,162 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# Third-party actions are pinned to a commit, not a movable tag; Dependabot
+# (.github/dependabot.yml) proposes the updates.
+
+jobs:
+  check:
+    # The daemon runs on macOS, Linux and Windows; every OS runs the suite.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      # Tests never read a .env file and never need a real key.
+      PLUGHIVE_NO_DOTENV: "1"
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # Keep LF line endings on Windows so fixtures and snapshots match.
+      - name: Line endings
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Dashboard tests
+        if: runner.os == 'Linux'
+        run: pnpm test:web
+
+      - name: Build
+        run: pnpm build
+
+      - name: Daemon smoke test
+        # Starts the built daemon in a throwaway home on this OS: health, MCP
+        # tool calls (local_status probes ffmpeg; the software catalog) and a
+        # secret round-trip through this OS's default backend.
+        run: pnpm smoke:ci
+
+      - name: Login service plan
+        # Prints this OS's LaunchAgent / systemd unit / Task Scheduler XML
+        # without installing it.
+        run: node dist/src/cli.js service install --dry-run
+
+      - name: Package contents
+        if: runner.os == 'Linux'
+        # What npm would publish from the build above: bin/export targets
+        # present; no .env, token, secrets, tests or stray dist entries.
+        run: pnpm check:pack
+
+      - name: Pack docs are current
+        if: runner.os == 'Linux'
+        run: pnpm docs:packs --check
+
+      - name: Dependency licenses
+        if: runner.os == 'Linux'
+        # "pnpm licenses" is a built-in pnpm command; "run" picks the script.
+        run: pnpm run licenses
+
+  app:
+    # The desktop app's Rust code on each OS: type-check and unit tests. The
+    # installers themselves are built by hand on each OS (app/README.md).
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+        working-directory: app/src-tauri
+    steps:
+      - name: Line endings
+        working-directory: .
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Linux system packages
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+
+      - name: Placeholder payload and Node sidecar
+        # The bundle config names these; the real ones come from
+        # app/scripts/build-payload.mjs and are not needed to compile.
+        run: |
+          mkdir -p ../payload binaries
+          triple=$(rustc -vV | sed -n 's/^host: //p')
+          ext=""; [ "$RUNNER_OS" = "Windows" ] && ext=".exe"
+          touch "binaries/node-${triple}${ext}"
+
+      - name: Check
+        run: cargo check --locked --all-targets
+
+      - name: Test
+        run: cargo test --locked
+
+  audit:
+    # Known vulnerabilities in the daemon's production dependencies and in the
+    # desktop app's crates. Fails on high or critical advisories.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+
+      - name: npm advisories (production dependencies)
+        run: pnpm audit --prod --audit-level high
+
+      - uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
+        with:
+          tool: cargo-audit
+
+      - name: Rust advisories (desktop app)
+        working-directory: app/src-tauri
+        run: cargo audit

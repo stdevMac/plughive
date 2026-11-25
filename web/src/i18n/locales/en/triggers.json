@@ -1,0 +1,112 @@
+{
+  "page": {
+    "title": "Triggers",
+    "headerTitle": "Triggers",
+    "description": "Run a workflow on a schedule, or when another service calls a signed webhook.",
+    "newTrigger": "New trigger",
+    "listLabel": "Triggers",
+    "emptyTitle": "No triggers yet",
+    "emptyBefore": "Create one with ",
+    "emptyStrong": "New trigger",
+    "emptyAfter": " to run a workflow every morning, or each time a form is sent.",
+    "created": "{name} created.",
+    "deleted": "{name} deleted."
+  },
+  "row": {
+    "runs": "Runs",
+    "webhookKind": "On a signed webhook",
+    "next": "Next",
+    "last": "Last",
+    "jobLink": "job",
+    "notRunYet": "Not run yet",
+    "reportsTo": "Reports to {target}",
+    "webhookCallback": "a webhook",
+    "webhookAddressFor": "Webhook address for {name}",
+    "runNow": "Run now",
+    "newSecret": "New secret",
+    "delete": "Delete",
+    "deleteFor": "Delete {name}",
+    "turnOn": "Turn on {name}",
+    "turnOff": "Turn off {name}",
+    "turned": "{name} turned {state}.",
+    "on": "on",
+    "off": "off",
+    "started": "{name} started. See it on the Jobs page."
+  },
+  "dialog": {
+    "title": "New trigger",
+    "description": "Start a workflow on a schedule or from another service, as a background job.",
+    "cancel": "Cancel",
+    "create": "Create trigger"
+  },
+  "form": {
+    "startsWhen": "Starts when",
+    "kindCron": "On a schedule",
+    "kindWebhook": "A webhook arrives",
+    "name": "Name",
+    "namePlaceholder": "Morning digest",
+    "workflow": "Workflow",
+    "chooseWorkflow": "Choose a workflow…",
+    "schedule": "Schedule",
+    "scheduleHint": "Cron: minute hour day month weekday.",
+    "timezone": "Time zone",
+    "timezoneLocal": "This computer's time",
+    "timezoneUtc": "UTC",
+    "catchUp": "If runs were missed while the daemon was off, run once when it starts",
+    "useBody": "Use the request's JSON body as workflow input",
+    "args": "Workflow input (JSON)",
+    "argsHint": "Fields in the request body override these.",
+    "callback": "When the job ends, report to",
+    "callbackNone": "Nobody",
+    "callbackWebhook": "A webhook (signed POST)",
+    "callbackTelegram": "Telegram (needs the Telegram pack)",
+    "callbackUrl": "Callback address",
+    "callbackUrlHint": "Public addresses only.",
+    "chatId": "Chat id (optional)",
+    "chatIdHint": "Empty uses the Telegram pack's default chat.",
+    "noWorkflows": "No workflows are loaded. Add one to your workflows folder first.",
+    "inputDoesNotFit": "The workflow input does not fit: {message}",
+    "nameRequired": "Give it a name.",
+    "workflowRequired": "Pick a workflow.",
+    "scheduleInvalid": "Use five fields: minute hour day month weekday.",
+    "argsNotJson": "This is not valid JSON.",
+    "argsNotObject": "Use a JSON object, like {}.",
+    "callbackUrlInvalid": "Enter an http or https address."
+  },
+  "presets": {
+    "every15Minutes": "Every 15 minutes",
+    "everyHour": "Every hour",
+    "everyDayAt9": "Every day at 09:00",
+    "weekdaysAt9": "Weekdays at 09:00",
+    "mondaysAt9": "Mondays at 09:00",
+    "firstOfMonth": "First of the month"
+  },
+  "zone": {
+    "utc": "UTC",
+    "local": "local time"
+  },
+  "lastRun": {
+    "error": "Could not start",
+    "skipped": "Skipped (missed)",
+    "started": "Started"
+  },
+  "secret": {
+    "title": "Signing secret for {name}",
+    "fallbackName": "trigger",
+    "description": "Copy it now. It is not shown again; make a new one if you lose it.",
+    "copied": "I have copied it",
+    "webhookAddress": "Webhook address",
+    "signingSecret": "Signing secret",
+    "hint1": "Callers send ",
+    "hint2": " (Unix seconds) and",
+    "hint3": ", the HMAC-SHA256 of",
+    "hint4": " with this secret. Job-done callbacks are signed the same way."
+  },
+  "delete": {
+    "title": "Delete {name}?",
+    "fallbackName": "trigger",
+    "keep": "Keep it",
+    "confirm": "Delete trigger",
+    "body": "It stops running and its webhook address stops working. Jobs it already started are kept."
+  }
+}

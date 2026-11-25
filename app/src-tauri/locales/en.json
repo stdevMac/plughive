@@ -1,0 +1,66 @@
+{
+  "status": {
+    "starting": "Starting…",
+    "running": "Running",
+    "attention": "Needs attention: {why}",
+    "stopped": "Stopped",
+    "tooltip": "PlugHive: {status}"
+  },
+  "menu": {
+    "open": "Open Dashboard",
+    "copy": "Copy Endpoint",
+    "connect": "Connect a Client",
+    "autostart": "Start at Login",
+    "troubleshoot": "Troubleshoot",
+    "restart": "Restart Daemon",
+    "logs": "Show Logs",
+    "quit": "Quit PlugHive",
+    "edit": "Edit",
+    "window": "Window",
+    "closeWindow": "Close Window",
+    "clientUnreadable": "{name} (config unreadable)",
+    "clientNotFound": "{name} (not found)"
+  },
+  "approvals": {
+    "none": "No Approvals Waiting",
+    "one": "1 Approval Waiting…",
+    "other": "{count} Approvals Waiting…",
+    "waiting": "{tool} is waiting for your OK",
+    "notifyTitle": "PlugHive asks before a call runs",
+    "estimate": ". Estimated ${usd}",
+    "notifyOpen": ". Open PlugHive to approve or deny."
+  },
+  "port": {
+    "title": "PlugHive moved to a new port",
+    "moved": "Port {old} is in use by another program, so PlugHive now runs on port {new}.",
+    "noClients": "No connected client needs to change.",
+    "ask": "These clients still point at the old address: {clients}.\n\nUpdate their config files to {to}?",
+    "update": "Update clients",
+    "notNow": "Not now",
+    "notUpdated": "{name}: not updated ({error})",
+    "updated": "updated",
+    "upToDate": "already up to date",
+    "failed": "Could not update the clients: {error}",
+    "doneTitle": "Clients updated"
+  },
+  "client": {
+    "listTitle": "Connect a client",
+    "listFailed": "Could not read the client list. See Show Logs.",
+    "notChangedTitle": "{name} config not changed",
+    "notChanged": "{path}\n\n{error}\n\nFix or move the file, then try again.",
+    "disconnectTitle": "Disconnect {name}",
+    "disconnectAsk": "Remove the PlugHive entry from {name}?\n\n{path}",
+    "disconnect": "Disconnect",
+    "cancel": "Cancel",
+    "disconnectedTitle": "{name} disconnected",
+    "removed": "Removed the plughive entry from:\n{path}",
+    "backup": "Backup of the previous file:\n{path}",
+    "disconnectFailed": "Disconnect failed",
+    "notRunningTitle": "PlugHive is not running",
+    "notRunning": "Wait until the menu says Running, then try again.",
+    "connected": "{name} is now set up to use PlugHive.\n\nConfig file:\n{path}",
+    "alreadyConnected": "{name} was already set up for PlugHive.\n\nConfig file:\n{path}",
+    "connectedTitle": "{name} connected",
+    "connectFailed": "Could not connect {name}"
+  }
+}

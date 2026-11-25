@@ -1,0 +1,114 @@
+{
+  "id": "local",
+  "name": "Local",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Zero-key tools and free capability fallbacks that run on this machine: ffmpeg media tools and video upscaling, speech to text (parakeet-mlx, Hex, whisperX or whisper.cpp), Ollama chat, translation, embeddings and reranking, Kokoro speech, ComfyUI image generation and editing, Real-ESRGAN upscaling, rembg cutouts, Demucs stems, pdftotext, Tesseract and OCRmyPDF parsing, pandoc and LibreOffice conversion, and yt-dlp transcripts. Each backend is detected, never assumed.",
+  "secrets": [
+    {
+      "name": "HF_TOKEN",
+      "label": "Hugging Face token (whisperX speaker labels)",
+      "helpUrl": "https://huggingface.co/settings/tokens",
+      "required": false
+    }
+  ],
+  "permissions": {
+    "spawn": [
+      "ffmpeg",
+      "ffprobe",
+      "whisper-cli",
+      "whisper-cpp",
+      "parakeet-mlx",
+      "hex",
+      "whisperx",
+      "realesrgan-ncnn-vulkan",
+      "rembg",
+      "demucs",
+      "tesseract",
+      "ocrmypdf",
+      "pdftotext",
+      "pandoc",
+      "soffice",
+      "yt-dlp"
+    ],
+    "localNetwork": ["127.0.0.1:8188", "127.0.0.1:11434", "127.0.0.1:8880"],
+    "library": "full"
+  },
+  "skills": "skills",
+  "settings": {
+    "type": "object",
+    "properties": {
+      "comfyUrl": {
+        "type": "string",
+        "title": "ComfyUI URL",
+        "format": "local-endpoint",
+        "description": "Loopback or private-network URL of ComfyUI. The host:port set here becomes reachable for this pack when it loads; the daemon's own port and metadata addresses never are.",
+        "default": "http://127.0.0.1:8188"
+      },
+      "allowRawComfyWorkflows": {
+        "type": "boolean",
+        "title": "Allow raw ComfyUI workflows",
+        "description": "Let agents call local_comfy_run_workflow, which runs any API-format node graph on your ComfyUI server. Any node installed there can run, including custom nodes that read files, download models or reach the network. Off by default; local_generate_image (a fixed txt2img graph) works without it.",
+        "default": false
+      },
+      "ollamaUrl": {
+        "type": "string",
+        "title": "Ollama URL",
+        "format": "local-endpoint",
+        "description": "Loopback or private-network URL of Ollama.",
+        "default": "http://127.0.0.1:11434"
+      },
+      "kokoroUrl": {
+        "type": "string",
+        "title": "Kokoro-FastAPI URL",
+        "format": "local-endpoint",
+        "description": "Loopback or private-network URL of Kokoro-FastAPI.",
+        "default": "http://127.0.0.1:8880"
+      },
+      "whisperModelPath": {
+        "type": "string",
+        "title": "whisper.cpp model path",
+        "description": "Absolute path of a ggml model file (for example ggml-base.en.bin). Leave empty to search ~/.cache/whisper.cpp, ~/whisper.cpp/models and the pack data folder models/."
+      },
+      "ollamaModel": {
+        "type": "string",
+        "title": "Default Ollama model",
+        "description": "Model used by local_chat when none is given (for example llama3.2). Empty means the first installed model."
+      },
+      "kokoroVoice": {
+        "type": "string",
+        "title": "Default Kokoro voice",
+        "description": "Voice used by local_speak when none is given.",
+        "default": "af_heart"
+      },
+      "transcriptionEngine": {
+        "type": "string",
+        "title": "Speech-to-text engine",
+        "enum": ["auto", "parakeet", "hex", "whisperx", "whisper.cpp"],
+        "description": "Engine for local_transcribe and audio.transcribe. auto tries parakeet-mlx first on Apple silicon, then Hex, whisper.cpp and whisperX, whichever is installed; elsewhere whisper.cpp, Hex, then whisperX. Speaker labels always use whisperX.",
+        "default": "auto"
+      },
+      "parakeetModel": {
+        "type": "string",
+        "title": "parakeet-mlx model",
+        "description": "Hugging Face model id for parakeet-mlx. Empty means mlx-community/parakeet-tdt-0.6b-v3."
+      },
+      "hexModel": {
+        "type": "string",
+        "title": "Hex model",
+        "description": "Model name passed to the Hex CLI. Empty means the model selected in Hex."
+      },
+      "whisperxModel": {
+        "type": "string",
+        "title": "whisperX model",
+        "description": "Whisper model size or id for whisperX (for example large-v3 or small). Empty means the whisperX default."
+      },
+      "ollamaEmbedModel": {
+        "type": "string",
+        "title": "Ollama embedding model",
+        "description": "Model used for text.embed and text.rerank when none is given (for example nomic-embed-text). Empty means the first installed embedding model."
+      }
+    }
+  }
+}

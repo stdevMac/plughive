@@ -1,0 +1,66 @@
+{
+  "status": {
+    "starting": "Iniciando…",
+    "running": "En marcha",
+    "attention": "Requiere atención: {why}",
+    "stopped": "Detenido",
+    "tooltip": "PlugHive: {status}"
+  },
+  "menu": {
+    "open": "Abrir el panel",
+    "copy": "Copiar el endpoint",
+    "connect": "Conectar un cliente",
+    "autostart": "Abrir al iniciar sesión",
+    "troubleshoot": "Solución de problemas",
+    "restart": "Reiniciar el servicio",
+    "logs": "Mostrar registros",
+    "quit": "Salir de PlugHive",
+    "edit": "Edición",
+    "window": "Ventana",
+    "closeWindow": "Cerrar ventana",
+    "clientUnreadable": "{name} (configuración ilegible)",
+    "clientNotFound": "{name} (no encontrado)"
+  },
+  "approvals": {
+    "none": "Ninguna aprobación pendiente",
+    "one": "1 aprobación pendiente…",
+    "other": "{count} aprobaciones pendientes…",
+    "waiting": "{tool} está esperando tu aprobación",
+    "notifyTitle": "PlugHive pregunta antes de ejecutar una llamada",
+    "estimate": ". Coste estimado: ${usd}",
+    "notifyOpen": ". Abre PlugHive para aprobarla o rechazarla."
+  },
+  "port": {
+    "title": "PlugHive cambió de puerto",
+    "moved": "Otro programa está usando el puerto {old}, así que PlugHive ahora usa el puerto {new}.",
+    "noClients": "Ningún cliente conectado necesita cambios.",
+    "ask": "Estos clientes siguen apuntando a la dirección anterior: {clients}.\n\n¿Actualizar sus archivos de configuración a {to}?",
+    "update": "Actualizar clientes",
+    "notNow": "Ahora no",
+    "notUpdated": "{name}: no se actualizó ({error})",
+    "updated": "actualizado",
+    "upToDate": "ya estaba al día",
+    "failed": "No se pudieron actualizar los clientes: {error}",
+    "doneTitle": "Clientes actualizados"
+  },
+  "client": {
+    "listTitle": "Conectar un cliente",
+    "listFailed": "No se pudo leer la lista de clientes. Consulta Mostrar registros.",
+    "notChangedTitle": "No se cambió la configuración de {name}",
+    "notChanged": "{path}\n\n{error}\n\nCorrige o mueve el archivo y vuelve a intentarlo.",
+    "disconnectTitle": "Desconectar {name}",
+    "disconnectAsk": "¿Quitar la entrada de PlugHive de {name}?\n\n{path}",
+    "disconnect": "Desconectar",
+    "cancel": "Cancelar",
+    "disconnectedTitle": "{name} desconectado",
+    "removed": "Se quitó la entrada de plughive de:\n{path}",
+    "backup": "Copia de seguridad del archivo anterior:\n{path}",
+    "disconnectFailed": "No se pudo desconectar",
+    "notRunningTitle": "PlugHive no está en marcha",
+    "notRunning": "Espera a que el menú diga En marcha y vuelve a intentarlo.",
+    "connected": "{name} ya está configurado para usar PlugHive.\n\nArchivo de configuración:\n{path}",
+    "alreadyConnected": "{name} ya estaba configurado para PlugHive.\n\nArchivo de configuración:\n{path}",
+    "connectedTitle": "{name} conectado",
+    "connectFailed": "No se pudo conectar {name}"
+  }
+}

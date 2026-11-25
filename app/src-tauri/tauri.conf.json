@@ -1,0 +1,56 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "PlugHive",
+  "version": "0.1.0",
+  "identifier": "dev.plughive.desktop",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "windows": [],
+    "withGlobalTauri": false,
+    "security": {
+      "csp": "default-src 'none'; style-src 'self'; img-src 'self'",
+      "freezePrototype": true
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "DeveloperTool",
+    "shortDescription": "Local MCP server for media tools",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
+    "externalBin": ["binaries/node"],
+    "resources": {
+      "../payload/": "daemon/"
+    },
+    "macOS": {
+      "signingIdentity": "-",
+      "hardenedRuntime": false,
+      "minimumSystemVersion": "12.0"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      },
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      }
+    },
+    "linux": {
+      "deb": {
+        "depends": ["libayatana-appindicator3-1", "libwebkit2gtk-4.1-0"]
+      },
+      "rpm": {
+        "depends": ["libayatana-appindicator-gtk3", "webkit2gtk4.1"]
+      }
+    }
+  }
+}

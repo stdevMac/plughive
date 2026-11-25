@@ -1,0 +1,51 @@
+{
+  "id": "machines",
+  "name": "Machines",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "enabledByDefault": false,
+  "description": "Register machines (SSH hosts today), run commands on them, move files between them and the artifact library, and update git checkouts on them.",
+  "permissions": {
+    "spawn": ["ssh"],
+    "userHome": true,
+    "library": "full"
+  },
+  "skills": "skills",
+  "settings": {
+    "type": "object",
+    "properties": {
+      "allowedHosts": {
+        "type": "array",
+        "items": { "type": "string" },
+        "title": "Allowed hosts",
+        "description": "Hosts agents may register and use, one per entry: host, user@host, host:port or user@host:port (IPv6 as [addr]:port). Empty (the default) means agents can register no machine at all. A stored machine whose host is taken off this list is refused the next time it is used. Agents cannot change this setting.",
+        "default": []
+      },
+      "allowedIdentityFiles": {
+        "type": "array",
+        "items": { "type": "string" },
+        "title": "Allowed identity files",
+        "description": "Private key paths (absolute or ~/...) a machine may reference as identity_file. Machines without identity_file use ssh-agent (use_agent) or, when Allow default keys is on, ssh's default keys (use_default_keys). Empty (the default) means no key file may be named. The pack never reads the key.",
+        "default": []
+      },
+      "allowDefaultKeys": {
+        "type": "boolean",
+        "title": "Allow default keys",
+        "description": "Let machines registered with use_default_keys=true use ssh's default ~/.ssh key files. Off (the default) means a machine needs identity_file or use_agent. Agents cannot change this setting.",
+        "default": false
+      },
+      "sshAuthSock": {
+        "type": "string",
+        "title": "ssh-agent socket",
+        "description": "Absolute path of the ssh-agent socket (the value of SSH_AUTH_SOCK in your shell; on Windows the agent pipe, \\\\.\\pipe\\openssh-ssh-agent). Used only for machines registered with use_agent=true; the pack's ssh runs with a bare environment, so set this for agent auth."
+      },
+      "connectTimeoutSeconds": {
+        "type": "integer",
+        "title": "Connect timeout (seconds)",
+        "description": "ssh ConnectTimeout.",
+        "default": 10
+      }
+    }
+  }
+}

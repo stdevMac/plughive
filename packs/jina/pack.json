@@ -1,0 +1,20 @@
+{
+  "id": "jina",
+  "name": "Jina AI",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Fetch web pages as clean Markdown, text or HTML with the Jina Reader (fetch_web), rerank documents with the Jina Reranker cross-encoder (rerank_text) and embed text with Jina Embeddings (embed_text), with your own key.",
+  "secrets": [
+    {
+      "name": "JINA_API_KEY",
+      "label": "Jina AI API key",
+      "helpUrl": "https://jina.ai/api-dashboard",
+      "required": true
+    }
+  ],
+  "permissions": {
+    "network": ["r.jina.ai", "api.jina.ai"]
+  },
+  "skills": "skills"
+}

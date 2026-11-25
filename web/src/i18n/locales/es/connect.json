@@ -1,0 +1,36 @@
+{
+  "tray": {
+    "before": "¿Tienes la app de la barra de menús? Abre su menú, elige ",
+    "strong": "Conectar un cliente",
+    "after": " y elige tu agente. Escribe la configuración por ti; después reinicia el agente."
+  },
+  "endpointLabel": "URL del endpoint",
+  "endpointUrl": "URL del endpoint",
+  "tabsLabel": "Agente",
+  "codeLabel": "Configuración de {label}",
+  "keyHint": {
+    "before": "Este daemon pide una clave de acceso a los agentes. Sustituye ",
+    "after": " por la clave que configuraste al arrancarlo."
+  },
+  "statusWaiting": "Esperando a tu agente. Pega un fragmento abajo y reinicia o recarga el agente.",
+  "connectedCount": "Agentes conectados: {count}",
+  "agents": {
+    "noAgent": "Todavía no se ha conectado ningún agente.",
+    "oneAgent": "{name} está conectado.",
+    "twoAgents": "{first} y {second} están conectados.",
+    "manyAgents": "{first}, {second} y {more} más están conectados."
+  },
+  "snippets": {
+    "claudeCode": {
+      "where": "Ejecuta en una terminal"
+    },
+    "claudeDesktop": {
+      "where": "Ajustes > Desarrollador > Editar configuración ({file})",
+      "note": "Claude Desktop llega a los servidores HTTP a través del puente mcp-remote, que necesita Node.js. Reinicia Claude Desktop después de guardar."
+    },
+    "other": {
+      "label": "Otros clientes",
+      "where": "Cualquier cliente MCP que hable Streamable HTTP"
+    }
+  }
+}

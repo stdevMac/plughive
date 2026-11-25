@@ -1,0 +1,16 @@
+{
+  "name": "plughive-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "payload": "node scripts/build-payload.mjs",
+    "icons": "node scripts/make-icons.mjs && tauri icon src-tauri/icons/source.png -o src-tauri/icons",
+    "tauri": "tauri",
+    "build": "node scripts/build-payload.mjs && node scripts/bundle.mjs",
+    "dev": "node scripts/build-payload.mjs && tauri dev"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.6"
+  }
+}

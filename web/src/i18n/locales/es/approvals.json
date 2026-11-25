@@ -1,0 +1,73 @@
+{
+  "page": {
+    "title": "Aprobaciones",
+    "headerTitle": "Aprobaciones",
+    "descriptionBefore": "Las llamadas que superarían un límite de gasto, o sobre las que tus reglas dicen que hay que preguntar, esperan aquí. Una aprobación deja que esa llamada exacta se ejecute una vez. Configura los límites en la página ",
+    "descriptionLink": "Uso",
+    "descriptionAfter": ".",
+    "show": "Mostrar",
+    "missing": "Esa petición no está en esta lista. Puede que sea más antigua o que esté filtrada.",
+    "nothingWaiting": "No hay nada en espera. Cuando un agente pide gastar por encima de un límite, la petición aparece aquí y en la barra lateral.",
+    "emptyTitle": "Aquí no hay nada",
+    "emptyBody": "No hay peticiones con este estado.",
+    "history": "Historial",
+    "footerNote": "Una aprobación cubre solo la llamada para la que se pidió, con los mismos argumentos, y solo una vez. Las peticiones que nadie responde caducan. Los importes son estimaciones."
+  },
+  "filter": {
+    "all": "Todas",
+    "pending": "En espera",
+    "consumed": "Usadas",
+    "denied": "Denegadas",
+    "expired": "Caducadas"
+  },
+  "waiting": {
+    "title": {
+      "zero": "En espera",
+      "one": "En espera ({count})",
+      "other": "En espera ({count})"
+    }
+  },
+  "kind": {
+    "tool": "Llamada a herramienta",
+    "provider": "Llamada a proveedor",
+    "workflow": "Ejecución de flujo de trabajo"
+  },
+  "status": {
+    "pending": "En espera",
+    "approved": "Aprobada",
+    "denied": "Denegada",
+    "expired": "Caducada",
+    "consumed": "Usada"
+  },
+  "card": {
+    "approvedToast": "Aprobada {tool}. Puede ejecutarse una vez.",
+    "deniedToast": "Denegada {tool}.",
+    "costUnknown": "Coste desconocido",
+    "costUpTo": "Hasta {amount}",
+    "asked": "Solicitada",
+    "provider": "Proveedor {provider}",
+    "profile": "Perfil {profile}",
+    "jobWaiting": "Trabajo en espera",
+    "expires": "Caduca",
+    "via": "vía {by}",
+    "approve": "Aprobar una vez",
+    "deny": "Denegar"
+  },
+  "cap": {
+    "period": {
+      "daily": "Diario",
+      "monthly": "Mensual"
+    },
+    "scope": {
+      "provider": "proveedor",
+      "profile": "perfil"
+    },
+    "global": "{period}, todo",
+    "scoped": "{period}, {scope} {id}"
+  },
+  "caps": {
+    "limitError": "Límite {n}: el valor debe ser un importe en dólares, como 5 o 0.50.",
+    "scopeError": "Límite {n}: indica el {scope} (letras, dígitos y . _ : -).",
+    "duplicateError": "El límite {n} repite un límite anterior con el mismo ámbito y periodo."
+  }
+}

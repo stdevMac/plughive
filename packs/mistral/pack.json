@@ -1,0 +1,21 @@
+{
+  "id": "mistral",
+  "name": "Mistral OCR",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Extract the text of library PDFs and images as Markdown with Mistral OCR and your own key (parse_document).",
+  "secrets": [
+    {
+      "name": "MISTRAL_API_KEY",
+      "label": "Mistral API key",
+      "helpUrl": "https://console.mistral.ai/api-keys",
+      "required": true
+    }
+  ],
+  "permissions": {
+    "network": ["api.mistral.ai"],
+    "library": "read-all"
+  },
+  "skills": "skills"
+}

@@ -1,0 +1,110 @@
+{
+  "title": "Trabajos",
+  "ran": "Ejecutado {name}",
+  "header": {
+    "description": "Las herramientas que tardan un poco, como el vídeo y la música, se ejecutan como trabajos. Siguen en marcha aunque cierres esta página o se desconecte tu agente."
+  },
+  "live": {
+    "open": "En vivo",
+    "connecting": "Conectando",
+    "closed": "Sin conexión en vivo, actualiza para ver los cambios"
+  },
+  "filter": {
+    "label": "Mostrar trabajos",
+    "all": {
+      "zero": "Todos",
+      "one": "Todos ({count})",
+      "other": "Todos ({count})"
+    },
+    "active": {
+      "zero": "En marcha",
+      "one": "En marcha ({count})",
+      "other": "En marcha ({count})"
+    },
+    "succeeded": "Terminados",
+    "failed": {
+      "zero": "Fallidos",
+      "one": "Fallidos ({count})",
+      "other": "Fallidos ({count})"
+    },
+    "cancelled": "Detenidos"
+  },
+  "loadMoreFailed": "No se pudieron cargar más trabajos. {error}",
+  "empty": {
+    "all": "Todavía no hay trabajos",
+    "active": "Ahora mismo no hay nada en marcha",
+    "failed": "No ha fallado nada",
+    "other": "Aquí no hay trabajos",
+    "bodyAll": "El vídeo, la música y otras herramientas lentas se ejecutan como trabajos. Cuando inicias uno tú, o lo inicia un agente, aparece aquí con su progreso.",
+    "bodyOther": "Los trabajos aparecen aquí a medida que llegan a este estado.",
+    "openPlayground": "Abrir la zona de pruebas",
+    "showAll": "Mostrar todos los trabajos"
+  },
+  "table": {
+    "caption": "Trabajos, los más recientes primero",
+    "tool": "Herramienta",
+    "status": "Estado",
+    "started": "Inicio",
+    "duration": "Duración",
+    "actions": "Acciones"
+  },
+  "row": {
+    "ariaLabel": "Detalles del trabajo de {tool} iniciado {time}",
+    "errorFallback": "El proveedor dejó de responder.",
+    "stop": "Detener",
+    "stopAria": "Detener el trabajo de {tool}"
+  },
+  "showMore": "Mostrar más",
+  "details": {
+    "titleFallback": "Trabajo",
+    "close": "Cerrar",
+    "stop": "Detener trabajo",
+    "tryAgain": "Intentarlo de nuevo en la zona de pruebas",
+    "loadFailed": "No se pudo cargar este trabajo",
+    "jobId": "Id del trabajo",
+    "tool": "Herramienta",
+    "started": "Inicio",
+    "took": "Duración",
+    "runningFor": "En marcha desde hace",
+    "expiredFallback": "El proveedor dejó de responder antes de que terminara el trabajo.",
+    "stopped": "Detenido",
+    "submissionUnknownTitle": "No sabemos si el proveedor lo recibió",
+    "submissionUnknownBody": "La conexión se cortó al enviar. Consulta el panel del propio proveedor antes de ejecutarlo otra vez.",
+    "result": "Resultado",
+    "input": "Entrada",
+    "inputUnavailable": "Las entradas solo se guardan para los trabajos que inicias desde la zona de pruebas en esta ventana.",
+    "inputJsonLabel": "Entrada del trabajo"
+  },
+  "copy": {
+    "jobId": "id del trabajo"
+  },
+  "status": {
+    "queued": "En espera",
+    "running": "En marcha",
+    "staging": "Preparando",
+    "submitting": "Enviando",
+    "submitted": "Enviado al proveedor",
+    "polling": "El proveedor está trabajando",
+    "downloading": "Guardando el resultado",
+    "awaitingApproval": "Esperando aprobación",
+    "submissionUnknown": "No está claro si se envió",
+    "succeeded": "Terminado",
+    "failed": "Fallido",
+    "cancelled": "Detenido",
+    "expired": "Caducado"
+  },
+  "progress": {
+    "waiting": "Esperando para empezar",
+    "ariaLabel": "Progreso de {tool}",
+    "working": "Trabajando",
+    "noPercent": "Trabajando, sin porcentaje",
+    "pct": "{pct}%"
+  },
+  "cancel": {
+    "stopped": "Trabajo detenido.",
+    "title": "¿Detener este trabajo?",
+    "body": " se detiene ahora. Es posible que se siga cobrando el trabajo que el proveedor ya ha hecho, y un trabajo detenido no se puede reanudar.",
+    "keep": "Dejarlo en marcha",
+    "confirm": "Detener trabajo"
+  }
+}

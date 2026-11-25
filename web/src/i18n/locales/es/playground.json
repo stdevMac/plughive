@@ -1,0 +1,67 @@
+{
+  "page": {
+    "title": "Zona de pruebas",
+    "description": "Prueba cualquier herramienta a mano, con las mismas comprobaciones que pasan tus agentes."
+  },
+  "picker": {
+    "searchLabel": "Buscar herramientas",
+    "searchPlaceholder": {
+      "one": "Buscar entre {count} herramienta",
+      "other": "Buscar entre {count} herramientas"
+    },
+    "shown": {
+      "one": "{count} herramienta mostrada",
+      "other": "{count} herramientas mostradas"
+    },
+    "listLabel": "Herramientas",
+    "builtIn": "Integrada",
+    "noMatch": "Ninguna herramienta coincide. Prueba con otra palabra."
+  },
+  "job": {
+    "took": "Tardó {duration}",
+    "soFar": "{duration} hasta ahora",
+    "openInJobs": "Abrir en Trabajos",
+    "stop": "Detener trabajo",
+    "failed": "El trabajo ha fallado.",
+    "unknownTitle": "No sabemos si el proveedor lo recibió",
+    "unknownBody": "La conexión se cortó al enviar. Consulta el panel del propio proveedor antes de ejecutarlo otra vez, para no pagar dos veces."
+  },
+  "errors": {
+    "invalidInputs": "Algunas entradas no son válidas"
+  },
+  "runner": {
+    "editAs": "Editar los argumentos como",
+    "modeForm": "Formulario",
+    "modeJson": "JSON",
+    "longRunning": "Se ejecuta como trabajo en segundo plano",
+    "needsSecrets": "Necesita {secrets}",
+    "mayCost": "Puede costar dinero con el proveedor",
+    "argsLabel": "Argumentos (JSON)",
+    "jsonPlaceholder": "Valor JSON",
+    "argsNotObject": "Los argumentos deben ser un objeto JSON.",
+    "notValidJson": "JSON no válido: {message}",
+    "fixJsonFirst": "Arregla el JSON antes de volver al formulario: {message}",
+    "started": "Iniciado como trabajo en segundo plano. Puedes salir de esta página; sigue en marcha.",
+    "clearResult": "Borrar resultado",
+    "run": "Ejecutar",
+    "noArguments": "Esta herramienta no recibe argumentos.",
+    "resultTitle": "Resultado",
+    "idleHint": "Ejecuta la herramienta para ver aquí su resultado. Los archivos que genere se guardan en la Biblioteca.",
+    "running": "En marcha",
+    "copyToolName": "nombre de la herramienta"
+  },
+  "empty": {
+    "noToolsTitle": "Todavía no hay herramientas",
+    "noToolsAction": "Activa un paquete",
+    "noToolsBody": "Las herramientas vienen de paquetes y servidores montados.",
+    "unavailableTitle": "Esa herramienta no está disponible",
+    "unavailableClear": "Quitar",
+    "unavailableBody": " no está cargada. Puede que su paquete esté desactivado.",
+    "pickTitle": "Elige una herramienta",
+    "pickBefore": "Elige una herramienta a la izquierda, o empieza con una gratis: ",
+    "pickLinkStatus": "estado del servidor",
+    "pickOr": " o ",
+    "pickLinkFiles": "ver tus archivos",
+    "pickAfter": "."
+  }
+}

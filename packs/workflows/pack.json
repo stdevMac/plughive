@@ -1,0 +1,29 @@
+{
+  "id": "workflows",
+  "name": "Workflows",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "description": "Ready-made multi-step workflows on top of the media, local, web and ElevenLabs tools: issue triage, short and launch videos, narrated ads, a brand kit from a URL, dubbing and podcast production. Each runs as a job; call it with dry_run: true first to see the steps, what is missing and the most paid calls it can make.",
+  "permissions": {
+    "tools": [
+      "chat",
+      "generate_image",
+      "generate_video",
+      "generate_speech",
+      "generate_music",
+      "transcribe_audio",
+      "local_audio_mix",
+      "local_audio_concat",
+      "local_video_concat",
+      "local_video_mux_audio",
+      "local_video_burn_captions",
+      "local_transcribe",
+      "firecrawl_scrape",
+      "screenshot_url",
+      "elevenlabs_dub"
+    ],
+    "library": "write"
+  },
+  "workflows": "workflows",
+  "skills": "skills"
+}

@@ -1,0 +1,110 @@
+{
+  "title": "Jobs",
+  "ran": "Ran {name}",
+  "header": {
+    "description": "Tools that take a while, like video and music, run as jobs. They keep going if you close this page or your agent disconnects."
+  },
+  "live": {
+    "open": "Live",
+    "connecting": "Connecting",
+    "closed": "Not live, refresh to update"
+  },
+  "filter": {
+    "label": "Show jobs",
+    "all": {
+      "zero": "All",
+      "one": "All ({count})",
+      "other": "All ({count})"
+    },
+    "active": {
+      "zero": "Running",
+      "one": "Running ({count})",
+      "other": "Running ({count})"
+    },
+    "succeeded": "Done",
+    "failed": {
+      "zero": "Failed",
+      "one": "Failed ({count})",
+      "other": "Failed ({count})"
+    },
+    "cancelled": "Stopped"
+  },
+  "loadMoreFailed": "More jobs could not be loaded. {error}",
+  "empty": {
+    "all": "No jobs yet",
+    "active": "Nothing running right now",
+    "failed": "Nothing has failed",
+    "other": "No jobs here",
+    "bodyAll": "Video, music and other slow tools run as jobs. When you or an agent start one, it shows up here with its progress.",
+    "bodyOther": "Jobs show up here as they reach this state.",
+    "openPlayground": "Open the playground",
+    "showAll": "Show all jobs"
+  },
+  "table": {
+    "caption": "Jobs, newest first",
+    "tool": "Tool",
+    "status": "Status",
+    "started": "Started",
+    "duration": "Duration",
+    "actions": "Actions"
+  },
+  "row": {
+    "ariaLabel": "Details of {tool} job started {time}",
+    "errorFallback": "The provider stopped answering.",
+    "stop": "Stop",
+    "stopAria": "Stop {tool} job"
+  },
+  "showMore": "Show more",
+  "details": {
+    "titleFallback": "Job",
+    "close": "Close",
+    "stop": "Stop job",
+    "tryAgain": "Try again in the playground",
+    "loadFailed": "This job could not be loaded",
+    "jobId": "Job id",
+    "tool": "Tool",
+    "started": "Started",
+    "took": "Took",
+    "runningFor": "Running for",
+    "expiredFallback": "The provider stopped answering before the job finished.",
+    "stopped": "Stopped",
+    "submissionUnknownTitle": "Not sure the provider got it",
+    "submissionUnknownBody": "The connection dropped while sending. Check the provider's own dashboard before running it again.",
+    "result": "Result",
+    "input": "Input",
+    "inputUnavailable": "Inputs are only kept for jobs you start from the playground in this window.",
+    "inputJsonLabel": "Job input"
+  },
+  "copy": {
+    "jobId": "job id"
+  },
+  "status": {
+    "queued": "Waiting",
+    "running": "Running",
+    "staging": "Preparing",
+    "submitting": "Sending",
+    "submitted": "Sent to provider",
+    "polling": "Provider working",
+    "downloading": "Saving result",
+    "awaitingApproval": "Awaiting approval",
+    "submissionUnknown": "Unclear if sent",
+    "succeeded": "Done",
+    "failed": "Failed",
+    "cancelled": "Stopped",
+    "expired": "Expired"
+  },
+  "progress": {
+    "waiting": "Waiting to start",
+    "ariaLabel": "Progress of {tool}",
+    "working": "Working",
+    "noPercent": "Working, no percentage reported",
+    "pct": "{pct}%"
+  },
+  "cancel": {
+    "stopped": "Job stopped.",
+    "title": "Stop this job?",
+    "body": " stops now. Work the provider has already done may still be billed, and a stopped job cannot be resumed.",
+    "keep": "Keep it running",
+    "confirm": "Stop job"
+  }
+}

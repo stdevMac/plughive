@@ -1,0 +1,25 @@
+{
+  "title": "Iniciar sesión",
+  "heading": "Inicia sesión en el panel",
+  "intro": {
+    "before": "La forma más rápida de entrar es",
+    "link": "Abrir el panel",
+    "after": " en la app de la barra de menús, o el enlace de inicio de sesión que plughive imprime al arrancar. También puedes pegar aquí el token de administración."
+  },
+  "tokenLabel": "Token de administración",
+  "tokenAria": "token de administración",
+  "submit": "Iniciar sesión",
+  "foot": {
+    "before": "El token está en el archivo ",
+    "middle": " de la carpeta de datos, normalmente ",
+    "after": ". Al iniciar sesión se crea una cookie de sesión; la página no guarda el token."
+  },
+  "errors": {
+    "empty": "Pega el token primero.",
+    "tooMany": "Demasiados intentos. Espera un minuto y vuelve a intentarlo.",
+    "badToken": "Ese token no es correcto. Vuelve a copiarlo del enlace de inicio de sesión o del archivo del token de administración.",
+    "paste": "Pega el token del enlace de inicio de sesión o del archivo del token de administración.",
+    "network": "No se puede contactar con el daemon. Comprueba que está en marcha.",
+    "failed": "No se pudo iniciar sesión. Inténtalo de nuevo."
+  }
+}

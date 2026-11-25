@@ -1,0 +1,190 @@
+{
+  "page": {
+    "title": "Keys & packs",
+    "description": "Packs add tools. Add the keys they need, and turn them on or off.",
+    "searchLabel": "Search packs",
+    "searchPlaceholder": "Search packs and tools",
+    "missingCount": {
+      "one": "{count} pack",
+      "other": "{count} packs"
+    },
+    "missingVerb": {
+      "one": "is",
+      "other": "are"
+    },
+    "missingSuffix": {
+      "one": "needs a key",
+      "other": "need keys"
+    },
+    "showAll": "Show all packs",
+    "showThese": "Show these",
+    "noMatch": "No packs match",
+    "noMatchHint": "Clear the search to see every pack.",
+    "listLabel": "Packs",
+    "serviceCount": {
+      "one": "{count} service",
+      "other": "{count} services"
+    },
+    "toolCount": {
+      "one": "{count} tool",
+      "other": "{count} tools"
+    },
+    "yourPackSuffix": " · your pack",
+    "needsKey": "Needs a key",
+    "chooseTitle": "Choose a pack",
+    "chooseHint": "Pick a pack from the list to see what it may do, its keys and its tools."
+  },
+  "consent": {
+    "title": "Turn on {name}?",
+    "description": "This pack was not shipped with plughive. Check what it may do before you turn it on.",
+    "cancel": "Cancel",
+    "confirm": "Turn it on",
+    "confirmHighRisk": "I understand, turn it on",
+    "loading": "Loading the review",
+    "errorChanged": "The pack's files changed since this review was loaded. Review the updated permissions below.",
+    "errorConsentRequired": "The daemon needs a fresh review before turning this pack on.",
+    "broadAccessTitle": "This pack asks for broad access",
+    "broadAccessBody": "It can run programs or reach any website. Only turn it on if you trust where it came from.",
+    "fullRightsTitle": "Its code runs with your full rights",
+    "fullRightsBody": "Turning this pack on lets its code run on this computer with your full rights: it can do anything you can. The lines below describe what plughive mediates for it, not a sandbox.",
+    "meta": "{name} {version}, from your packs folder.",
+    "mayTitle": "It may",
+    "mayNothing": "Nothing beyond working on what you pass it.",
+    "keysTitle": "Keys it may read",
+    "keysHint": "The pack only sees the keys you allow here.",
+    "requiredSuffix": " (needed for its tools)"
+  },
+  "settings": {
+    "title": "Settings",
+    "save": "Save settings",
+    "saved": "{name} settings saved."
+  },
+  "detail": {
+    "versionTitle": "Version {version}",
+    "builtin": "Built in",
+    "yourPack": "Your pack",
+    "packId": "Pack id",
+    "turnOn": "Turn on {name}",
+    "turnOff": "Turn off {name}",
+    "turnedOn": "{name} turned on.",
+    "turnedOff": "{name} turned off.",
+    "turnedOffUndo": "{name} turned off. Its tools are gone from every profile.",
+    "undo": "Undo",
+    "reloaded": "{name} reloaded.",
+    "noticeTitle": "Before you turn it on",
+    "loadErrorTitle": "This pack could not load",
+    "loadAgain": "Load again",
+    "reviewTitle": "Review needed",
+    "reviewBody": "The pack changed or asks for new access. Review it to turn it on again.",
+    "review": "Review",
+    "permsTitle": "What it may do",
+    "keysTitle": "Keys",
+    "howToKeep": "How to keep them",
+    "howToFix": "How to fix this",
+    "servicesTitle": "Services ({count})",
+    "servicesHintBefore": "Jobs your agent asks for through the shared tools, which this pack can do. Choose which service goes first on ",
+    "servicesHintLink": "Preferred services",
+    "servicesHintAfter": ".",
+    "toolsTitle": "Tools ({count})",
+    "noToolsShared": "No tools of its own: agents use it through the shared tools for its services.",
+    "noTools": "This pack has no tools right now.",
+    "noToolsOff": "Turn the pack on to load its tools.",
+    "tryTool": "Try {tool} in the playground"
+  },
+  "secret": {
+    "source": {
+      "keychain": "system keychain",
+      "file": "secrets file",
+      "memory": "memory",
+      "env": "environment variable"
+    },
+    "errorPasteFirst": "Paste the key first.",
+    "saved": "{label} saved.",
+    "removed": "{label} removed.",
+    "set": "Set",
+    "setIn": " in {source}",
+    "notSet": "Not set",
+    "notSetOptional": "Not set (optional)",
+    "notGranted": "Not granted to this pack",
+    "placeholderNew": "Paste the new key",
+    "placeholderFirst": "Paste the key",
+    "save": "Save",
+    "cancel": "Cancel",
+    "getKey": "Get a key",
+    "replace": "Replace",
+    "setKey": "Set key",
+    "replaceAria": "Replace {label}",
+    "setAria": "Set {label}",
+    "remove": "Remove",
+    "removeAria": "Remove {label}",
+    "envNote": "This key comes from an environment variable. A key saved here takes its place.",
+    "removeTitle": "Remove {label}?",
+    "keepIt": "Keep it",
+    "removeKey": "Remove key",
+    "removeBody": "Tools that need this key stop working until you set it again. The stored value is deleted and cannot be shown again."
+  },
+  "storage": {
+    "secretsFileFallback": "secrets.json in the plughive data folder",
+    "words": {
+      "keychain": "Keys are saved in the macOS Keychain on this computer.",
+      "keychainService": "Keys are saved in the macOS Keychain on this computer, under the service name {service}.",
+      "keyring": "Keys are saved in this computer's credential store (Windows Credential Manager or the system keyring).",
+      "fileEncrypted": "Keys are saved encrypted in {file}, readable only by your user account.",
+      "filePlain": "Keys are saved in {file} without encryption. Only your user account can read the file, but the keys in it are plain text.",
+      "memory": "Keys are kept in memory only and are lost when the daemon restarts.",
+      "fileUnknown": "Keys are saved in {file}, readable only by your user account. The file is encrypted only when PLUGHIVE_SECRETS_PASSPHRASE is set.",
+      "daemon": "Keys are saved by the daemon.",
+      "daemonBackend": "Keys are saved by the daemon ({backend})."
+    },
+    "label": {
+      "keychain": "macOS Keychain",
+      "keyring": "System credential store",
+      "fileEncrypted": "Encrypted file",
+      "filePlain": "File, not encrypted",
+      "memory": "Memory only, lost on restart"
+    },
+    "memoryAlertTitle": "Keys you add now will not survive a restart",
+    "memoryNote": {
+      "beforeKeychain": "This daemon keeps keys in memory only. To keep them, restart it with ",
+      "macos": " (macOS), ",
+      "windowsLinux": " (Windows, Linux desktop) or ",
+      "afterFile": ". With the file option, also set ",
+      "toEncrypt": " to encrypt the file."
+    },
+    "plainAlertTitle": "Keys are saved in a file that is not encrypted",
+    "plainNote": {
+      "afterWords": " Anything that can read your files, such as a backup or another program running as you, can read them. On a Mac, restart with ",
+      "afterKeychain": "; on Windows or a Linux desktop, ",
+      "afterKeyring": ". Otherwise restart with ",
+      "afterPassphrase": " set. The daemon does not reuse a plain file once a passphrase is set, so move the old file away and add the keys again."
+    },
+    "savedKeyNeverShown": "A saved key is never shown again."
+  },
+  "library": {
+    "read": "Reads the files it made in the library",
+    "readAll": "Reads every file in the library",
+    "write": "Saves new files to the library",
+    "full": "Reads, saves and removes files in the library"
+  },
+  "permissions": {
+    "networkAny": "Connects to any website",
+    "network": "Connects to {list}",
+    "networkMore": "Connects to {list} and {count} more",
+    "local": "Connects to services on this computer or network: {list}",
+    "localMore": "Connects to services on this computer or network: {list} and {count} more",
+    "spawn": "Runs programs on this computer: {list}",
+    "spawnMore": "Runs programs on this computer: {list} and {count} more",
+    "userHome": "Programs it runs can read and write your home folder",
+    "llm": "Asks a language model through the daemon",
+    "tools": "Calls other tools: {list}",
+    "toolsMore": "Calls other tools: {list} and {count} more",
+    "none": "No network, programs or files: it works on what you pass it"
+  },
+  "state": {
+    "off": "Off",
+    "on": "On",
+    "needsReview": "Needs review",
+    "invalid": "Invalid",
+    "failedLoad": "Failed to load"
+  }
+}

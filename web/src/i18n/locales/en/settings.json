@@ -1,0 +1,57 @@
+{
+  "language": {
+    "label": "Language",
+    "help": "For the dashboard and the desktop app's menu."
+  },
+  "title": "Settings",
+  "description": "Your endpoint, how the dashboard looks, and how this server is set up.",
+  "endpoint": {
+    "title": "Endpoint",
+    "connect": "Connect a client",
+    "label": "MCP endpoint for all tools",
+    "hintBefore": "Agents connect here. To give an agent fewer tools, make a profile on the ",
+    "hintLink": "What agents see",
+    "hintAfter": " page."
+  },
+  "appearance": {
+    "title": "Appearance"
+  },
+  "theme": {
+    "label": "Theme",
+    "help": "System follows your computer's light or dark setting.",
+    "system": "System",
+    "light": "Light",
+    "dark": "Dark"
+  },
+  "server": {
+    "title": "This server",
+    "refresh": "Refresh",
+    "version": "Version",
+    "listeningOn": "Listening on",
+    "localOnly": "This computer only",
+    "network": "Reachable from your network",
+    "accessKey": "Access key",
+    "keySet": "Set, agents must send it",
+    "keyNotNeeded": "Not needed (only this computer can connect)",
+    "keyNotSet": "Not set",
+    "dataFolder": "Data folder",
+    "dataFolderPath": "Data folder path",
+    "notReported": "Not reported",
+    "providerKeys": "Provider keys",
+    "runningFor": "Running for",
+    "nodejs": "Node.js",
+    "danger": "Anyone on your network can use this server. Set PLUGHIVE_ACCESS_KEY and restart it."
+  },
+  "help": {
+    "title": "Help",
+    "mcp": "What MCP is and how agents use it",
+    "connectClaude": "Connecting an MCP server to Claude Desktop",
+    "health": "Health check",
+    "healthNote": "(plain status, for scripts and monitoring)"
+  },
+  "session": {
+    "title": "Session",
+    "hint": "Signing out ends this browser's session. Open the sign-in link from the terminal again to come back.",
+    "signOut": "Sign out"
+  }
+}

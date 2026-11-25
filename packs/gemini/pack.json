@@ -1,0 +1,21 @@
+{
+  "id": "gemini",
+  "name": "Google Gemini",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Image, video, speech, music, transcription and chat through the Google Gemini API (Interactions API) with your own key.",
+  "secrets": [
+    {
+      "name": "GEMINI_API_KEY",
+      "label": "Gemini API key",
+      "helpUrl": "https://aistudio.google.com/apikey",
+      "required": true
+    }
+  ],
+  "permissions": {
+    "network": ["generativelanguage.googleapis.com"],
+    "library": "full"
+  },
+  "skills": "skills"
+}

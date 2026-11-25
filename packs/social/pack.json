@@ -1,0 +1,26 @@
+{
+  "id": "social",
+  "name": "Social posting (Ayrshare)",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Publish or schedule posts to X, LinkedIn, Instagram, Facebook, TikTok, Threads, Bluesky and more through Ayrshare; delete them and read the post history.",
+  "secrets": [
+    {
+      "name": "AYRSHARE_API_KEY",
+      "label": "Ayrshare API key",
+      "helpUrl": "https://app.ayrshare.com/api-key",
+      "required": true
+    },
+    {
+      "name": "AYRSHARE_PROFILE_KEY",
+      "label": "Ayrshare profile key (optional, Business plan user profiles)",
+      "helpUrl": "https://www.ayrshare.com/docs/apis/profiles/overview",
+      "required": false
+    }
+  ],
+  "permissions": {
+    "network": ["api.ayrshare.com"]
+  },
+  "skills": "skills"
+}

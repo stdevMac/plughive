@@ -1,0 +1,561 @@
+{
+  "url": "https://replicate.com/topazlabs/video-upscale",
+  "owner": "topazlabs",
+  "name": "video-upscale",
+  "description": "",
+  "visibility": "public",
+  "is_official": true,
+  "run_count": 1,
+  "default_example": null,
+  "latest_version": {
+    "id": "cb2f27b054ed939092a638d96afa31639e6793de51c1e3fbdd90d0e4c3b0d67f",
+    "created_at": "2025-01-01T00:00:00Z",
+    "cog_version": "0.0.0",
+    "openapi_schema": {
+      "info": {
+        "title": "Cog",
+        "version": "0.22.0"
+      },
+      "paths": {
+        "/": {
+          "get": {
+            "summary": "Root",
+            "responses": {
+              "200": {
+                "content": {
+                  "application/json": {
+                    "schema": {}
+                  }
+                },
+                "description": "Successful Response"
+              }
+            },
+            "operationId": "root__get"
+          }
+        },
+        "/predictions": {
+          "post": {
+            "summary": "Predict",
+            "responses": {
+              "200": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "title": "PredictionResponse",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "title": "Id"
+                        },
+                        "logs": {
+                          "type": "string",
+                          "title": "Logs"
+                        },
+                        "error": {
+                          "type": "string",
+                          "title": "Error"
+                        },
+                        "input": {
+                          "type": "object",
+                          "title": "Input",
+                          "required": ["video"],
+                          "properties": {
+                            "video": {
+                              "type": "string",
+                              "title": "Video",
+                              "format": "uri",
+                              "x-order": 0,
+                              "description": "Video file to upscale"
+                            },
+                            "target_fps": {
+                              "type": "integer",
+                              "title": "Target Fps",
+                              "default": 30,
+                              "maximum": 60,
+                              "minimum": 15,
+                              "x-order": 2,
+                              "description": "Target FPS (choose from 15-60fps)"
+                            },
+                            "target_resolution": {
+                              "enum": ["720p", "1080p", "4k"],
+                              "type": "string",
+                              "title": "target_resolution",
+                              "description": "Target resolution",
+                              "default": "1080p",
+                              "x-order": 1
+                            }
+                          }
+                        },
+                        "output": {
+                          "type": "string",
+                          "title": "Output",
+                          "format": "uri"
+                        },
+                        "status": {
+                          "type": "string",
+                          "title": "Status"
+                        },
+                        "metrics": {
+                          "type": "object",
+                          "title": "Metrics"
+                        },
+                        "version": {
+                          "type": "string",
+                          "title": "Version"
+                        },
+                        "created_at": {
+                          "type": "string",
+                          "title": "Created At",
+                          "format": "date-time"
+                        },
+                        "started_at": {
+                          "type": "string",
+                          "title": "Started At",
+                          "format": "date-time"
+                        },
+                        "completed_at": {
+                          "type": "string",
+                          "title": "Completed At",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                },
+                "description": "Successful Response"
+              },
+              "422": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "title": "HTTPValidationError",
+                      "properties": {
+                        "detail": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "title": "ValidationError",
+                            "required": ["loc", "msg", "type"],
+                            "properties": {
+                              "loc": {
+                                "type": "array",
+                                "items": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "integer"
+                                    }
+                                  ]
+                                },
+                                "title": "Location"
+                              },
+                              "msg": {
+                                "type": "string",
+                                "title": "Message"
+                              },
+                              "type": {
+                                "type": "string",
+                                "title": "Error Type"
+                              }
+                            }
+                          },
+                          "title": "Detail"
+                        }
+                      }
+                    }
+                  }
+                },
+                "description": "Validation Error"
+              }
+            },
+            "description": "Run a single prediction on the model",
+            "operationId": "predict_predictions_post",
+            "requestBody": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "title": "PredictionRequest",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "title": "Id"
+                      },
+                      "input": {
+                        "type": "object",
+                        "title": "Input",
+                        "required": ["video"],
+                        "properties": {
+                          "video": {
+                            "type": "string",
+                            "title": "Video",
+                            "format": "uri",
+                            "x-order": 0,
+                            "description": "Video file to upscale"
+                          },
+                          "target_fps": {
+                            "type": "integer",
+                            "title": "Target Fps",
+                            "default": 30,
+                            "maximum": 60,
+                            "minimum": 15,
+                            "x-order": 2,
+                            "description": "Target FPS (choose from 15-60fps)"
+                          },
+                          "target_resolution": {
+                            "enum": ["720p", "1080p", "4k"],
+                            "type": "string",
+                            "title": "target_resolution",
+                            "description": "Target resolution",
+                            "default": "1080p",
+                            "x-order": 1
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "/health-check": {
+          "get": {
+            "summary": "Healthcheck",
+            "responses": {
+              "200": {
+                "content": {
+                  "application/json": {
+                    "schema": {}
+                  }
+                },
+                "description": "Successful Response"
+              }
+            },
+            "operationId": "healthcheck_health_check_get"
+          }
+        },
+        "/predictions/{prediction_id}/cancel": {
+          "post": {
+            "summary": "Cancel",
+            "responses": {
+              "200": {
+                "content": {
+                  "application/json": {
+                    "schema": {}
+                  }
+                },
+                "description": "Successful Response"
+              },
+              "422": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "title": "HTTPValidationError",
+                      "properties": {
+                        "detail": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "title": "ValidationError",
+                            "required": ["loc", "msg", "type"],
+                            "properties": {
+                              "loc": {
+                                "type": "array",
+                                "items": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "integer"
+                                    }
+                                  ]
+                                },
+                                "title": "Location"
+                              },
+                              "msg": {
+                                "type": "string",
+                                "title": "Message"
+                              },
+                              "type": {
+                                "type": "string",
+                                "title": "Error Type"
+                              }
+                            }
+                          },
+                          "title": "Detail"
+                        }
+                      }
+                    }
+                  }
+                },
+                "description": "Validation Error"
+              }
+            },
+            "parameters": [
+              {
+                "in": "path",
+                "name": "prediction_id",
+                "schema": {
+                  "type": "string",
+                  "title": "Prediction Id"
+                },
+                "required": true
+              }
+            ],
+            "operationId": "cancel_predictions__prediction_id__cancel_post"
+          }
+        }
+      },
+      "openapi": "3.0.2",
+      "components": {
+        "schemas": {
+          "Input": {
+            "type": "object",
+            "title": "Input",
+            "required": ["video"],
+            "properties": {
+              "video": {
+                "type": "string",
+                "title": "Video",
+                "format": "uri",
+                "x-order": 0,
+                "description": "Video file to upscale"
+              },
+              "target_fps": {
+                "type": "integer",
+                "title": "Target Fps",
+                "default": 30,
+                "maximum": 60,
+                "minimum": 15,
+                "x-order": 2,
+                "description": "Target FPS (choose from 15-60fps)"
+              },
+              "target_resolution": {
+                "enum": ["720p", "1080p", "4k"],
+                "type": "string",
+                "title": "target_resolution",
+                "description": "Target resolution",
+                "default": "1080p",
+                "x-order": 1
+              }
+            }
+          },
+          "Output": {
+            "type": "string",
+            "title": "Output",
+            "format": "uri"
+          },
+          "Status": {
+            "enum": ["starting", "processing", "succeeded", "canceled", "failed"],
+            "type": "string",
+            "title": "Status",
+            "description": "An enumeration."
+          },
+          "ValidationError": {
+            "type": "object",
+            "title": "ValidationError",
+            "required": ["loc", "msg", "type"],
+            "properties": {
+              "loc": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer"
+                    }
+                  ]
+                },
+                "title": "Location"
+              },
+              "msg": {
+                "type": "string",
+                "title": "Message"
+              },
+              "type": {
+                "type": "string",
+                "title": "Error Type"
+              }
+            }
+          },
+          "PredictionRequest": {
+            "type": "object",
+            "title": "PredictionRequest",
+            "properties": {
+              "id": {
+                "type": "string",
+                "title": "Id"
+              },
+              "input": {
+                "type": "object",
+                "title": "Input",
+                "required": ["video"],
+                "properties": {
+                  "video": {
+                    "type": "string",
+                    "title": "Video",
+                    "format": "uri",
+                    "x-order": 0,
+                    "description": "Video file to upscale"
+                  },
+                  "target_fps": {
+                    "type": "integer",
+                    "title": "Target Fps",
+                    "default": 30,
+                    "maximum": 60,
+                    "minimum": 15,
+                    "x-order": 2,
+                    "description": "Target FPS (choose from 15-60fps)"
+                  },
+                  "target_resolution": {
+                    "enum": ["720p", "1080p", "4k"],
+                    "type": "string",
+                    "title": "target_resolution",
+                    "description": "Target resolution",
+                    "default": "1080p",
+                    "x-order": 1
+                  }
+                }
+              }
+            }
+          },
+          "target_resolution": {
+            "enum": ["720p", "1080p", "4k"],
+            "type": "string",
+            "title": "target_resolution",
+            "description": "An enumeration."
+          },
+          "PredictionResponse": {
+            "type": "object",
+            "title": "PredictionResponse",
+            "properties": {
+              "id": {
+                "type": "string",
+                "title": "Id"
+              },
+              "logs": {
+                "type": "string",
+                "title": "Logs"
+              },
+              "error": {
+                "type": "string",
+                "title": "Error"
+              },
+              "input": {
+                "type": "object",
+                "title": "Input",
+                "required": ["video"],
+                "properties": {
+                  "video": {
+                    "type": "string",
+                    "title": "Video",
+                    "format": "uri",
+                    "x-order": 0,
+                    "description": "Video file to upscale"
+                  },
+                  "target_fps": {
+                    "type": "integer",
+                    "title": "Target Fps",
+                    "default": 30,
+                    "maximum": 60,
+                    "minimum": 15,
+                    "x-order": 2,
+                    "description": "Target FPS (choose from 15-60fps)"
+                  },
+                  "target_resolution": {
+                    "enum": ["720p", "1080p", "4k"],
+                    "type": "string",
+                    "title": "target_resolution",
+                    "description": "Target resolution",
+                    "default": "1080p",
+                    "x-order": 1
+                  }
+                }
+              },
+              "output": {
+                "type": "string",
+                "title": "Output",
+                "format": "uri"
+              },
+              "status": {
+                "type": "string",
+                "title": "Status"
+              },
+              "metrics": {
+                "type": "object",
+                "title": "Metrics"
+              },
+              "version": {
+                "type": "string",
+                "title": "Version"
+              },
+              "created_at": {
+                "type": "string",
+                "title": "Created At",
+                "format": "date-time"
+              },
+              "started_at": {
+                "type": "string",
+                "title": "Started At",
+                "format": "date-time"
+              },
+              "completed_at": {
+                "type": "string",
+                "title": "Completed At",
+                "format": "date-time"
+              }
+            }
+          },
+          "HTTPValidationError": {
+            "type": "object",
+            "title": "HTTPValidationError",
+            "properties": {
+              "detail": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "title": "ValidationError",
+                  "required": ["loc", "msg", "type"],
+                  "properties": {
+                    "loc": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "integer"
+                          }
+                        ]
+                      },
+                      "title": "Location"
+                    },
+                    "msg": {
+                      "type": "string",
+                      "title": "Message"
+                    },
+                    "type": {
+                      "type": "string",
+                      "title": "Error Type"
+                    }
+                  }
+                },
+                "title": "Detail"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

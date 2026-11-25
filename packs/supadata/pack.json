@@ -1,0 +1,20 @@
+{
+  "id": "supadata",
+  "name": "Supadata transcripts",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Transcripts of YouTube, TikTok, X, Instagram and Facebook videos and media file URLs through Supadata with your own key (get_media_transcript).",
+  "secrets": [
+    {
+      "name": "SUPADATA_API_KEY",
+      "label": "Supadata API key",
+      "helpUrl": "https://dash.supadata.ai",
+      "required": true
+    }
+  ],
+  "permissions": {
+    "network": ["api.supadata.ai"]
+  },
+  "skills": "skills"
+}

@@ -1,0 +1,93 @@
+{
+  "title": "Library",
+  "header": {
+    "title": "Library",
+    "description": "Files the tools have made: images, video, audio and documents, kept on this computer."
+  },
+  "filter": {
+    "label": "Show",
+    "all": "All",
+    "image": "Images",
+    "video": "Video",
+    "audio": "Audio",
+    "document": "Documents"
+  },
+  "filesCount": {
+    "one": "{count} file",
+    "other": "{count} files"
+  },
+  "kind": {
+    "image": "Image",
+    "video": "Video",
+    "audio": "Audio",
+    "pdf": "PDF",
+    "document": "Document",
+    "data": "Data",
+    "file": "File"
+  },
+  "tile": {
+    "fromTool": "{kind} from {source}",
+    "madeAt": "{kind} · {time}",
+    "ariaLabel": "{kind}: {label}, {time}"
+  },
+  "list": {
+    "ariaLabel": "Files, newest first"
+  },
+  "empty": {
+    "all": "No files yet",
+    "images": "No images yet",
+    "video": "No video yet",
+    "audio": "No audio yet",
+    "documents": "No documents yet",
+    "body": "Every image, video, sound or document a tool makes is saved here, whether you ran it in the playground or your agent did.",
+    "openPlayground": "Open the playground",
+    "showAll": "Show all files"
+  },
+  "showMore": "Show more",
+  "loadMoreFailed": "More files could not be loaded. {error}",
+  "lightbox": {
+    "position": "{index} of {total}",
+    "deleted": "File deleted.",
+    "deleteFailed": "The file could not be deleted. {error}",
+    "delete": "Delete",
+    "copyLink": "Copy link",
+    "download": "Download",
+    "previous": "Previous file (Left arrow)",
+    "next": "Next file (Right arrow)"
+  },
+  "copy": {
+    "fileLink": "file link",
+    "fileId": "file id"
+  },
+  "deleteDialog": {
+    "title": "Delete this file?",
+    "body": "The {kind} is removed from this computer and from the library. Links to it stop working, and jobs that made it keep their record but can no longer show it. This cannot be undone.",
+    "keep": "Keep it",
+    "confirm": "Delete file"
+  },
+  "meta": {
+    "madeBy": "Made by",
+    "unknown": "Unknown",
+    "model": "Model",
+    "size": "Size",
+    "cost": "Cost",
+    "id": "Id"
+  },
+  "media": {
+    "cannotShow": "This file cannot be shown here.",
+    "openIt": "Open it",
+    "altResult": "Result: {label}",
+    "altImage": "Result image"
+  },
+  "result": {
+    "finishedIn": "Finished in {duration}",
+    "openFile": "Open file",
+    "copyLink": "Copy link",
+    "savedTo": "Saved to the Library. ",
+    "openLibrary": "Open the Library",
+    "fullResult": "Full result"
+  },
+  "json": {
+    "defaultLabel": "Result as JSON"
+  }
+}

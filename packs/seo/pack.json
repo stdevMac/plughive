@@ -1,0 +1,26 @@
+{
+  "id": "seo",
+  "name": "SEO (DataForSEO)",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Google SERP, keyword volume, keywords for a site, backlinks and on-page audits through DataForSEO.",
+  "secrets": [
+    {
+      "name": "DATAFORSEO_LOGIN",
+      "label": "DataForSEO API login",
+      "helpUrl": "https://app.dataforseo.com/api-access",
+      "required": true
+    },
+    {
+      "name": "DATAFORSEO_PASSWORD",
+      "label": "DataForSEO API password",
+      "helpUrl": "https://app.dataforseo.com/api-access",
+      "required": true
+    }
+  ],
+  "permissions": {
+    "network": ["api.dataforseo.com"]
+  },
+  "skills": "skills"
+}

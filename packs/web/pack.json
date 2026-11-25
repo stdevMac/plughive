@@ -1,0 +1,32 @@
+{
+  "id": "web",
+  "name": "Web (Firecrawl and screenshots)",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Scrape, search, map and crawl the web through Firecrawl, and capture screenshots with a local headless browser.",
+  "secrets": [
+    {
+      "name": "FIRECRAWL_API_KEY",
+      "label": "Firecrawl API key",
+      "helpUrl": "https://www.firecrawl.dev/app/api-keys",
+      "required": false
+    }
+  ],
+  "permissions": {
+    "network": ["api.firecrawl.dev"],
+    "library": "write"
+  },
+  "settings": {
+    "type": "object",
+    "properties": {
+      "allowLocalUrls": {
+        "type": "boolean",
+        "title": "Allow local URLs in screenshot_url",
+        "description": "Let screenshot_url open loopback and private-network addresses (for example a dev server on localhost). Only a page you ask for by a local address may load local resources; a public page never can. Link-local, cloud metadata, other reserved ranges and the daemon itself stay blocked.",
+        "default": false
+      }
+    }
+  },
+  "skills": "skills"
+}

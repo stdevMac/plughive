@@ -1,0 +1,132 @@
+{
+  "groups": {
+    "images": "Images",
+    "video": "Video",
+    "audio": "Audio and voice",
+    "text": "Text and language",
+    "documents": "Documents",
+    "web": "Web",
+    "other": "Other"
+  },
+  "labels": {
+    "imageGenerate": { "title": "Make images", "blurb": "Pictures from a description" },
+    "imageEdit": { "title": "Edit images", "blurb": "Change a picture from an instruction" },
+    "imageUpscale": { "title": "Upscale images", "blurb": "Bigger, sharper pictures" },
+    "imageRemoveBackground": { "title": "Remove backgrounds", "blurb": "Cut out the subject" },
+    "3dGenerate": { "title": "Make 3D models", "blurb": "Models from text or a picture" },
+    "videoGenerate": { "title": "Make videos", "blurb": "Clips from a description or a picture" },
+    "videoUpscale": { "title": "Upscale videos", "blurb": "Higher-resolution clips" },
+    "videoLipsync": { "title": "Lip sync", "blurb": "A face speaks a new audio track" },
+    "mediaTranscript": {
+      "title": "Video transcripts",
+      "blurb": "What a video or podcast link says"
+    },
+    "speechGenerate": { "title": "Read text aloud", "blurb": "Natural speech from text" },
+    "musicGenerate": { "title": "Make music", "blurb": "Songs and sound beds" },
+    "audioTranscribe": { "title": "Transcribe audio", "blurb": "Recorded speech as text" },
+    "audioSeparateStems": {
+      "title": "Split a song",
+      "blurb": "Vocals, drums, bass and the rest apart"
+    },
+    "voiceClone": { "title": "Clone a voice", "blurb": "A reusable voice from samples" },
+    "soundEffect": { "title": "Sound effects", "blurb": "Sounds from a description" },
+    "chat": { "title": "Language model", "blurb": "Packs that ask a model to write or answer" },
+    "textTranslate": { "title": "Translate", "blurb": "Text in another language" },
+    "textEmbed": { "title": "Embeddings", "blurb": "Text as vectors, for search and memory" },
+    "textRerank": { "title": "Rerank", "blurb": "Order results by relevance" },
+    "documentParse": { "title": "Read documents", "blurb": "Text out of PDFs and scans" },
+    "documentConvert": {
+      "title": "Convert documents",
+      "blurb": "PDF, Word, HTML, Markdown and more"
+    },
+    "webSearch": { "title": "Search the web", "blurb": "Find pages on the web" },
+    "webFetch": { "title": "Read web pages", "blurb": "A page as clean text" }
+  },
+  "cost": {
+    "local": "Free, on this computer",
+    "account": "Uses your own account",
+    "paid": "Paid per use"
+  },
+  "badge": {
+    "paid": "Paid",
+    "account": "Your account",
+    "free": "Free"
+  },
+  "skip": {
+    "notInstalled": "Not installed or not running",
+    "notSetup": "Not set up",
+    "needsKey": "Needs a key",
+    "rateLimited": "Rate limited, back {when}",
+    "namedOnly": "Only when asked for by name"
+  },
+  "setup": {
+    "install": "Install",
+    "addKey": "Add key",
+    "setUp": "Set up"
+  },
+  "row": {
+    "uses": "Uses ",
+    "noService": "No service",
+    "nothingSetUp": "Nothing set up",
+    "moved": "{label} is now number {position} of {total} for {capability}.",
+    "usedNow": "Used now",
+    "moveUp": "Move {provider} up for {capability}",
+    "moveDown": "Move {provider} down for {capability}",
+    "listLabel": "Services for {capability}, first is tried first"
+  },
+  "panel": {
+    "emptyTitle": "No service offers this yet",
+    "emptyBefore": "Turn on a pack that can {capability} on the ",
+    "emptyLink": "Keys & packs",
+    "emptyAfter": " page.",
+    "hintSetup": "To {capability}, set up one of these.",
+    "hintFree": " {provider} is free and runs on this computer.",
+    "fallbackOrder": "Tried from the top. If one is busy or down, the next takes over before anything is charged.",
+    "resetOrder": "Use the default order",
+    "resetSaid": "{capability} uses the default order again."
+  },
+  "page": {
+    "title": "Preferred services",
+    "description": "Which service does each job. Free services on this computer can go first; paid ones take over when they are missing or busy.",
+    "freeFirst": "Free and local first",
+    "resetAll": "Reset all",
+    "ofTotal": " of {total}",
+    "jobsReady": "jobs ready",
+    "runFree": "run free",
+    "needSetup": "need setup",
+    "show": "Show",
+    "filterAll": "All",
+    "filterSetup": "Needs setup",
+    "filterPaid": "Paid",
+    "filterFree": "Free",
+    "searchLabel": "Search jobs and services",
+    "searchPlaceholder": "Search",
+    "noMatchTitle": "Nothing matches",
+    "showEverything": "Show everything",
+    "backToOrder": "{capability} is back to the order it had.",
+    "earlierOrderBack": "The earlier order is back."
+  },
+  "preset": {
+    "freeAlready": "Free services already come first everywhere.",
+    "defaultAlready": "Every job already uses the default order.",
+    "freeApplied": {
+      "one": "Free services now come first for {count} job.",
+      "other": "Free services now come first for {count} jobs."
+    },
+    "defaultApplied": {
+      "one": "{count} job uses the default order again.",
+      "other": "{count} jobs use the default order again."
+    }
+  },
+  "composer": {
+    "contextShare": {
+      "about": "about {pct}% of a {contextK}k context",
+      "lessThanOne": "less than 1% of a {contextK}k context"
+    },
+    "threshold": {
+      "enterNumber": "Enter a number.",
+      "wholeNumber": "Use a whole number, like 8000.",
+      "atLeastOne": "Use a number of at least 1."
+    }
+  }
+}

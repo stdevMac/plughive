@@ -1,0 +1,39 @@
+# Secrets and local state never enter the build context, at any depth.
+**/.env
+**/.env.*
+!**/.env.example
+**/*.pem
+**/*.key
+**/*.p12
+**/secrets.json
+**/admin-token
+**/.npmrc
+# docker-compose.yml reads its secrets from here; they are mounted, never built in.
+secrets
+
+# Version control and tooling
+.git
+.github
+.claude
+.vscode
+.idea
+
+# Dependencies and build output: the image installs and builds its own.
+node_modules
+**/node_modules
+dist
+web/dist
+coverage
+
+# Not part of the daemon
+app
+docs
+examples
+tests
+plugin
+**/e2e-screenshots
+**/screenshots
+**/test-results
+**/playwright-report
+*.log
+.DS_Store

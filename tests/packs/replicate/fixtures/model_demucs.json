@@ -1,0 +1,891 @@
+{
+  "url": "https://replicate.com/ryan5453/demucs",
+  "owner": "ryan5453",
+  "name": "demucs",
+  "description": "",
+  "visibility": "public",
+  "is_official": false,
+  "run_count": 1,
+  "default_example": null,
+  "latest_version": {
+    "id": "ff5ad47d2685b27c0f820ee134c4394140804f08fa755cb20c846459faa4b337",
+    "created_at": "2025-01-01T00:00:00Z",
+    "cog_version": "0.0.0",
+    "openapi_schema": {
+      "info": {
+        "title": "Cog",
+        "version": "0.1.0"
+      },
+      "paths": {
+        "/": {
+          "get": {
+            "summary": "Root",
+            "responses": {
+              "200": {
+                "content": {
+                  "application/json": {
+                    "schema": {}
+                  }
+                },
+                "description": "Successful Response"
+              }
+            },
+            "operationId": "root__get"
+          }
+        },
+        "/predictions": {
+          "post": {
+            "summary": "Predict",
+            "responses": {
+              "200": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "title": "PredictionResponse",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "title": "Id"
+                        },
+                        "logs": {
+                          "type": "string",
+                          "title": "Logs"
+                        },
+                        "error": {
+                          "type": "string",
+                          "title": "Error"
+                        },
+                        "input": {
+                          "type": "object",
+                          "title": "Input",
+                          "required": ["audio"],
+                          "properties": {
+                            "seed": {
+                              "type": "integer",
+                              "title": "Seed",
+                              "default": -1,
+                              "x-order": 6,
+                              "description": "Seed for the random shifts, for reproducible output; -1 for random"
+                            },
+                            "audio": {
+                              "type": "string",
+                              "title": "Audio",
+                              "format": "uri",
+                              "x-order": 0,
+                              "description": "The audio file to separate"
+                            },
+                            "model": {
+                              "enum": ["htdemucs"],
+                              "type": "string",
+                              "title": "model",
+                              "description": "Model to use for separation (this deployment serves htdemucs)",
+                              "default": "htdemucs",
+                              "x-order": 1
+                            },
+                            "format": {
+                              "type": "string",
+                              "title": "Format",
+                              "default": "wav",
+                              "x-order": 2,
+                              "description": "Output audio format, anything supported by FFmpeg"
+                            },
+                            "shifts": {
+                              "type": "integer",
+                              "title": "Shifts",
+                              "default": 1,
+                              "maximum": 20,
+                              "minimum": 0,
+                              "x-order": 4,
+                              "description": "Random time shifts to average; more is slower and slightly better. 0 disables them"
+                            },
+                            "clip_mode": {
+                              "enum": ["none", "rescale", "clamp", "tanh"],
+                              "type": "string",
+                              "title": "clip_mode",
+                              "description": "How to keep output within [-1, 1]; \"none\" leaves it unchanged",
+                              "default": "rescale",
+                              "x-order": 7
+                            },
+                            "isolate_stem": {
+                              "enum": ["none", "drums", "bass", "other", "vocals"],
+                              "type": "string",
+                              "title": "isolate_stem",
+                              "description": "Only creates a {stem} and no_{stem} stem/file",
+                              "default": "none",
+                              "x-order": 3
+                            },
+                            "split_overlap": {
+                              "type": "number",
+                              "title": "Split Overlap",
+                              "default": 0.25,
+                              "maximum": 0.99,
+                              "minimum": 0,
+                              "x-order": 5,
+                              "description": "Overlap between segments; higher values improve quality at segment boundaries"
+                            }
+                          }
+                        },
+                        "output": {
+                          "type": "object",
+                          "title": "Output",
+                          "properties": {
+                            "bass": {
+                              "type": "string",
+                              "title": "Bass",
+                              "format": "uri"
+                            },
+                            "drums": {
+                              "type": "string",
+                              "title": "Drums",
+                              "format": "uri"
+                            },
+                            "other": {
+                              "type": "string",
+                              "title": "Other",
+                              "format": "uri"
+                            },
+                            "vocals": {
+                              "type": "string",
+                              "title": "Vocals",
+                              "format": "uri"
+                            },
+                            "no_bass": {
+                              "type": "string",
+                              "title": "No Bass",
+                              "format": "uri"
+                            },
+                            "no_drums": {
+                              "type": "string",
+                              "title": "No Drums",
+                              "format": "uri"
+                            },
+                            "no_other": {
+                              "type": "string",
+                              "title": "No Other",
+                              "format": "uri"
+                            },
+                            "no_vocals": {
+                              "type": "string",
+                              "title": "No Vocals",
+                              "format": "uri"
+                            }
+                          }
+                        },
+                        "status": {
+                          "type": "string",
+                          "title": "Status"
+                        },
+                        "metrics": {
+                          "type": "object",
+                          "title": "Metrics"
+                        },
+                        "version": {
+                          "type": "string",
+                          "title": "Version"
+                        },
+                        "created_at": {
+                          "type": "string",
+                          "title": "Created At",
+                          "format": "date-time"
+                        },
+                        "started_at": {
+                          "type": "string",
+                          "title": "Started At",
+                          "format": "date-time"
+                        },
+                        "completed_at": {
+                          "type": "string",
+                          "title": "Completed At",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                },
+                "description": "Successful Response"
+              },
+              "422": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "title": "HTTPValidationError",
+                      "properties": {
+                        "detail": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "title": "ValidationError",
+                            "required": ["loc", "msg", "type"],
+                            "properties": {
+                              "loc": {
+                                "type": "array",
+                                "items": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "integer"
+                                    }
+                                  ]
+                                },
+                                "title": "Location"
+                              },
+                              "msg": {
+                                "type": "string",
+                                "title": "Message"
+                              },
+                              "type": {
+                                "type": "string",
+                                "title": "Error Type"
+                              }
+                            }
+                          },
+                          "title": "Detail"
+                        }
+                      }
+                    }
+                  }
+                },
+                "description": "Validation Error"
+              }
+            },
+            "description": "Run a single prediction on the model",
+            "operationId": "predict_predictions_post",
+            "requestBody": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "title": "PredictionRequest",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "title": "Id"
+                      },
+                      "input": {
+                        "type": "object",
+                        "title": "Input",
+                        "required": ["audio"],
+                        "properties": {
+                          "seed": {
+                            "type": "integer",
+                            "title": "Seed",
+                            "default": -1,
+                            "x-order": 6,
+                            "description": "Seed for the random shifts, for reproducible output; -1 for random"
+                          },
+                          "audio": {
+                            "type": "string",
+                            "title": "Audio",
+                            "format": "uri",
+                            "x-order": 0,
+                            "description": "The audio file to separate"
+                          },
+                          "model": {
+                            "enum": ["htdemucs"],
+                            "type": "string",
+                            "title": "model",
+                            "description": "Model to use for separation (this deployment serves htdemucs)",
+                            "default": "htdemucs",
+                            "x-order": 1
+                          },
+                          "format": {
+                            "type": "string",
+                            "title": "Format",
+                            "default": "wav",
+                            "x-order": 2,
+                            "description": "Output audio format, anything supported by FFmpeg"
+                          },
+                          "shifts": {
+                            "type": "integer",
+                            "title": "Shifts",
+                            "default": 1,
+                            "maximum": 20,
+                            "minimum": 0,
+                            "x-order": 4,
+                            "description": "Random time shifts to average; more is slower and slightly better. 0 disables them"
+                          },
+                          "clip_mode": {
+                            "enum": ["none", "rescale", "clamp", "tanh"],
+                            "type": "string",
+                            "title": "clip_mode",
+                            "description": "How to keep output within [-1, 1]; \"none\" leaves it unchanged",
+                            "default": "rescale",
+                            "x-order": 7
+                          },
+                          "isolate_stem": {
+                            "enum": ["none", "drums", "bass", "other", "vocals"],
+                            "type": "string",
+                            "title": "isolate_stem",
+                            "description": "Only creates a {stem} and no_{stem} stem/file",
+                            "default": "none",
+                            "x-order": 3
+                          },
+                          "split_overlap": {
+                            "type": "number",
+                            "title": "Split Overlap",
+                            "default": 0.25,
+                            "maximum": 0.99,
+                            "minimum": 0,
+                            "x-order": 5,
+                            "description": "Overlap between segments; higher values improve quality at segment boundaries"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "/health-check": {
+          "get": {
+            "summary": "Healthcheck",
+            "responses": {
+              "200": {
+                "content": {
+                  "application/json": {
+                    "schema": {}
+                  }
+                },
+                "description": "Successful Response"
+              }
+            },
+            "operationId": "healthcheck_health_check_get"
+          }
+        },
+        "/predictions/{prediction_id}/cancel": {
+          "post": {
+            "summary": "Cancel",
+            "responses": {
+              "200": {
+                "content": {
+                  "application/json": {
+                    "schema": {}
+                  }
+                },
+                "description": "Successful Response"
+              },
+              "422": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "title": "HTTPValidationError",
+                      "properties": {
+                        "detail": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "title": "ValidationError",
+                            "required": ["loc", "msg", "type"],
+                            "properties": {
+                              "loc": {
+                                "type": "array",
+                                "items": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "integer"
+                                    }
+                                  ]
+                                },
+                                "title": "Location"
+                              },
+                              "msg": {
+                                "type": "string",
+                                "title": "Message"
+                              },
+                              "type": {
+                                "type": "string",
+                                "title": "Error Type"
+                              }
+                            }
+                          },
+                          "title": "Detail"
+                        }
+                      }
+                    }
+                  }
+                },
+                "description": "Validation Error"
+              }
+            },
+            "parameters": [
+              {
+                "in": "path",
+                "name": "prediction_id",
+                "schema": {
+                  "type": "string",
+                  "title": "Prediction Id"
+                },
+                "required": true
+              }
+            ],
+            "operationId": "cancel_predictions__prediction_id__cancel_post"
+          }
+        }
+      },
+      "openapi": "3.0.2",
+      "components": {
+        "schemas": {
+          "Input": {
+            "type": "object",
+            "title": "Input",
+            "required": ["audio"],
+            "properties": {
+              "seed": {
+                "type": "integer",
+                "title": "Seed",
+                "default": -1,
+                "x-order": 6,
+                "description": "Seed for the random shifts, for reproducible output; -1 for random"
+              },
+              "audio": {
+                "type": "string",
+                "title": "Audio",
+                "format": "uri",
+                "x-order": 0,
+                "description": "The audio file to separate"
+              },
+              "model": {
+                "enum": ["htdemucs"],
+                "type": "string",
+                "title": "model",
+                "description": "Model to use for separation (this deployment serves htdemucs)",
+                "default": "htdemucs",
+                "x-order": 1
+              },
+              "format": {
+                "type": "string",
+                "title": "Format",
+                "default": "wav",
+                "x-order": 2,
+                "description": "Output audio format, anything supported by FFmpeg"
+              },
+              "shifts": {
+                "type": "integer",
+                "title": "Shifts",
+                "default": 1,
+                "maximum": 20,
+                "minimum": 0,
+                "x-order": 4,
+                "description": "Random time shifts to average; more is slower and slightly better. 0 disables them"
+              },
+              "clip_mode": {
+                "enum": ["none", "rescale", "clamp", "tanh"],
+                "type": "string",
+                "title": "clip_mode",
+                "description": "How to keep output within [-1, 1]; \"none\" leaves it unchanged",
+                "default": "rescale",
+                "x-order": 7
+              },
+              "isolate_stem": {
+                "enum": ["none", "drums", "bass", "other", "vocals"],
+                "type": "string",
+                "title": "isolate_stem",
+                "description": "Only creates a {stem} and no_{stem} stem/file",
+                "default": "none",
+                "x-order": 3
+              },
+              "split_overlap": {
+                "type": "number",
+                "title": "Split Overlap",
+                "default": 0.25,
+                "maximum": 0.99,
+                "minimum": 0,
+                "x-order": 5,
+                "description": "Overlap between segments; higher values improve quality at segment boundaries"
+              }
+            }
+          },
+          "model": {
+            "enum": ["htdemucs"],
+            "type": "string",
+            "title": "model",
+            "description": "An enumeration."
+          },
+          "Output": {
+            "type": "object",
+            "title": "Output",
+            "properties": {
+              "bass": {
+                "type": "string",
+                "title": "Bass",
+                "format": "uri"
+              },
+              "drums": {
+                "type": "string",
+                "title": "Drums",
+                "format": "uri"
+              },
+              "other": {
+                "type": "string",
+                "title": "Other",
+                "format": "uri"
+              },
+              "vocals": {
+                "type": "string",
+                "title": "Vocals",
+                "format": "uri"
+              },
+              "no_bass": {
+                "type": "string",
+                "title": "No Bass",
+                "format": "uri"
+              },
+              "no_drums": {
+                "type": "string",
+                "title": "No Drums",
+                "format": "uri"
+              },
+              "no_other": {
+                "type": "string",
+                "title": "No Other",
+                "format": "uri"
+              },
+              "no_vocals": {
+                "type": "string",
+                "title": "No Vocals",
+                "format": "uri"
+              }
+            }
+          },
+          "Status": {
+            "enum": ["starting", "processing", "succeeded", "canceled", "failed"],
+            "type": "string",
+            "title": "Status",
+            "description": "An enumeration."
+          },
+          "clip_mode": {
+            "enum": ["none", "rescale", "clamp", "tanh"],
+            "type": "string",
+            "title": "clip_mode",
+            "description": "An enumeration."
+          },
+          "isolate_stem": {
+            "enum": ["none", "drums", "bass", "other", "vocals"],
+            "type": "string",
+            "title": "isolate_stem",
+            "description": "An enumeration."
+          },
+          "ValidationError": {
+            "type": "object",
+            "title": "ValidationError",
+            "required": ["loc", "msg", "type"],
+            "properties": {
+              "loc": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer"
+                    }
+                  ]
+                },
+                "title": "Location"
+              },
+              "msg": {
+                "type": "string",
+                "title": "Message"
+              },
+              "type": {
+                "type": "string",
+                "title": "Error Type"
+              }
+            }
+          },
+          "PredictionRequest": {
+            "type": "object",
+            "title": "PredictionRequest",
+            "properties": {
+              "id": {
+                "type": "string",
+                "title": "Id"
+              },
+              "input": {
+                "type": "object",
+                "title": "Input",
+                "required": ["audio"],
+                "properties": {
+                  "seed": {
+                    "type": "integer",
+                    "title": "Seed",
+                    "default": -1,
+                    "x-order": 6,
+                    "description": "Seed for the random shifts, for reproducible output; -1 for random"
+                  },
+                  "audio": {
+                    "type": "string",
+                    "title": "Audio",
+                    "format": "uri",
+                    "x-order": 0,
+                    "description": "The audio file to separate"
+                  },
+                  "model": {
+                    "enum": ["htdemucs"],
+                    "type": "string",
+                    "title": "model",
+                    "description": "Model to use for separation (this deployment serves htdemucs)",
+                    "default": "htdemucs",
+                    "x-order": 1
+                  },
+                  "format": {
+                    "type": "string",
+                    "title": "Format",
+                    "default": "wav",
+                    "x-order": 2,
+                    "description": "Output audio format, anything supported by FFmpeg"
+                  },
+                  "shifts": {
+                    "type": "integer",
+                    "title": "Shifts",
+                    "default": 1,
+                    "maximum": 20,
+                    "minimum": 0,
+                    "x-order": 4,
+                    "description": "Random time shifts to average; more is slower and slightly better. 0 disables them"
+                  },
+                  "clip_mode": {
+                    "enum": ["none", "rescale", "clamp", "tanh"],
+                    "type": "string",
+                    "title": "clip_mode",
+                    "description": "How to keep output within [-1, 1]; \"none\" leaves it unchanged",
+                    "default": "rescale",
+                    "x-order": 7
+                  },
+                  "isolate_stem": {
+                    "enum": ["none", "drums", "bass", "other", "vocals"],
+                    "type": "string",
+                    "title": "isolate_stem",
+                    "description": "Only creates a {stem} and no_{stem} stem/file",
+                    "default": "none",
+                    "x-order": 3
+                  },
+                  "split_overlap": {
+                    "type": "number",
+                    "title": "Split Overlap",
+                    "default": 0.25,
+                    "maximum": 0.99,
+                    "minimum": 0,
+                    "x-order": 5,
+                    "description": "Overlap between segments; higher values improve quality at segment boundaries"
+                  }
+                }
+              }
+            }
+          },
+          "PredictionResponse": {
+            "type": "object",
+            "title": "PredictionResponse",
+            "properties": {
+              "id": {
+                "type": "string",
+                "title": "Id"
+              },
+              "logs": {
+                "type": "string",
+                "title": "Logs"
+              },
+              "error": {
+                "type": "string",
+                "title": "Error"
+              },
+              "input": {
+                "type": "object",
+                "title": "Input",
+                "required": ["audio"],
+                "properties": {
+                  "seed": {
+                    "type": "integer",
+                    "title": "Seed",
+                    "default": -1,
+                    "x-order": 6,
+                    "description": "Seed for the random shifts, for reproducible output; -1 for random"
+                  },
+                  "audio": {
+                    "type": "string",
+                    "title": "Audio",
+                    "format": "uri",
+                    "x-order": 0,
+                    "description": "The audio file to separate"
+                  },
+                  "model": {
+                    "enum": ["htdemucs"],
+                    "type": "string",
+                    "title": "model",
+                    "description": "Model to use for separation (this deployment serves htdemucs)",
+                    "default": "htdemucs",
+                    "x-order": 1
+                  },
+                  "format": {
+                    "type": "string",
+                    "title": "Format",
+                    "default": "wav",
+                    "x-order": 2,
+                    "description": "Output audio format, anything supported by FFmpeg"
+                  },
+                  "shifts": {
+                    "type": "integer",
+                    "title": "Shifts",
+                    "default": 1,
+                    "maximum": 20,
+                    "minimum": 0,
+                    "x-order": 4,
+                    "description": "Random time shifts to average; more is slower and slightly better. 0 disables them"
+                  },
+                  "clip_mode": {
+                    "enum": ["none", "rescale", "clamp", "tanh"],
+                    "type": "string",
+                    "title": "clip_mode",
+                    "description": "How to keep output within [-1, 1]; \"none\" leaves it unchanged",
+                    "default": "rescale",
+                    "x-order": 7
+                  },
+                  "isolate_stem": {
+                    "enum": ["none", "drums", "bass", "other", "vocals"],
+                    "type": "string",
+                    "title": "isolate_stem",
+                    "description": "Only creates a {stem} and no_{stem} stem/file",
+                    "default": "none",
+                    "x-order": 3
+                  },
+                  "split_overlap": {
+                    "type": "number",
+                    "title": "Split Overlap",
+                    "default": 0.25,
+                    "maximum": 0.99,
+                    "minimum": 0,
+                    "x-order": 5,
+                    "description": "Overlap between segments; higher values improve quality at segment boundaries"
+                  }
+                }
+              },
+              "output": {
+                "type": "object",
+                "title": "Output",
+                "properties": {
+                  "bass": {
+                    "type": "string",
+                    "title": "Bass",
+                    "format": "uri"
+                  },
+                  "drums": {
+                    "type": "string",
+                    "title": "Drums",
+                    "format": "uri"
+                  },
+                  "other": {
+                    "type": "string",
+                    "title": "Other",
+                    "format": "uri"
+                  },
+                  "vocals": {
+                    "type": "string",
+                    "title": "Vocals",
+                    "format": "uri"
+                  },
+                  "no_bass": {
+                    "type": "string",
+                    "title": "No Bass",
+                    "format": "uri"
+                  },
+                  "no_drums": {
+                    "type": "string",
+                    "title": "No Drums",
+                    "format": "uri"
+                  },
+                  "no_other": {
+                    "type": "string",
+                    "title": "No Other",
+                    "format": "uri"
+                  },
+                  "no_vocals": {
+                    "type": "string",
+                    "title": "No Vocals",
+                    "format": "uri"
+                  }
+                }
+              },
+              "status": {
+                "type": "string",
+                "title": "Status"
+              },
+              "metrics": {
+                "type": "object",
+                "title": "Metrics"
+              },
+              "version": {
+                "type": "string",
+                "title": "Version"
+              },
+              "created_at": {
+                "type": "string",
+                "title": "Created At",
+                "format": "date-time"
+              },
+              "started_at": {
+                "type": "string",
+                "title": "Started At",
+                "format": "date-time"
+              },
+              "completed_at": {
+                "type": "string",
+                "title": "Completed At",
+                "format": "date-time"
+              }
+            }
+          },
+          "HTTPValidationError": {
+            "type": "object",
+            "title": "HTTPValidationError",
+            "properties": {
+              "detail": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "title": "ValidationError",
+                  "required": ["loc", "msg", "type"],
+                  "properties": {
+                    "loc": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "integer"
+                          }
+                        ]
+                      },
+                      "title": "Location"
+                    },
+                    "msg": {
+                      "type": "string",
+                      "title": "Message"
+                    },
+                    "type": {
+                      "type": "string",
+                      "title": "Error Type"
+                    }
+                  }
+                },
+                "title": "Detail"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

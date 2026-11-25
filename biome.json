@@ -1,0 +1,55 @@
+{
+  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "organizeImports": {
+    "enabled": true
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "style": {
+        "noNonNullAssertion": "off"
+      }
+    }
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100
+  },
+  "files": {
+    "ignore": [
+      "dist",
+      "node_modules",
+      "coverage",
+      "web/dist",
+      "web/e2e-screenshots",
+      "app/src-tauri/target",
+      ".claude",
+      "app/payload",
+      "app/src-tauri/gen",
+      "packs/openrouter/catalog-seed.json",
+      "packs/fal/seeds.json"
+    ]
+  },
+  "overrides": [
+    {
+      "include": ["tests/**", "web/test/**", "scripts/e2e-*.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off",
+            "noAssignInExpressions": "off"
+          },
+          "performance": {
+            "noDelete": "off"
+          },
+          "style": {
+            "noCommaOperator": "off"
+          }
+        }
+      }
+    }
+  ]
+}

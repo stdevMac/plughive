@@ -1,0 +1,25 @@
+{
+  "title": "Sign in",
+  "heading": "Sign in to the dashboard",
+  "intro": {
+    "before": "The quickest way in is",
+    "link": "Open Dashboard",
+    "after": " in the menu-bar app, or the sign-in link plughive prints when it starts. Or paste the admin token here."
+  },
+  "tokenLabel": "Admin token",
+  "tokenAria": "admin token",
+  "submit": "Sign in",
+  "foot": {
+    "before": "The token is in the file ",
+    "middle": " in the data folder, usually ",
+    "after": ". Signing in sets a session cookie; the page does not keep the token."
+  },
+  "errors": {
+    "empty": "Paste the token first.",
+    "tooMany": "Too many attempts. Wait a minute, then try again.",
+    "badToken": "That token is not right. Copy it again from the sign-in link or the admin-token file.",
+    "paste": "Paste the token from the sign-in link or the admin-token file.",
+    "network": "Cannot reach the daemon. Check that it is running.",
+    "failed": "Sign-in failed. Try again."
+  }
+}

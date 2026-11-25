@@ -1,0 +1,50 @@
+{
+  "somethingWentWrong": "Something went wrong.",
+  "missingSecret": {
+    "what": "{name} needs an API key first.",
+    "whatNoName": "This needs an API key first.",
+    "whyLabel": "{label} is not set yet.",
+    "why": "The key is not set yet.",
+    "next": "Add your {name} key"
+  },
+  "network": {
+    "what": "The dashboard could not reach the server.",
+    "why": "It may have stopped or restarted.",
+    "next": "Reload the page"
+  },
+  "invalidArguments": "Some inputs are not valid.",
+  "unknownTool": {
+    "what": "That tool is not available.",
+    "why": "Its pack may be off or removed.",
+    "next": "Open Keys & packs"
+  },
+  "cancelled": "The job was stopped.",
+  "auth": {
+    "what": "{name} did not accept the key.",
+    "whatNoName": "The service did not accept the key.",
+    "why": "It may be wrong, expired or missing a permission.",
+    "next": "Replace the {name} key"
+  },
+  "credit": {
+    "what": "{name} says the account is out of credit.",
+    "whatNoName": "The service says the account is out of credit.",
+    "why": "Add credit with the provider, then try again."
+  },
+  "rateLimited": {
+    "what": "The service is rate limiting requests.",
+    "why": "Wait a minute, then try again."
+  },
+  "timeout": {
+    "what": "The service took too long to answer.",
+    "why": "Try again; long jobs may need a smaller input."
+  },
+  "serverError": {
+    "what": "The service had a problem on its side.",
+    "why": "This is usually temporary. Try again shortly."
+  },
+  "noProvider": {
+    "what": "No service is set up for this.",
+    "why": "Add a key for one that can do it.",
+    "next": "Add a provider key"
+  }
+}

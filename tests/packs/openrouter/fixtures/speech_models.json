@@ -1,0 +1,56 @@
+{
+  "data": [
+    {
+      "id": "elevenlabs/eleven-v3",
+      "name": "ElevenLabs: Eleven v3",
+      "description": "Eleven v3 is a text-to-speech model from ElevenLabs. It produces emotionally rich, highly expressive speech with inline audio tags, supports 70+ languages, and has a 5,000-character request limit.",
+      "input_modalities": [
+        {
+          "type": "text"
+        }
+      ],
+      "output_modalities": [
+        {
+          "type": "speech",
+          "supported_parameters": {
+            "voice": {
+              "type": "enum",
+              "values": [
+                "george",
+                "sarah",
+                "adam",
+                "alice",
+                "bella",
+                "bill",
+                "brian",
+                "callum",
+                "charlie",
+                "chris",
+                "daniel",
+                "eric",
+                "harry",
+                "jessica",
+                "laura",
+                "liam",
+                "lily",
+                "matilda",
+                "river",
+                "roger",
+                "will"
+              ]
+            },
+            "response_format": {
+              "type": "enum",
+              "values": ["mp3", "pcm"]
+            },
+            "speed": {
+              "type": "range",
+              "min": 0.7,
+              "max": 1.2
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

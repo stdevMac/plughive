@@ -1,0 +1,93 @@
+{
+  "title": "Biblioteca",
+  "header": {
+    "title": "Biblioteca",
+    "description": "Archivos que han creado las herramientas: imágenes, vídeo, audio y documentos, guardados en este equipo."
+  },
+  "filter": {
+    "label": "Mostrar",
+    "all": "Todo",
+    "image": "Imágenes",
+    "video": "Vídeo",
+    "audio": "Audio",
+    "document": "Documentos"
+  },
+  "filesCount": {
+    "one": "{count} archivo",
+    "other": "{count} archivos"
+  },
+  "kind": {
+    "image": "Imagen",
+    "video": "Vídeo",
+    "audio": "Audio",
+    "pdf": "PDF",
+    "document": "Documento",
+    "data": "Datos",
+    "file": "Archivo"
+  },
+  "tile": {
+    "fromTool": "{kind} de {source}",
+    "madeAt": "{kind} · {time}",
+    "ariaLabel": "{kind}: {label}, {time}"
+  },
+  "list": {
+    "ariaLabel": "Archivos, los más recientes primero"
+  },
+  "empty": {
+    "all": "Todavía no hay archivos",
+    "images": "Todavía no hay imágenes",
+    "video": "Todavía no hay vídeo",
+    "audio": "Todavía no hay audio",
+    "documents": "Todavía no hay documentos",
+    "body": "Cada imagen, vídeo, sonido o documento que crea una herramienta se guarda aquí, lo hayas ejecutado tú en la zona de pruebas o lo haya hecho tu agente.",
+    "openPlayground": "Abrir la zona de pruebas",
+    "showAll": "Mostrar todos los archivos"
+  },
+  "showMore": "Mostrar más",
+  "loadMoreFailed": "No se pudieron cargar más archivos. {error}",
+  "lightbox": {
+    "position": "{index} de {total}",
+    "deleted": "Archivo eliminado.",
+    "deleteFailed": "No se pudo eliminar el archivo. {error}",
+    "delete": "Eliminar",
+    "copyLink": "Copiar enlace",
+    "download": "Descargar",
+    "previous": "Archivo anterior (flecha izquierda)",
+    "next": "Archivo siguiente (flecha derecha)"
+  },
+  "copy": {
+    "fileLink": "enlace del archivo",
+    "fileId": "id del archivo"
+  },
+  "deleteDialog": {
+    "title": "¿Eliminar este archivo?",
+    "body": "El {kind} se quita de este equipo y de la biblioteca. Los enlaces dejan de funcionar, y los trabajos que lo crearon conservan su registro pero ya no pueden mostrarlo. Esto no se puede deshacer.",
+    "keep": "Mantenerlo",
+    "confirm": "Eliminar archivo"
+  },
+  "meta": {
+    "madeBy": "Creado por",
+    "unknown": "Desconocido",
+    "model": "Modelo",
+    "size": "Tamaño",
+    "cost": "Coste",
+    "id": "Id"
+  },
+  "media": {
+    "cannotShow": "Este archivo no se puede mostrar aquí.",
+    "openIt": "Abrirlo",
+    "altResult": "Resultado: {label}",
+    "altImage": "Imagen del resultado"
+  },
+  "result": {
+    "finishedIn": "Terminado en {duration}",
+    "openFile": "Abrir archivo",
+    "copyLink": "Copiar enlace",
+    "savedTo": "Guardado en la biblioteca. ",
+    "openLibrary": "Abrir la biblioteca",
+    "fullResult": "Resultado completo"
+  },
+  "json": {
+    "defaultLabel": "Resultado en JSON"
+  }
+}

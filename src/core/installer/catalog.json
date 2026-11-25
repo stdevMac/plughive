@@ -1,0 +1,681 @@
+{
+  "schema": 1,
+  "items": [
+    {
+      "id": "uv",
+      "name": "uv",
+      "summary": "Python package and tool manager. Installs the Python-based tools in this list.",
+      "version": "0.13.9",
+      "license": "MIT OR Apache-2.0",
+      "size_mb": 17,
+      "gated": false,
+      "homepage": "https://docs.astral.sh/uv/",
+      "tags": ["python"],
+      "bins": ["uv", "uvx"],
+      "probe": { "bin": "uv", "args": ["--version"], "version": "uv (\\S+)" },
+      "sources": {
+        "darwin-arm64": {
+          "archive": {
+            "url": "https://github.com/astral-sh/uv/releases/download/0.13.9/uv-aarch64-apple-darwin.tar.gz",
+            "sha256": "5aeca67f2283f75235de40d0bd9c0a5bbc5fce23b6d48b3bf9fa1b2db08382ca",
+            "format": "tar.gz",
+            "bin": {
+              "uv": "uv-aarch64-apple-darwin/uv",
+              "uvx": "uv-aarch64-apple-darwin/uvx"
+            }
+          }
+        },
+        "darwin-x64": {
+          "archive": {
+            "url": "https://github.com/astral-sh/uv/releases/download/0.13.9/uv-x86_64-apple-darwin.tar.gz",
+            "sha256": "617a3211261b0fc739562f0071aa34e9739797c510208ede8e2977c30903d041",
+            "format": "tar.gz",
+            "bin": {
+              "uv": "uv-x86_64-apple-darwin/uv",
+              "uvx": "uv-x86_64-apple-darwin/uvx"
+            }
+          }
+        },
+        "linux-x64": {
+          "archive": {
+            "url": "https://github.com/astral-sh/uv/releases/download/0.13.9/uv-x86_64-unknown-linux-gnu.tar.gz",
+            "sha256": "a7fbaff2b9a271d85c1bdb540941090fd1ce011797b4abeb48e4dcd39c2471d5",
+            "format": "tar.gz",
+            "bin": {
+              "uv": "uv-x86_64-unknown-linux-gnu/uv",
+              "uvx": "uv-x86_64-unknown-linux-gnu/uvx"
+            }
+          }
+        },
+        "linux-arm64": {
+          "archive": {
+            "url": "https://github.com/astral-sh/uv/releases/download/0.13.9/uv-aarch64-unknown-linux-gnu.tar.gz",
+            "sha256": "0797542018e541a9288855df555c8077eed06f7a47d206362030480e8ecc9f3d",
+            "format": "tar.gz",
+            "bin": {
+              "uv": "uv-aarch64-unknown-linux-gnu/uv",
+              "uvx": "uv-aarch64-unknown-linux-gnu/uvx"
+            }
+          }
+        },
+        "win32-x64": {
+          "archive": {
+            "url": "https://github.com/astral-sh/uv/releases/download/0.13.9/uv-x86_64-pc-windows-msvc.zip",
+            "sha256": "edd61f7f5728a56cc62455386661860bdfc7bab65872f39b0c25bdcc1d8e1beb",
+            "format": "zip",
+            "bin": { "uv": "uv.exe", "uvx": "uvx.exe" }
+          }
+        }
+      },
+      "pkgmgr": { "brew": "uv", "winget": "astral-sh.uv" }
+    },
+    {
+      "id": "yt-dlp",
+      "name": "yt-dlp",
+      "summary": "Downloads video and audio from YouTube and over a thousand other sites.",
+      "version": "2026.11.23",
+      "license": "Unlicense",
+      "size_mb": 38,
+      "gated": false,
+      "homepage": "https://github.com/yt-dlp/yt-dlp",
+      "tags": ["video", "download"],
+      "bins": ["yt-dlp"],
+      "probe": {
+        "bin": "yt-dlp",
+        "args": ["--version"],
+        "version": "^(\\S+)",
+        "timeout_ms": 45000
+      },
+      "sources": {
+        "darwin-arm64": {
+          "archive": {
+            "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.11.23/yt-dlp_macos",
+            "sha256": "57654854886d0398a798895aadf5173e2749fbb5e249b9f3728022ab376e11fb",
+            "format": "raw",
+            "bin": { "yt-dlp": "yt-dlp" }
+          }
+        },
+        "darwin-x64": {
+          "archive": {
+            "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.11.23/yt-dlp_macos",
+            "sha256": "57654854886d0398a798895aadf5173e2749fbb5e249b9f3728022ab376e11fb",
+            "format": "raw",
+            "bin": { "yt-dlp": "yt-dlp" }
+          }
+        },
+        "linux-x64": {
+          "archive": {
+            "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.11.23/yt-dlp_linux",
+            "sha256": "249ddb058234276bc449b9cd9492aad9f133bda5923c61a9e39983ae114ef17d",
+            "format": "raw",
+            "bin": { "yt-dlp": "yt-dlp" }
+          }
+        },
+        "linux-arm64": {
+          "archive": {
+            "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.11.23/yt-dlp_linux_aarch64",
+            "sha256": "fb847a2e4a9ddc8cf5fcfb4bb7f42ba8969ecf72068def0278074f9d300bd13c",
+            "format": "raw",
+            "bin": { "yt-dlp": "yt-dlp" }
+          }
+        },
+        "win32-x64": {
+          "archive": {
+            "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.11.23/yt-dlp.exe",
+            "sha256": "622ed48023cac1daa52a3bf3a6ac38f03514de214b5f0fa069389fd0f6d17e5c",
+            "format": "raw",
+            "bin": { "yt-dlp": "yt-dlp.exe" }
+          }
+        }
+      },
+      "pkgmgr": { "brew": "yt-dlp", "winget": "yt-dlp.yt-dlp", "apt": "yt-dlp" }
+    },
+    {
+      "id": "ffmpeg",
+      "name": "FFmpeg",
+      "summary": "Cuts, converts, joins and captions video and audio. The local pack needs it.",
+      "version": "6.1.1",
+      "license": "GPL-3.0-or-later (static build)",
+      "size_mb": 170,
+      "gated": false,
+      "homepage": "https://ffmpeg.org/",
+      "tags": ["video", "audio"],
+      "bins": ["ffmpeg", "ffprobe"],
+      "probe": { "bin": "ffmpeg", "args": ["-version"], "version": "ffmpeg version (\\S+)" },
+      "sources": {
+        "darwin-arm64": {
+          "archive": {
+            "url": "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-darwin-arm64",
+            "sha256": "a90e3db6a3fd35f6074b013f948b1aa45b31c6375489d39e572bea3f18336584",
+            "format": "raw",
+            "bin": { "ffmpeg": "ffmpeg" }
+          },
+          "extra": [
+            {
+              "url": "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffprobe-darwin-arm64",
+              "sha256": "bb2db6f5d8cef919da12fbf592119a987202a8c060a886f3cab091f9cab90b64",
+              "format": "raw",
+              "bin": { "ffprobe": "ffprobe" }
+            }
+          ]
+        },
+        "darwin-x64": {
+          "archive": {
+            "url": "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-darwin-x64",
+            "sha256": "ebdddc936f61e14049a2d4b549a412b8a40deeff6540e58a9f2a2da9e6b18894",
+            "format": "raw",
+            "bin": { "ffmpeg": "ffmpeg" }
+          },
+          "extra": [
+            {
+              "url": "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffprobe-darwin-x64",
+              "sha256": "fa3add0ce901f7241abe0dfc0155d958fc834aca3f8ce61f87cc712ae669c1e0",
+              "format": "raw",
+              "bin": { "ffprobe": "ffprobe" }
+            }
+          ]
+        },
+        "linux-x64": {
+          "archive": {
+            "url": "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-linux-x64",
+            "sha256": "e7e7fb30477f717e6f55f9180a70386c62677ef8a4d4d1a5d948f4098aa3eb99",
+            "format": "raw",
+            "bin": { "ffmpeg": "ffmpeg" }
+          },
+          "extra": [
+            {
+              "url": "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffprobe-linux-x64",
+              "sha256": "4f231a1960d83e403d08f7971e271707bec278a9ae18e21b8b5b03186668450d",
+              "format": "raw",
+              "bin": { "ffprobe": "ffprobe" }
+            }
+          ]
+        },
+        "linux-arm64": {
+          "archive": {
+            "url": "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-linux-arm64",
+            "sha256": "6bb182d0d75d23028db82e9e4f723ca69b853d055698486e6984ddb2c06fb8ce",
+            "format": "raw",
+            "bin": { "ffmpeg": "ffmpeg" }
+          },
+          "extra": [
+            {
+              "url": "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffprobe-linux-arm64",
+              "sha256": "d17ae9b4c297d48e2521ba14e417bb0537c6ff77c584cdbcd6bb0d8d0307a2e8",
+              "format": "raw",
+              "bin": { "ffprobe": "ffprobe" }
+            }
+          ]
+        },
+        "win32-x64": {
+          "archive": {
+            "url": "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-win32-x64",
+            "sha256": "04e1307997530f9cf2fe35cba2ca7e8875ca91da02f89d6c7243df819c94ad00",
+            "format": "raw",
+            "bin": { "ffmpeg": "ffmpeg.exe" }
+          },
+          "extra": [
+            {
+              "url": "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffprobe-win32-x64",
+              "sha256": "3a7e2dc003dc2cd1472827e4c7c4f056ae1ae0ae7c5bbc580c99b49827351ba4",
+              "format": "raw",
+              "bin": { "ffprobe": "ffprobe.exe" }
+            }
+          ]
+        }
+      },
+      "pkgmgr": { "brew": "ffmpeg", "winget": "Gyan.FFmpeg", "apt": "ffmpeg" }
+    },
+    {
+      "id": "imagemagick",
+      "name": "ImageMagick",
+      "summary": "Resizes, crops, converts and composites images from the command line.",
+      "version": "7",
+      "license": "ImageMagick",
+      "size_mb": 120,
+      "gated": false,
+      "homepage": "https://imagemagick.org/",
+      "tags": ["image"],
+      "bins": ["magick"],
+      "probe": { "bin": "magick", "args": ["-version"], "version": "Version: ImageMagick (\\S+)" },
+      "pkgmgr": { "brew": "imagemagick", "winget": "ImageMagick.ImageMagick", "apt": "imagemagick" }
+    },
+    {
+      "id": "tesseract",
+      "name": "Tesseract OCR",
+      "summary": "Reads the text in images and scans.",
+      "version": "5",
+      "license": "Apache-2.0",
+      "size_mb": 60,
+      "gated": false,
+      "homepage": "https://github.com/tesseract-ocr/tesseract",
+      "tags": ["ocr", "document"],
+      "bins": ["tesseract"],
+      "probe": { "bin": "tesseract", "args": ["--version"], "version": "tesseract v?(\\S+)" },
+      "pkgmgr": {
+        "brew": "tesseract",
+        "winget": "UB-Mannheim.TesseractOCR",
+        "apt": "tesseract-ocr"
+      }
+    },
+    {
+      "id": "ocrmypdf",
+      "name": "OCRmyPDF",
+      "summary": "Adds a searchable text layer to scanned PDFs. Needs Tesseract and Ghostscript.",
+      "version": "17.14.2",
+      "license": "MPL-2.0",
+      "size_mb": 80,
+      "gated": false,
+      "homepage": "https://ocrmypdf.readthedocs.io/",
+      "tags": ["ocr", "document", "pdf"],
+      "bins": ["ocrmypdf"],
+      "probe": { "bin": "ocrmypdf", "args": ["--version"], "version": "^(\\S+)" },
+      "uv": { "package": "ocrmypdf==17.14.2", "python": "3.12" },
+      "pkgmgr": { "brew": "ocrmypdf", "apt": "ocrmypdf" }
+    },
+    {
+      "id": "pandoc",
+      "name": "Pandoc",
+      "summary": "Converts documents between Markdown, Word, HTML, EPUB, PDF and more.",
+      "version": "3.14",
+      "license": "GPL-2.0-or-later",
+      "size_mb": 240,
+      "gated": false,
+      "homepage": "https://pandoc.org/",
+      "tags": ["document"],
+      "bins": ["pandoc"],
+      "probe": { "bin": "pandoc", "args": ["--version"], "version": "pandoc(?:\\.exe)? (\\S+)" },
+      "sources": {
+        "darwin-arm64": {
+          "archive": {
+            "url": "https://github.com/jgm/pandoc/releases/download/3.14/pandoc-3.14-arm64-macOS.zip",
+            "sha256": "58d6593884fec9d4424b641b92503c316d9c36decb2891ff8d73ae74dd3b6304",
+            "format": "zip",
+            "bin": { "pandoc": "pandoc-3.14-arm64/bin/pandoc" }
+          }
+        },
+        "darwin-x64": {
+          "archive": {
+            "url": "https://github.com/jgm/pandoc/releases/download/3.14/pandoc-3.14-x86_64-macOS.zip",
+            "sha256": "891708579061e7b1c1a6ce0df30ebb3cb2b6d0ca045ed3c8554ab830c1e0c270",
+            "format": "zip",
+            "bin": { "pandoc": "pandoc-3.14-x86_64/bin/pandoc" }
+          }
+        },
+        "linux-x64": {
+          "archive": {
+            "url": "https://github.com/jgm/pandoc/releases/download/3.14/pandoc-3.14-linux-amd64.tar.gz",
+            "sha256": "c5f4720cdefb3f7bdc5d07202ef579feef0d1370773c873804dd8fdaa8c4f1b8",
+            "format": "tar.gz",
+            "bin": { "pandoc": "pandoc-3.14/bin/pandoc" }
+          }
+        },
+        "linux-arm64": {
+          "archive": {
+            "url": "https://github.com/jgm/pandoc/releases/download/3.14/pandoc-3.14-linux-arm64.tar.gz",
+            "sha256": "c692f3d78a415741bbbac4cdbbbe26fa7edca1f43d2301b982fbf4009cc8cf7f",
+            "format": "tar.gz",
+            "bin": { "pandoc": "pandoc-3.14/bin/pandoc" }
+          }
+        },
+        "win32-x64": {
+          "archive": {
+            "url": "https://github.com/jgm/pandoc/releases/download/3.14/pandoc-3.14-windows-x86_64.zip",
+            "sha256": "0144b96e8c7b023fd382ec5ef5bdc475e873f1019d6fa72502492df2c9a94a3b",
+            "format": "zip",
+            "bin": { "pandoc": "pandoc-3.14/pandoc.exe" }
+          }
+        }
+      },
+      "pkgmgr": { "brew": "pandoc", "winget": "JohnMacFarlane.Pandoc", "apt": "pandoc" }
+    },
+    {
+      "id": "libreoffice",
+      "name": "LibreOffice",
+      "summary": "Office suite. Converts Word, Excel and PowerPoint files to PDF without a window.",
+      "version": "25",
+      "license": "MPL-2.0",
+      "size_mb": 900,
+      "gated": true,
+      "homepage": "https://www.libreoffice.org/",
+      "install_url": "https://www.libreoffice.org/download/download-libreoffice/",
+      "tags": ["document", "office"],
+      "bins": ["soffice"],
+      "probe": {
+        "bin": "soffice",
+        "args": ["--version"],
+        "version": "LibreOffice (\\S+)",
+        "paths": {
+          "darwin": ["/Applications/LibreOffice.app/Contents/MacOS/soffice"],
+          "win32": ["C:\\Program Files\\LibreOffice\\program\\soffice.exe"]
+        }
+      },
+      "pkgmgr": {
+        "brew_cask": "libreoffice",
+        "winget": "TheDocumentFoundation.LibreOffice",
+        "apt": "libreoffice"
+      }
+    },
+    {
+      "id": "whisper.cpp",
+      "name": "whisper.cpp",
+      "summary": "Fast speech-to-text on this computer. Needs a model file: install a Whisper model too.",
+      "version": "1.9.5",
+      "license": "MIT",
+      "size_mb": 10,
+      "gated": false,
+      "homepage": "https://github.com/ggml-org/whisper.cpp",
+      "tags": ["audio", "transcribe"],
+      "bins": ["whisper-cli"],
+      "probe": { "bin": "whisper-cli", "args": ["--help"], "expect": "usage" },
+      "pkgmgr": { "brew": "whisper-cpp" }
+    },
+    {
+      "id": "whisper-model-base",
+      "name": "Whisper base model",
+      "summary": "The multilingual model whisper.cpp uses by default: quick, good enough for most recordings.",
+      "version": "5359861",
+      "license": "MIT",
+      "size_mb": 148,
+      "gated": false,
+      "homepage": "https://huggingface.co/ggerganov/whisper.cpp",
+      "tags": ["audio", "transcribe", "model"],
+      "bins": [],
+      "model": {
+        "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-base.bin",
+        "sha256": "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe",
+        "file": "ggml-base.bin",
+        "pack": "local",
+        "dir": "models"
+      }
+    },
+    {
+      "id": "whisper-model-large-v3-turbo",
+      "name": "Whisper large-v3 turbo model",
+      "summary": "The most accurate whisper.cpp model, compressed (q5_0). Slower than base without a GPU.",
+      "version": "5359861",
+      "license": "MIT",
+      "size_mb": 574,
+      "gated": false,
+      "homepage": "https://huggingface.co/ggerganov/whisper.cpp",
+      "tags": ["audio", "transcribe", "model"],
+      "bins": [],
+      "model": {
+        "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-large-v3-turbo-q5_0.bin",
+        "sha256": "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2",
+        "file": "ggml-large-v3-turbo-q5_0.bin",
+        "pack": "local",
+        "dir": "models"
+      }
+    },
+    {
+      "id": "parakeet-mlx",
+      "name": "Parakeet (MLX)",
+      "summary": "NVIDIA Parakeet speech-to-text on Apple silicon. Very fast for English.",
+      "version": "0.7.0",
+      "license": "Apache-2.0",
+      "size_mb": 150,
+      "gated": false,
+      "homepage": "https://github.com/senstella/parakeet-mlx",
+      "tags": ["audio", "transcribe"],
+      "platforms": ["darwin-arm64"],
+      "bins": ["parakeet-mlx"],
+      "probe": {
+        "bin": "parakeet-mlx",
+        "args": ["--help"],
+        "expect": "usage",
+        "timeout_ms": 20000
+      },
+      "uv": { "package": "parakeet-mlx==0.7.0", "python": "3.12" }
+    },
+    {
+      "id": "whisperx",
+      "name": "WhisperX",
+      "summary": "Transcription with word timings and speaker labels. Pulls PyTorch (several GB).",
+      "version": "3.8.6",
+      "license": "BSD-2-Clause",
+      "size_mb": 3000,
+      "gated": true,
+      "homepage": "https://github.com/m-bain/whisperX",
+      "tags": ["audio", "transcribe"],
+      "bins": ["whisperx"],
+      "probe": { "bin": "whisperx", "args": ["--help"], "expect": "usage", "timeout_ms": 60000 },
+      "uv": { "package": "whisperx==3.8.6", "python": "3.12" }
+    },
+    {
+      "id": "kokoro",
+      "name": "Kokoro TTS",
+      "summary": "Natural text-to-speech on this computer, served by Kokoro-FastAPI on port 8880.",
+      "version": "0.9.4",
+      "license": "Apache-2.0",
+      "size_mb": 400,
+      "gated": false,
+      "homepage": "https://github.com/remsky/Kokoro-FastAPI",
+      "install_url": "https://github.com/remsky/Kokoro-FastAPI#get-started",
+      "tags": ["audio", "speech"],
+      "bins": [],
+      "probe": { "http": "http://127.0.0.1:8880/v1/audio/voices" }
+    },
+    {
+      "id": "demucs",
+      "name": "Demucs",
+      "summary": "Splits a song into vocals, drums, bass and other stems. Pulls PyTorch.",
+      "version": "4.1.0",
+      "license": "MIT",
+      "size_mb": 2500,
+      "gated": false,
+      "homepage": "https://github.com/adefossez/demucs",
+      "tags": ["audio", "music"],
+      "bins": ["demucs"],
+      "probe": { "bin": "demucs", "args": ["--help"], "expect": "usage", "timeout_ms": 120000 },
+      "uv": { "package": "demucs==4.1.0", "python": "3.11", "with": ["numpy==2.3.5"] }
+    },
+    {
+      "id": "rembg",
+      "name": "rembg",
+      "summary": "Removes image backgrounds on this computer.",
+      "version": "2.0.88",
+      "license": "MIT",
+      "size_mb": 400,
+      "gated": false,
+      "homepage": "https://github.com/danielgatis/rembg",
+      "tags": ["image"],
+      "bins": ["rembg"],
+      "probe": { "bin": "rembg", "args": ["--help"], "expect": "usage", "timeout_ms": 120000 },
+      "uv": { "package": "rembg[cpu,cli]==2.0.88", "python": "3.12" }
+    },
+    {
+      "id": "realesrgan",
+      "name": "Real-ESRGAN (ncnn)",
+      "summary": "Upscales images 2x to 4x on the GPU. Models included.",
+      "version": "0.2.5.0",
+      "license": "BSD-3-Clause",
+      "size_mb": 52,
+      "gated": false,
+      "homepage": "https://github.com/xinntao/Real-ESRGAN",
+      "tags": ["image", "upscale"],
+      "bins": ["realesrgan-ncnn-vulkan"],
+      "probe": { "bin": "realesrgan-ncnn-vulkan", "args": ["-h"], "expect": "Usage" },
+      "sources": {
+        "darwin-arm64": {
+          "archive": {
+            "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-macos.zip",
+            "sha256": "e0ad05580abfeb25f8d8fb55aaf7bedf552c375b5b4d9bd3c8d59764d2cc333a",
+            "format": "zip",
+            "bin": { "realesrgan-ncnn-vulkan": "realesrgan-ncnn-vulkan" }
+          }
+        },
+        "darwin-x64": {
+          "archive": {
+            "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-macos.zip",
+            "sha256": "e0ad05580abfeb25f8d8fb55aaf7bedf552c375b5b4d9bd3c8d59764d2cc333a",
+            "format": "zip",
+            "bin": { "realesrgan-ncnn-vulkan": "realesrgan-ncnn-vulkan" }
+          }
+        },
+        "linux-x64": {
+          "archive": {
+            "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-ubuntu.zip",
+            "sha256": "e5aa6eb131234b87c0c51f82b89390f5e3e642b7b70f2b9bbe95b6a285a40c96",
+            "format": "zip",
+            "bin": { "realesrgan-ncnn-vulkan": "realesrgan-ncnn-vulkan" }
+          }
+        },
+        "win32-x64": {
+          "archive": {
+            "url": "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-windows.zip",
+            "sha256": "abc02804e17982a3be33675e4d471e91ea374e65b70167abc09e31acb412802d",
+            "format": "zip",
+            "bin": { "realesrgan-ncnn-vulkan": "realesrgan-ncnn-vulkan.exe" }
+          }
+        }
+      }
+    },
+    {
+      "id": "ollama",
+      "name": "Ollama",
+      "summary": "Runs open chat and vision models (Llama, Qwen, Gemma) on this computer.",
+      "version": "0.40",
+      "license": "MIT",
+      "size_mb": 190,
+      "gated": false,
+      "homepage": "https://ollama.com/",
+      "install_url": "https://ollama.com/download",
+      "tags": ["llm"],
+      "bins": ["ollama"],
+      "probe": {
+        "bin": "ollama",
+        "args": ["--version"],
+        "version": "version is (\\S+)",
+        "http": "http://127.0.0.1:11434/api/version"
+      },
+      "pkgmgr": { "brew": "ollama", "winget": "Ollama.Ollama" }
+    },
+    {
+      "id": "comfy-cli",
+      "name": "comfy-cli",
+      "summary": "Installs and starts ComfyUI, the node-based image and video workflow engine.",
+      "version": "1.29.0",
+      "license": "GPL-3.0-only",
+      "size_mb": 60,
+      "gated": false,
+      "homepage": "https://github.com/Comfy-Org/comfy-cli",
+      "tags": ["image", "video"],
+      "bins": ["comfy"],
+      "probe": { "bin": "comfy", "args": ["--help"], "expect": "Usage", "timeout_ms": 20000 },
+      "uv": { "package": "comfy-cli==1.29.0", "python": "3.12" }
+    },
+    {
+      "id": "llama.cpp",
+      "name": "llama.cpp",
+      "summary": "Runs GGUF language models on this computer, with an OpenAI-style server.",
+      "version": "1.0.0",
+      "license": "MIT",
+      "size_mb": 30,
+      "gated": false,
+      "homepage": "https://github.com/ggml-org/llama.cpp",
+      "tags": ["llm"],
+      "bins": ["llama-server", "llama-cli"],
+      "probe": { "bin": "llama-cli", "args": ["--version"], "version": "version: (\\S+)" },
+      "pkgmgr": { "brew": "llama.cpp", "winget": "ggml.llamacpp" }
+    },
+    {
+      "id": "docker",
+      "name": "Docker",
+      "summary": "Runs containers. The sandbox pack runs code in throwaway containers with no network and no access to your files.",
+      "version": "4",
+      "license": "Docker Subscription Service Agreement",
+      "size_mb": 1500,
+      "gated": true,
+      "homepage": "https://www.docker.com/",
+      "install_url": "https://docs.docker.com/get-started/get-docker/",
+      "tags": ["sandbox", "container"],
+      "bins": ["docker"],
+      "probe": {
+        "bin": "docker",
+        "args": ["--version"],
+        "version": "Docker version ([0-9][^, ]*)",
+        "paths": {
+          "darwin": ["/Applications/Docker.app/Contents/Resources/bin/docker"],
+          "win32": ["C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe"]
+        }
+      },
+      "pkgmgr": {
+        "brew_cask": "docker-desktop",
+        "winget": "Docker.DockerDesktop",
+        "apt": "docker.io"
+      }
+    },
+    {
+      "id": "hex",
+      "name": "Hex",
+      "summary": "Push-to-talk dictation for macOS, transcribed on this computer. On Windows and Linux, use whisper.cpp.",
+      "version": "3.4.0",
+      "license": "MIT",
+      "size_mb": 30,
+      "gated": false,
+      "homepage": "https://anoma.ly/hex/",
+      "tags": ["audio", "dictation"],
+      "platforms": ["darwin-arm64", "darwin-x64"],
+      "bins": [],
+      "probe": { "paths": { "darwin": ["/Applications/Hex.app"] } },
+      "pkgmgr": { "brew_cask": "anomaly-hex" }
+    },
+    {
+      "id": "claude",
+      "name": "Claude Code",
+      "summary": "Anthropic's coding agent for the terminal.",
+      "version": "latest",
+      "license": "Proprietary",
+      "size_mb": 0,
+      "gated": false,
+      "homepage": "https://docs.claude.com/en/docs/claude-code/overview",
+      "install_url": "https://docs.claude.com/en/docs/claude-code/setup",
+      "tags": ["agent"],
+      "bins": ["claude"],
+      "probe": { "bin": "claude", "args": ["--version"], "version": "^(\\S+)" }
+    },
+    {
+      "id": "codex",
+      "name": "Codex CLI",
+      "summary": "OpenAI's coding agent for the terminal.",
+      "version": "latest",
+      "license": "Apache-2.0",
+      "size_mb": 0,
+      "gated": false,
+      "homepage": "https://github.com/openai/codex",
+      "install_url": "https://github.com/openai/codex#quickstart",
+      "tags": ["agent"],
+      "bins": ["codex"],
+      "probe": { "bin": "codex", "args": ["--version"], "version": "(\\d+\\.\\d+\\.\\d+\\S*)" }
+    },
+    {
+      "id": "opencode",
+      "name": "opencode",
+      "summary": "Open source coding agent for the terminal.",
+      "version": "latest",
+      "license": "MIT",
+      "size_mb": 0,
+      "gated": false,
+      "homepage": "https://opencode.ai/",
+      "install_url": "https://opencode.ai/docs/",
+      "tags": ["agent"],
+      "bins": ["opencode"],
+      "probe": { "bin": "opencode", "args": ["--version"], "version": "(\\d+\\.\\d+\\.\\d+\\S*)" }
+    },
+    {
+      "id": "agy",
+      "name": "Antigravity CLI",
+      "summary": "Google's agent CLI (agy).",
+      "version": "latest",
+      "license": "Proprietary",
+      "size_mb": 0,
+      "gated": false,
+      "homepage": "https://antigravity.google/",
+      "install_url": "https://antigravity.google/download",
+      "tags": ["agent"],
+      "bins": ["agy"],
+      "probe": { "bin": "agy", "args": ["--version"], "version": "(\\d+\\.\\d+\\.\\d+\\S*)" }
+    }
+  ]
+}

@@ -1,0 +1,180 @@
+{
+  "page": {
+    "title": "Lo que ven los agentes",
+    "description": "Elige qué herramientas recibe un agente. Cada perfil tiene su propia dirección, así que cada agente puede ver herramientas distintas."
+  },
+  "actions": {
+    "newProfile": "Nuevo perfil",
+    "deleteProfile": "Eliminar {name}",
+    "connectClient": "Conectar un cliente"
+  },
+  "section": {
+    "core": "Núcleo",
+    "packs": "Paquetes",
+    "workflows": "Flujos de trabajo",
+    "mounts": "Servidores remotos"
+  },
+  "mode": {
+    "auto": "Auto",
+    "listAll": "Listar todo",
+    "search": "Buscar",
+    "word": {
+      "list": "Lista",
+      "search": "Búsqueda"
+    },
+    "help": {
+      "list": "Todas las herramientas elegidas están en la lista del agente. Es simple, pero una lista larga consume más de su contexto.",
+      "search": "El agente recibe una herramienta de búsqueda y tus herramientas fijadas, y encuentra el resto cuando las necesita.",
+      "auto": "Lista las herramientas mientras la lista es corta y cambia a búsqueda cuando se hace larga."
+    }
+  },
+  "empty": {
+    "noToolsMatch": "Ninguna herramienta coincide",
+    "noToolsLoaded": "Ninguna herramienta cargada",
+    "searchHint": "Prueba con una búsqueda más corta o bórrala con Esc.",
+    "packsHint": "Activa un paquete en Claves y paquetes para añadir herramientas.",
+    "noProfilesTitle": "Sin perfiles",
+    "noProfilesBody": "Crea un perfil para elegir qué herramientas muestra un endpoint."
+  },
+  "tabs": {
+    "label": "Perfiles",
+    "unsaved": " (cambios sin guardar)"
+  },
+  "form": {
+    "profileName": "Nombre del perfil",
+    "endpoint": "Endpoint de este perfil",
+    "endpointUrl": "URL del endpoint de {name}",
+    "howShown": "Cómo se muestran las herramientas"
+  },
+  "advanced": {
+    "summary": "Avanzado: cuándo Auto cambia a búsqueda",
+    "switchOver": "Cambiar a búsqueda cuando la lista supere",
+    "tokensOr": "tokens o",
+    "toolsDot": "herramientas.",
+    "tokenLimit": "Límite de tokens",
+    "toolLimit": "Límite de herramientas"
+  },
+  "tree": {
+    "label": "Herramientas",
+    "alwaysListed": "Siempre en la lista",
+    "groupAria": "{label}, {on} de {total} herramientas activadas",
+    "turnOnAll": "Activar todo en {label}",
+    "turnOffAll": "Desactivar todo en {label}",
+    "toolAria": "{name}",
+    "toolAriaPinned": "{name}, siempre en la lista",
+    "turnOn": "Activar {name}",
+    "turnOff": "Desactivar {name}",
+    "pinOn": "Poner siempre {name} en la lista",
+    "pinOff": "Dejar de poner siempre {name} en la lista",
+    "pinTitleOn": "Poner siempre esta herramienta en la lista, aunque el agente use la búsqueda",
+    "pinTitleOff": "Siempre en la lista, aunque el agente use la búsqueda",
+    "count": "{on} de {total} activadas",
+    "search": "Buscar herramientas",
+    "shortcuts": "Atajos de teclado",
+    "shortcutsBase": "Las flechas mueven, Space activa o desactiva, Enter abre un grupo",
+    "shortcutsPin": ", P fija una herramienta para que esté siempre en la lista",
+    "pinsNote": "Las herramientas fijadas siguen en la lista del agente aunque use la búsqueda (como máximo {max})."
+  },
+  "summary": {
+    "tools": {
+      "one": "{count} herramienta",
+      "other": "{count} herramientas"
+    },
+    "tokens": "{count} tokens",
+    "foundBySearch": "por búsqueda",
+    "listed": "en la lista"
+  },
+  "tokenBar": {
+    "label": "{total} tokens. La búsqueda se activa en {threshold}.",
+    "labelDirect": " Listar todas las herramientas elegidas usaría {direct}.",
+    "tick": "La búsqueda se activa aquí ({threshold})",
+    "legend": "Listar todas las herramientas elegidas: {direct} tokens"
+  },
+  "preview": {
+    "title": "Lo que ve el agente",
+    "updating": "Actualizando",
+    "errorTitle": "No se pudo crear la vista previa",
+    "loading": "Creando la vista previa",
+    "tools": "Herramientas",
+    "tokens": "Tokens",
+    "mode": "Modo",
+    "contextShare": "La lista usa {share}.",
+    "listAria": "Herramientas en la lista del agente",
+    "toolTokens": "{count} tokens",
+    "inputSchema": "Esquema de entrada de {name}",
+    "searchList": {
+      "one": "La lista del agente tiene {count} herramienta: una herramienta de búsqueda{pinned}.",
+      "other": "La lista del agente tiene {count} herramientas: una herramienta de búsqueda{pinned}."
+    },
+    "pinnedPart": {
+      "one": " y {count} herramienta fijada",
+      "other": " y {count} herramientas fijadas"
+    },
+    "canFindAll": {
+      "one": "Puede encontrar {count} herramienta con la búsqueda.",
+      "other": "Puede encontrar las {count} herramientas con la búsqueda."
+    },
+    "savesTokens": " Así se ahorran unos {count} tokens frente a listarlas todas.",
+    "extraListed": "{chosen} elegidas + {extra} siempre incluidas ({names}).",
+    "chosenList": {
+      "one": "{count} herramienta elegida, en la lista del agente.",
+      "other": "{count} herramientas elegidas, todas en la lista del agente."
+    },
+    "autoNote": " Auto cambia a búsqueda por encima de {tokens} tokens o {tools} herramientas."
+  },
+  "savebar": {
+    "aria": "Cambios sin guardar",
+    "badge": "Cambios sin guardar",
+    "added": {
+      "one": "{count} herramienta activada",
+      "other": "{count} herramientas activadas"
+    },
+    "removed": {
+      "one": "{count} herramienta desactivada",
+      "other": "{count} herramientas desactivadas"
+    },
+    "pinsChanged": "fijadas cambiadas",
+    "modeChanged": "modo cambiado",
+    "renamed": "nombre cambiado",
+    "limitsChanged": "límites cambiados",
+    "fallback": "Selección de herramientas cambiada",
+    "discard": "Descartar",
+    "save": "Guardar"
+  },
+  "discardDialog": {
+    "title": "¿Descartar los cambios sin guardar?",
+    "body": "Los cambios en {name} aún no se han guardado. Si los descartas, no se pueden recuperar.",
+    "keepEditing": "Seguir editando",
+    "discardChanges": "Descartar cambios"
+  },
+  "deleteDialog": {
+    "title": "¿Eliminar {name}?",
+    "bodyBefore": "Los agentes conectados a ",
+    "bodyAfter": " pierden todas sus herramientas en su próxima petición. Esto no se puede deshacer.",
+    "keep": "Mantenerlo",
+    "delete": "Eliminar perfil"
+  },
+  "connectDialog": {
+    "title": "Conectar un cliente a {name}"
+  },
+  "createDialog": {
+    "description": "Un perfil es un endpoint aparte con su propia selección de herramientas. Empieza vacío: activa las herramientas que debe mostrar.",
+    "nameLabel": "Nombre",
+    "namePlaceholder": "Trabajo de vídeo",
+    "urlLabel": "Nombre de la URL",
+    "urlHintSet": "El endpoint terminará en /p/{id}/mcp",
+    "urlHintEmpty": "Letras minúsculas, dígitos y guiones.",
+    "cancel": "Cancelar",
+    "submit": "Crear perfil",
+    "errName": "Ponle un nombre al perfil.",
+    "errUrl": "El nombre de la URL debe empezar por una letra y usar de 2 a 32 letras minúsculas, dígitos o guiones.",
+    "errExists": "Ya existe un perfil con este nombre de URL.",
+    "errLimit": "Este servidor ya tiene todos los perfiles que admite. Elimina uno primero."
+  },
+  "toast": {
+    "saved": "{name} guardado. Los agentes lo verán la próxima vez que se conecten o actualicen sus herramientas.",
+    "deleted": "{name} eliminado.",
+    "created": "{name} creado.",
+    "maxPins": "Se pueden fijar como máximo {max} herramientas."
+  }
+}

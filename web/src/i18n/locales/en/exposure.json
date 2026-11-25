@@ -1,0 +1,180 @@
+{
+  "page": {
+    "title": "What agents see",
+    "description": "Choose which tools an agent gets. Each profile is its own address, so different agents can see different tools."
+  },
+  "actions": {
+    "newProfile": "New profile",
+    "deleteProfile": "Delete {name}",
+    "connectClient": "Connect a client"
+  },
+  "section": {
+    "core": "Core",
+    "packs": "Packs",
+    "workflows": "Workflows",
+    "mounts": "Remote servers"
+  },
+  "mode": {
+    "auto": "Auto",
+    "listAll": "List all",
+    "search": "Search",
+    "word": {
+      "list": "Listed",
+      "search": "Search"
+    },
+    "help": {
+      "list": "Every chosen tool is in the agent's list. Simple, but a big list uses more of its context.",
+      "search": "The agent gets a search tool plus your pinned tools, and finds the rest when it needs them.",
+      "auto": "Lists the tools while the list is small, and switches to search once it gets big."
+    }
+  },
+  "empty": {
+    "noToolsMatch": "No tools match",
+    "noToolsLoaded": "No tools loaded",
+    "searchHint": "Try a shorter search, or clear it with Esc.",
+    "packsHint": "Turn on a pack in Keys & packs to add tools.",
+    "noProfilesTitle": "No profiles",
+    "noProfilesBody": "Create a profile to choose which tools an endpoint shows."
+  },
+  "tabs": {
+    "label": "Profiles",
+    "unsaved": " (unsaved changes)"
+  },
+  "form": {
+    "profileName": "Profile name",
+    "endpoint": "Endpoint for this profile",
+    "endpointUrl": "endpoint URL for {name}",
+    "howShown": "How tools are shown"
+  },
+  "advanced": {
+    "summary": "Advanced: when auto switches to search",
+    "switchOver": "Switch to search when the list is over",
+    "tokensOr": "tokens or",
+    "toolsDot": "tools.",
+    "tokenLimit": "Token limit",
+    "toolLimit": "Tool limit"
+  },
+  "tree": {
+    "label": "Tools",
+    "alwaysListed": "Always listed",
+    "groupAria": "{label}, {on} of {total} tools on",
+    "turnOnAll": "Turn on all of {label}",
+    "turnOffAll": "Turn off all of {label}",
+    "toolAria": "{name}",
+    "toolAriaPinned": "{name}, always listed",
+    "turnOn": "Turn on {name}",
+    "turnOff": "Turn off {name}",
+    "pinOn": "Always list {name}",
+    "pinOff": "Stop always listing {name}",
+    "pinTitleOn": "Always list this tool, even when the agent uses search",
+    "pinTitleOff": "Always listed, even when the agent uses search",
+    "count": "{on} of {total} on",
+    "search": "Search tools",
+    "shortcuts": "Keyboard shortcuts",
+    "shortcutsBase": "Arrow keys move, Space turns on or off, Enter opens a group",
+    "shortcutsPin": ", P pins a tool so it is always listed",
+    "pinsNote": "Pinned tools stay in the agent's list even when it uses search (at most {max})."
+  },
+  "summary": {
+    "tools": {
+      "one": "{count} tool",
+      "other": "{count} tools"
+    },
+    "tokens": "{count} tokens",
+    "foundBySearch": "found by search",
+    "listed": "listed"
+  },
+  "tokenBar": {
+    "label": "{total} tokens. Search turns on at {threshold}.",
+    "labelDirect": " Listing every chosen tool would use {direct}.",
+    "tick": "Search turns on here ({threshold})",
+    "legend": "Listing every chosen tool: {direct} tokens"
+  },
+  "preview": {
+    "title": "What the agent sees",
+    "updating": "Updating",
+    "errorTitle": "The preview could not be made",
+    "loading": "Making the preview",
+    "tools": "Tools",
+    "tokens": "Tokens",
+    "mode": "Mode",
+    "contextShare": "The list uses {share}.",
+    "listAria": "Tools in the agent's list",
+    "toolTokens": "{count} tokens",
+    "inputSchema": "Input schema of {name}",
+    "searchList": {
+      "one": "The agent's list has {count} tool: a search tool{pinned}.",
+      "other": "The agent's list has {count} tools: a search tool{pinned}."
+    },
+    "pinnedPart": {
+      "one": " and {count} pinned tool",
+      "other": " and {count} pinned tools"
+    },
+    "canFindAll": {
+      "one": "It can find all {count} tool through search.",
+      "other": "It can find all {count} tools through search."
+    },
+    "savesTokens": " That saves about {count} tokens compared with listing them all.",
+    "extraListed": "{chosen} chosen + {extra} always included ({names}).",
+    "chosenList": {
+      "one": "{count} chosen tool, all in the agent's list.",
+      "other": "{count} chosen tools, all in the agent's list."
+    },
+    "autoNote": " Auto switches to search above {tokens} tokens or {tools} tools."
+  },
+  "savebar": {
+    "aria": "Unsaved changes",
+    "badge": "Unsaved changes",
+    "added": {
+      "one": "{count} tool turned on",
+      "other": "{count} tools turned on"
+    },
+    "removed": {
+      "one": "{count} tool turned off",
+      "other": "{count} tools turned off"
+    },
+    "pinsChanged": "pins changed",
+    "modeChanged": "mode changed",
+    "renamed": "renamed",
+    "limitsChanged": "limits changed",
+    "fallback": "Tool selection changed",
+    "discard": "Discard",
+    "save": "Save"
+  },
+  "discardDialog": {
+    "title": "Discard unsaved changes?",
+    "body": "The changes to {name} are not saved yet. Discarding them cannot be undone.",
+    "keepEditing": "Keep editing",
+    "discardChanges": "Discard changes"
+  },
+  "deleteDialog": {
+    "title": "Delete {name}?",
+    "bodyBefore": "Agents connected to ",
+    "bodyAfter": " lose all its tools on their next request. This cannot be undone.",
+    "keep": "Keep it",
+    "delete": "Delete profile"
+  },
+  "connectDialog": {
+    "title": "Connect a client to {name}"
+  },
+  "createDialog": {
+    "description": "A profile is a separate endpoint with its own tool selection. It starts empty: turn on the tools it should show.",
+    "nameLabel": "Name",
+    "namePlaceholder": "Video work",
+    "urlLabel": "URL name",
+    "urlHintSet": "The endpoint will end in /p/{id}/mcp",
+    "urlHintEmpty": "Lowercase letters, digits and dashes.",
+    "cancel": "Cancel",
+    "submit": "Create profile",
+    "errName": "Give the profile a name.",
+    "errUrl": "The URL name must start with a letter and use 2 to 32 lowercase letters, digits or dashes.",
+    "errExists": "A profile with this URL name already exists.",
+    "errLimit": "This server has as many profiles as it supports. Delete one first."
+  },
+  "toast": {
+    "saved": "{name} saved. Agents pick this up the next time they connect or refresh their tools.",
+    "deleted": "{name} deleted.",
+    "created": "{name} created.",
+    "maxPins": "At most {max} tools can be pinned."
+  }
+}

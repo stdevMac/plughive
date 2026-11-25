@@ -1,0 +1,38 @@
+{
+  "id": "telegram",
+  "name": "Telegram",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Send Telegram messages and stored artifacts through a bot.",
+  "secrets": [
+    {
+      "name": "TELEGRAM_BOT_TOKEN",
+      "label": "Telegram bot token",
+      "helpUrl": "https://core.telegram.org/bots#how-do-i-create-a-bot",
+      "required": true
+    }
+  ],
+  "permissions": {
+    "network": ["api.telegram.org"],
+    "library": "read-all"
+  },
+  "skills": "skills",
+  "settings": {
+    "type": "object",
+    "properties": {
+      "defaultChatId": {
+        "type": "string",
+        "title": "Default chat id",
+        "description": "Chat used when a call gives no chat_id. Always an allowed destination; with no default and an empty allowedChatIds list the pack sends nowhere."
+      },
+      "allowedChatIds": {
+        "type": "array",
+        "items": { "type": "string" },
+        "title": "Allowed chat ids",
+        "description": "Chat ids (numeric, or @username) this pack may send to besides the default chat. Empty (the default) means only the default chat. This pack reads every library artifact (library: read-all), so this list is what keeps artifacts inside chats you own. Agents cannot change this setting.",
+        "default": []
+      }
+    }
+  }
+}

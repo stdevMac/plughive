@@ -1,0 +1,58 @@
+{
+  "id": "cli-bridge",
+  "name": "Agent CLIs",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "enabledByDefault": false,
+  "description": "Use the agent CLIs already installed and signed in on this computer (Claude Code, Codex, Gemini CLI, Antigravity, opencode, Copilot): list them, ask one a question and get its answer back, or have Antigravity draw an image into the library. Each runs on your own subscription, in a scratch folder or a folder you allow, as a background job with a timeout.",
+  "permissions": {
+    "spawn": ["agy", "claude", "codex", "gemini", "opencode", "copilot", "node"],
+    "userHome": true,
+    "library": "write"
+  },
+  "skills": "skills",
+  "notice": "This pack runs the vendors' own CLIs with the accounts you signed in to them; it never reads or copies their credentials. Each use counts against that account and falls under the vendor's terms: Anthropic's Consumer Terms or Commercial Terms and usage policy (claude), OpenAI's Terms of Use (codex), Google's Terms of Service and Gemini API terms (gemini, agy), GitHub's Terms for Copilot (copilot), and the terms of whichever model provider opencode is set up with. Some subscriptions allow personal, interactive use only; check yours before automating it. Without a cwd each run uses an empty scratch folder of this pack. With a cwd (only inside a folder you list in Allowed folders) the CLI may read and change files there with its own tools and permission settings, and its own folder-trust checks apply: gemini asks for the folder to be trusted and codex wants a git repository. Claude Code skips its trust dialog in non-interactive mode, so list only folders you trust. Antigravity images are made in agy's default mode with its sandbox, in the pack's scratch folder only. Prefer API keys? Enable the bundled provider packs (Anthropic, OpenAI, Gemini, OpenRouter) and add your key there instead: their usage is billed per call and does not go through these CLIs.",
+  "settings": {
+    "type": "object",
+    "properties": {
+      "allowedFolders": {
+        "type": "array",
+        "items": { "type": "string" },
+        "format": "folder-list",
+        "title": "Allowed folders",
+        "description": "Absolute folders (or ~/...) an agent may pass as cwd to ask_agent_cli. The CLI can read and change files there with its own tools. Empty (the default) means every run uses an empty scratch folder of this pack.",
+        "default": []
+      },
+      "defaultTimeoutSeconds": {
+        "type": "integer",
+        "title": "Default timeout (seconds)",
+        "description": "How long a CLI may run when the call gives no timeout_s (10 to 1800). The whole process tree is stopped after it.",
+        "default": 600
+      },
+      "maxOutputBytes": {
+        "type": "integer",
+        "title": "Output cap (bytes)",
+        "description": "Most output a CLI may print before it is stopped (64 KiB to 64 MiB).",
+        "default": 4194304
+      },
+      "claudeConfigDir": {
+        "type": "string",
+        "title": "Claude Code config folder",
+        "description": "Optional CLAUDE_CONFIG_DIR for claude (absolute or ~/...), when you signed Claude Code in with a non-default config folder. The pack passes the path on and never reads it."
+      },
+      "npmPrefix": {
+        "type": "string",
+        "title": "npm prefix (Windows)",
+        "description": "Windows only: the npm global prefix the CLIs were installed into, if not %APPDATA%\\npm. The pack starts npm-installed CLIs as node <entry script>, never through their .cmd shims."
+      },
+      "chatCli": {
+        "type": "string",
+        "title": "CLI for chat",
+        "description": "CLI that answers the chat capability for other packs. It is used only after you also add cli-bridge to the chat preference order.",
+        "enum": ["", "claude", "codex", "gemini", "agy", "opencode", "copilot"],
+        "default": ""
+      }
+    }
+  }
+}

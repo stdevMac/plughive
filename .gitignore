@@ -1,0 +1,30 @@
+node_modules/
+dist/
+web/dist/
+web/e2e-screenshots/
+# secrets: any .env variant, the dashboard admin token and the file secrets
+# backend (also its lock and temp files) if PLUGHIVE_HOME points inside the repo
+.env
+.env.*
+!.env.example
+admin-token
+secrets.json
+.secrets.json.lock
+.secrets.*.tmp
+# docker-compose.yml secrets folder
+/secrets/
+*.pem
+*.key
+*.log
+.DS_Store
+coverage/
+.vitest-cache/
+
+# local runtime state if PLUGHIVE_ROOT points inside repo
+artifacts/
+library.db*
+jobs.db*
+logs/
+
+# local Claude Code config
+.claude/

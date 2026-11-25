@@ -1,0 +1,73 @@
+{
+  "page": {
+    "title": "Approvals",
+    "headerTitle": "Approvals",
+    "descriptionBefore": "Calls that would go over a spend cap, or that your rules say to ask about, wait here. An approval lets that exact call run once. Set caps on the ",
+    "descriptionLink": "Usage",
+    "descriptionAfter": "page.",
+    "show": "Show",
+    "missing": "That request is not in this list. It may be older, or filtered out.",
+    "nothingWaiting": "Nothing is waiting. When an agent asks to spend over a cap, the request shows up here and in the sidebar.",
+    "emptyTitle": "Nothing here",
+    "emptyBody": "No requests with this status.",
+    "history": "History",
+    "footerNote": "An approval covers only the call it was asked for, with the same arguments, and only once. Requests nobody answers expire. Amounts are estimates."
+  },
+  "filter": {
+    "all": "All",
+    "pending": "Waiting",
+    "consumed": "Used",
+    "denied": "Denied",
+    "expired": "Expired"
+  },
+  "waiting": {
+    "title": {
+      "zero": "Waiting for you",
+      "one": "Waiting for you ({count})",
+      "other": "Waiting for you ({count})"
+    }
+  },
+  "kind": {
+    "tool": "Tool call",
+    "provider": "Provider call",
+    "workflow": "Workflow run"
+  },
+  "status": {
+    "pending": "Waiting",
+    "approved": "Approved",
+    "denied": "Denied",
+    "expired": "Expired",
+    "consumed": "Used"
+  },
+  "card": {
+    "approvedToast": "Approved {tool}. It can run once.",
+    "deniedToast": "Denied {tool}.",
+    "costUnknown": "Cost unknown",
+    "costUpTo": "Up to {amount}",
+    "asked": "Asked",
+    "provider": "Provider {provider}",
+    "profile": "Profile {profile}",
+    "jobWaiting": "Job waiting",
+    "expires": "Expires",
+    "via": "via {by}",
+    "approve": "Approve once",
+    "deny": "Deny"
+  },
+  "cap": {
+    "period": {
+      "daily": "Daily",
+      "monthly": "Monthly"
+    },
+    "scope": {
+      "provider": "provider",
+      "profile": "profile"
+    },
+    "global": "{period}, everything",
+    "scoped": "{period}, {scope} {id}"
+  },
+  "caps": {
+    "limitError": "Cap {n}: the limit must be an amount in dollars, like 5 or 0.50.",
+    "scopeError": "Cap {n}: name the {scope} (letters, digits, and . _ : -).",
+    "duplicateError": "Cap {n} repeats an earlier cap with the same scope and period."
+  }
+}

@@ -1,0 +1,131 @@
+{
+  "title": "Inicio",
+  "getStarted": "Empezar",
+  "getStartedDescription": "Cuatro pasos, más o menos un minuto. No se cobra nada hasta que ejecutes una herramienta de pago.",
+  "setupGuide": "Guía de configuración",
+  "openPlayground": "Abrir la zona de pruebas",
+  "backHome": "Volver al inicio",
+  "skipSetup": "Saltar la configuración",
+  "header": {
+    "connectAgent": "Conectar un agente"
+  },
+  "providers": {
+    "openrouter": "Cientos de modelos de chat, imagen, vídeo y voz con una sola clave.",
+    "fal": "Modelos rápidos de imagen y vídeo como FLUX, Kling y Nano Banana.",
+    "replicate": "Ejecuta modelos abiertos de imagen, vídeo, voz y música.",
+    "gemini": "Los modelos de imagen, vídeo, música y transcripción de Google.",
+    "elevenlabs": "Voz, música, doblaje, transcripción y aislamiento de voz.",
+    "local": "ffmpeg, ComfyUI, Ollama y Whisper en este equipo. No hace falta clave."
+  },
+  "provider": {
+    "notInstalled": "No instalado",
+    "offLink": "Desactivado: actívalo en Claves y paquetes",
+    "needsAttention": "Requiere atención",
+    "noKeyNeeded": "No hace falta clave",
+    "keyAdded": "Clave añadida",
+    "close": "Cerrar",
+    "addKey": "Añadir clave",
+    "forName": " para {name}"
+  },
+  "check": {
+    "done": ", hecho",
+    "todo": ", pendiente"
+  },
+  "checklist": {
+    "connect": {
+      "title": "Conecta tu agente",
+      "summaryTodo": "Pega un fragmento en Claude, Cursor u otro agente.",
+      "waiting": "Esperando a tu agente. Esto se actualiza solo.",
+      "body": "Tu agente tendrá las herramientas de este servidor en cuanto lo añadas. Elige tu agente, copia el fragmento y reinicia o recarga el agente.",
+      "cta": "Conectar un agente",
+      "later": "Hacerlo más tarde"
+    },
+    "goal": {
+      "title": "Di qué quieres hacer",
+      "body": "Elige un objetivo para ver qué le falta todavía a este equipo. Primero aparecen las opciones gratuitas que mantienen tus archivos aquí; no se instala nada hasta que lo apruebes.",
+      "next": "Siguiente",
+      "openSoftware": "Abrir Software",
+      "skip": "Saltar: lo decidiré más tarde"
+    },
+    "key": {
+      "title": "Añade una clave",
+      "body": "Una clave de proveedor desbloquea sus herramientas de imagen, vídeo y voz. Puedes saltarte esto: las herramientas gratuitas y locales funcionan sin clave.",
+      "skip": "Saltar: usar solo herramientas gratuitas"
+    },
+    "try": {
+      "title": "Ejecuta una herramienta en la zona de pruebas",
+      "summaryDone": "Hecho. Todo lo que crea una herramienta aparece en la biblioteca.",
+      "summaryTodo": "Rellena un formulario corto y pulsa Ejecutar.",
+      "bodyStatus": "Empieza por la comprobación de estado gratuita. Se ejecuta en este equipo y no cuesta nada.",
+      "bodyImage": "Crea una imagen con {provider}: escribe un prompt y pulsa Ejecutar. Lo que genere aparecerá en la biblioteca.",
+      "bodyTool": "Prueba una herramienta de {provider}: rellena el formulario y pulsa Ejecutar. Los archivos que genere aparecerán en la biblioteca.",
+      "openPlayground": "Abrir la zona de pruebas",
+      "seeLibrary": "Ver la biblioteca"
+    },
+    "goalSummary": {
+      "picked": "{title}. Su plan de configuración está en la página Software.",
+      "skipped": "Omitido. Pídele a tu agente que llame a setup_plan cuando quieras.",
+      "prompt": "Elige qué quieres hacer y mira qué le falta todavía a este equipo."
+    },
+    "keySummary": {
+      "added": "Clave añadida para {providers}.",
+      "skipped": "Omitido. Las herramientas gratuitas y locales funcionan sin clave.",
+      "prompt": "Una clave desbloquea las herramientas de imagen, vídeo y voz."
+    },
+    "doneTitle": "Todo listo.",
+    "doneBody": "Pídele a tu agente una imagen o una locución; se ejecuta aquí.",
+    "hideGuide": "Ocultar esta guía",
+    "progress": "{done} de {total} hechos. Puedes salir y volver: esta lista recuerda por dónde vas."
+  },
+  "attention": {
+    "title": "Requiere atención",
+    "notLoaded": "{name} no se cargó.",
+    "notLoadedAction": "Ver por qué",
+    "rateLimited": "{name} está limitando las peticiones. Se omite hasta {until}.",
+    "rateLimitedAction": "Servicios preferidos",
+    "noKey": "Aún no hay clave de proveedor, así que solo funcionan las herramientas gratuitas y locales.",
+    "noKeyAction": "Añadir una clave"
+  },
+  "overview": {
+    "agentsTitle": "Agentes conectados",
+    "agentsNone": "Aún ninguno. Conecta uno y aparecerá aquí.",
+    "endpointTitle": "Endpoint",
+    "endpointUrl": "URL del endpoint",
+    "endpointHintBefore": "Los agentes se conectan aquí.",
+    "endpointHintLink": "Elige qué ven",
+    "weekTitle": "Esta semana",
+    "usageAction": "Uso",
+    "callsEstimated": {
+      "one": "{count} llamada, estimado",
+      "other": "{count} llamadas, estimado"
+    },
+    "spendLabel": "Gasto por día esta semana",
+    "callsLabel": "Llamadas por día esta semana",
+    "runningTitle": "En marcha ahora",
+    "allJobs": "Todos los trabajos",
+    "runningEmpty": "No hay nada en marcha. Las tareas largas, como el vídeo, muestran aquí su progreso.",
+    "recentTitle": "Archivos recientes",
+    "libraryAction": "Biblioteca",
+    "filesEmptyBefore": "Aún no hay archivos. Las imágenes, el vídeo y el audio que crean tus herramientas se guardan aquí.",
+    "filesEmptyLink": "Probar una herramienta",
+    "artifactLabel": "{kind} de {source}, {when}",
+    "aTool": "una herramienta"
+  },
+  "plan": {
+    "listLabel": "Objetivos",
+    "fewer": "Menos objetivos",
+    "more": "Más objetivos ({count})",
+    "ready": "Listo: todo lo que necesita {title} está configurado.",
+    "stepsLeft": {
+      "one": "Queda {count} paso obligatorio. Primero aparecen las opciones gratuitas que se ejecutan en este equipo.",
+      "other": "Quedan {count} pasos obligatorios. Primero aparecen las opciones gratuitas que se ejecutan en este equipo."
+    },
+    "optional": "Opcional",
+    "doneWith": "Terminado con {name}.",
+    "optionWhy": ": {why}",
+    "sizeSep": " · {size}",
+    "orAlternatives": " · o {names}",
+    "noOptions": "No se ofrece nada en este equipo.",
+    "officialPage": "Página oficial"
+  }
+}

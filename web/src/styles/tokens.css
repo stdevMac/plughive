@@ -1,0 +1,129 @@
+/* Design tokens. One accent, one radius, a 4 px spacing scale, one type scale.
+   Light is the default. lib/theme.ts always sets html[data-theme] to the theme
+   in effect (following the system unless the user picked one), so the dark
+   values live in one block and cannot drift. */
+
+:root {
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
+
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+  --s-8: 64px;
+
+  --t-xs: 12px;
+  --t-sm: 13px;
+  --t-md: 14px;
+  --t-lg: 16px;
+  --t-xl: 20px;
+  --t-2xl: 26px;
+  --lh-tight: 1.25;
+  --lh: 1.5;
+
+  /* One radius. Pills and dots use --r-full. */
+  --r: 8px;
+  --r-full: 999px;
+
+  --sidebar-w: 224px;
+  --content-max: 1120px;
+  /* Motion: ease-out, 120 to 200 ms. base.css zeroes it for reduced motion. */
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 120ms;
+  --dur: 160ms;
+  --dur-slow: 200ms;
+
+  color-scheme: light;
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f1f3f5;
+  --surface-3: #e8ebef;
+  --sidebar-bg: #eef0f3;
+  --border: #e0e3e8;
+  --border-strong: #c4c9d1;
+  --text: #1a1d22;
+  --text-2: #444c58;
+  --text-3: #5f6874;
+  --accent-text: #2f4bbf;
+  --accent-soft: #e9eeff;
+  --accent-soft-border: #c5d0fa;
+  --ok: #1d7a3a;
+  --ok-soft: #e6f4ea;
+  --warn: #8a5a00;
+  --warn-soft: #fdf3dc;
+  --danger: #c22b2b;
+  --danger-hover: #a82323;
+  --danger-soft: #fdecec;
+  --focus: #3b5bdb;
+  --shadow-1: 0 1px 2px rgb(16 24 40 / 6%), 0 1px 3px rgb(16 24 40 / 6%);
+  --shadow-2: 0 4px 12px rgb(16 24 40 / 10%), 0 2px 4px rgb(16 24 40 / 6%);
+  --shadow-3: 0 16px 40px rgb(16 24 40 / 18%), 0 4px 12px rgb(16 24 40 / 8%);
+  --scrim: rgb(15 18 24 / 40%);
+  --skeleton: #e6e9ee;
+  --skeleton-hi: #f1f3f6;
+  --control-border: #7a828e;
+  --accent-fill: #3b5bdb;
+  --accent-fill-hover: #3150c6;
+  --on-accent-fill: #ffffff;
+  --danger-fill: #c22b2b;
+  --danger-fill-hover: #a82323;
+  --on-danger: #ffffff;
+  --switch-off: #7a828e;
+  --switch-thumb: #ffffff;
+  --progress-track: #c5d0fa;
+  --toast-ok: #7ee2a0;
+  --toast-danger: #ff9a9a;
+  --chart-1: #3b5bdb;
+  --chart-2: #94a3b8;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0e1013;
+  --surface: #16181c;
+  --surface-2: #1c1f24;
+  --surface-3: #252930;
+  --sidebar-bg: #121417;
+  --border: #262a31;
+  --border-strong: #363c45;
+  --text: #eceef1;
+  --text-2: #bcc2cb;
+  --text-3: #9aa2ae;
+  --accent-text: #9db0ff;
+  --accent-soft: #1f2846;
+  --accent-soft-border: #34427a;
+  --ok: #5cc27e;
+  --ok-soft: #16301f;
+  --warn: #e0b453;
+  --warn-soft: #33290f;
+  --danger: #f07a7a;
+  --danger-hover: #f49292;
+  --danger-soft: #3a1b1d;
+  --focus: #8aa0ff;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 30%);
+  --shadow-2: 0 4px 12px rgb(0 0 0 / 40%);
+  --shadow-3: 0 16px 40px rgb(0 0 0 / 55%);
+  --scrim: rgb(0 0 0 / 55%);
+  --skeleton: #1f2228;
+  --skeleton-hi: #292d34;
+  --control-border: #737c88;
+  --accent-fill: #7d95ff;
+  --accent-fill-hover: #93a7ff;
+  --on-accent-fill: #10131a;
+  --danger-fill: #c22b2b;
+  --danger-fill-hover: #a82323;
+  --on-danger: #ffffff;
+  --switch-off: #737c88;
+  --switch-thumb: #ffffff;
+  --progress-track: #34427a;
+  --toast-ok: #1d7a3a;
+  --toast-danger: #c22b2b;
+  --chart-1: #7d95ff;
+  --chart-2: #56606e;
+}

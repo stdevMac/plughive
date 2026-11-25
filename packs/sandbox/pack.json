@@ -1,0 +1,52 @@
+{
+  "id": "sandbox",
+  "name": "Sandboxes (E2B, Daytona, Docker)",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "enabledByDefault": false,
+  "description": "Run code away from your machine: E2B and Daytona cloud sandboxes (create, run commands and code, move files, destroy) and throwaway local Docker containers with no host mounts and no network by default.",
+  "secrets": [
+    {
+      "name": "E2B_API_KEY",
+      "label": "E2B API key",
+      "helpUrl": "https://e2b.dev/dashboard?tab=keys",
+      "required": false
+    },
+    {
+      "name": "DAYTONA_API_KEY",
+      "label": "Daytona API key",
+      "helpUrl": "https://app.daytona.io/dashboard/keys",
+      "required": false
+    }
+  ],
+  "permissions": {
+    "network": ["api.e2b.app", "*.e2b.app", "app.daytona.io", "proxy.app.daytona.io"],
+    "spawn": ["docker"],
+    "library": "full"
+  },
+  "settings": {
+    "type": "object",
+    "properties": {
+      "allowedImages": {
+        "type": "array",
+        "items": { "type": "string" },
+        "title": "Allowed Docker images",
+        "description": "Images docker_run may start, exactly as written (pin tags). Default: python:3.12-slim, node:22-slim, alpine:3.20. Agents cannot change this setting.",
+        "default": ["python:3.12-slim", "node:22-slim", "alpine:3.20"]
+      },
+      "allowNetwork": {
+        "type": "boolean",
+        "title": "Allow container network",
+        "description": "Let docker_run give a container network access when it asks for it. Off by default: containers run with --network none.",
+        "default": false
+      },
+      "dockerHost": {
+        "type": "string",
+        "title": "Docker host",
+        "description": "DOCKER_HOST for the docker CLI, e.g. unix:///Users/you/.docker/run/docker.sock. The pack's docker runs with its own HOME, so set this when docker cannot find its socket."
+      }
+    }
+  },
+  "skills": "skills"
+}

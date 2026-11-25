@@ -1,0 +1,236 @@
+{
+  "page": {
+    "title": "Servidores remotos",
+    "description": "Otros servidores MCP cuyas herramientas pasan a tus agentes en la misma dirección."
+  },
+  "addServer": {
+    "button": "Añadir un servidor"
+  },
+  "transport": {
+    "local": "Programa local",
+    "remote": "Servidor remoto"
+  },
+  "toolNames": {
+    "before": "Los nombres de las herramientas empiezan por "
+  },
+  "toolCount": {
+    "one": "{count} herramienta",
+    "other": "{count} herramientas"
+  },
+  "state": {
+    "waitingForSignIn": "Esperando el inicio de sesión",
+    "needsSignIn": "Necesita iniciar sesión",
+    "notSignedIn": "Sin iniciar sesión",
+    "signedIn": "Sesión iniciada",
+    "cannotConnect": "No se puede conectar",
+    "needsKey": "Necesita una clave",
+    "connected": "Conectado",
+    "connecting": "Conectando"
+  },
+  "signIn": {
+    "signedInTo": "Sesión iniciada en {name}.",
+    "signedOutOf": "Sesión cerrada en {name}.",
+    "finish": "Termina de iniciar sesión en la página que se abrió en tu navegador. Esta página se actualiza sola.",
+    "refreshNeeded": "El servidor ya no acepta el inicio de sesión. Vuelve a conectar para seguir usándolo.",
+    "connectHint": "Conecta para iniciar sesión en el sitio del proveedor. Los tokens se quedan en el almacén de secretos de este equipo.",
+    "connect": "Conectar",
+    "openAgain": "Abrir de nuevo",
+    "connectAria": "Conectar {name}",
+    "signOut": "Cerrar sesión",
+    "signOutAria": "Cerrar sesión en {name}",
+    "badLink": "El enlace de inicio de sesión que devolvió el daemon no es una dirección http(s)."
+  },
+  "notMountable": {
+    "setKey": "Configura su clave primero para activarlo.",
+    "cannotEnable": "Todavía no se puede activar."
+  },
+  "toggled": {
+    "on": "{name} activado.",
+    "off": "{name} desactivado."
+  },
+  "toggle": {
+    "on": "Activar {name}",
+    "off": "Desactivar {name}"
+  },
+  "keys": {
+    "label": "Claves"
+  },
+  "docs": "Documentación",
+  "remove": {
+    "label": "Quitar",
+    "aria": "Quitar {name}"
+  },
+  "removed": "{name} quitado.",
+  "added": "{name} añadido.",
+  "addedDefault": "Servidor",
+  "fileError": {
+    "title": "Tu archivo de servidores tiene un problema",
+    "before": "Ninguno de tus propios servidores se conecta hasta que lo arregles: "
+  },
+  "packsCard": {
+    "title": "De paquetes"
+  },
+  "packsList": {
+    "aria": "Servidores de paquetes"
+  },
+  "packsEmpty": {
+    "title": "Ningún paquete ofrece un servidor",
+    "body": "Los paquetes pueden traer servidores listos para usar. Activa un paquete en la página Claves y paquetes para verlos aquí."
+  },
+  "userCard": {
+    "title": "Añadidos por ti"
+  },
+  "userList": {
+    "aria": "Servidores que añadiste"
+  },
+  "userEmpty": {
+    "title": "Todavía no tienes servidores propios",
+    "before": "Añade cualquier servidor MCP que uses, remoto o un programa de este equipo, con ",
+    "link": "Añadir un servidor",
+    "after": " más arriba."
+  },
+  "add": {
+    "title": "Añade tu propio servidor MCP",
+    "description": "Sus herramientas aparecen junto a las demás, con el prefijo que elijas.",
+    "cancel": "Cancelar",
+    "submit": "Añadir servidor",
+    "reach": {
+      "label": "Cómo llegar a él",
+      "http": "Servidor remoto (HTTP)"
+    },
+    "fields": {
+      "name": "Nombre",
+      "id": "Id",
+      "prefix": "Prefijo de las herramientas",
+      "url": "Dirección del servidor",
+      "header": "Cabecera (opcional)",
+      "headerValue": "Valor de la cabecera",
+      "command": "Programa",
+      "args": "Argumentos"
+    },
+    "hints": {
+      "id": "Se usa en enlaces y en nombres de claves.",
+      "prefix": "Las herramientas se llaman {prefix}_…",
+      "url": "Para usar una clave, escribe ${secret:NAME} y configúrala después de añadir.",
+      "command": "Un nombre de programa de tu PATH, o una ruta completa.",
+      "args": "Separados por espacios. Usa comillas para mantener los espacios dentro de un argumento."
+    },
+    "examplePrefix": "prefijo",
+    "placeholders": {
+      "name": "Mi servidor de notas",
+      "id": "mis-notas",
+      "prefix": "notas"
+    },
+    "errors": {
+      "name": "Ponle un nombre.",
+      "id": "Usa de 2 a 32 letras minúsculas, dígitos o guiones, empezando por una letra.",
+      "url": "Escribe una dirección http o https.",
+      "command": "Escribe el programa que se va a iniciar.",
+      "exists": "Ya existe un servidor con este id. Elige otro id."
+    },
+    "stdioWarning": {
+      "title": "Esto ejecuta un programa en tu equipo",
+      "body": "plughive lo inicia con los permisos de tu usuario. Añade solo programas de confianza."
+    }
+  },
+  "removeDialog": {
+    "title": "¿Quitar {name}?",
+    "unnamed": "servidor",
+    "body": "Sus herramientas desaparecen de tus agentes. Las claves que configures para él siguen guardadas hasta que las quites.",
+    "keep": "Mantenerlo",
+    "confirm": "Quitar servidor"
+  },
+  "smart": {
+    "title": "Montaje inteligente",
+    "summary": "Los servidores activos añaden unos {tokens} tokens de definiciones de herramientas a tus agentes. Aplicar las sugerencias de abajo ahorra unos {reclaimable}.",
+    "mode": {
+      "label": "Modo de montaje inteligente",
+      "off": "Apagado",
+      "suggest": "Sugerir",
+      "auto": "Automático"
+    },
+    "modeHint": {
+      "off": "No se revisa ni se sugiere nada.",
+      "suggest": "Aquí aparecen los servidores y herramientas que no usas desde hace un tiempo. Nada cambia hasta que actúes.",
+      "auto": "Los servidores sin uso durante los días de abajo se aparcan (se apagan) solos, una vez por hora. Puedes volver a encender cualquiera más abajo cuando quieras."
+    },
+    "idleDays": "Aparcar tras estos días sin uso",
+    "nothing": "Todos los servidores activos se han usado hace poco. No hay nada que cambiar.",
+    "suggestionsAria": "Sugerencias del montaje inteligente",
+    "kind": {
+      "idle": "Sin uso",
+      "heavy": "Costoso",
+      "failing": "No funciona",
+      "overlap": "Duplicado",
+      "profile_unused": "Sin uso en un perfil",
+      "unused_tools": "Herramientas sin uso",
+      "search_mode": "Perfil costoso",
+      "sign_in": "Sesión cerrada",
+      "missing_key": "Falta la clave",
+      "failing_tool": "Herramienta con fallos"
+    },
+    "reason": {
+      "idle": {
+        "one": "Sin llamadas desde hace {count} día.",
+        "other": "Sin llamadas desde hace {count} días."
+      },
+      "heavy": "Unos {tokens} tokens de definiciones para {calls} llamadas en 30 días.",
+      "failing": "Está encendido pero no puede conectarse, así que sus herramientas nunca llegan a tus agentes.",
+      "overlap": "Hace lo mismo que {with}, que tuvo {withCalls} llamadas frente a sus {calls} en 30 días.",
+      "profile_unused": "Otros perfiles lo usan; el perfil «{profile}» nunca lo hizo.",
+      "unused_tools": {
+        "one": "El perfil «{profile}» nunca llama a {count} de sus herramientas: {tools}.",
+        "other": "El perfil «{profile}» nunca llama a {count} de sus herramientas: {tools}."
+      },
+      "search_mode": "Cada turno del perfil «{profile}» lleva su lista completa de herramientas. El modo automático las sirve mediante búsqueda.",
+      "sign_in": "Está encendido pero sin sesión. Vuelve a iniciar sesión en su tarjeta, más abajo.",
+      "missing_key": "Está encendido pero necesita {secrets}. Configúrala en su tarjeta, más abajo.",
+      "failing_tool": "{tool} falló el {percent}% de sus {calls} llamadas esta semana. Revisa su clave, sesión o plan."
+    },
+    "lastUsed": "Último uso {when}.",
+    "keep": "Mantener siempre",
+    "park": "Aparcar",
+    "parkAll": "Aparcar todos",
+    "parked": {
+      "one": "{count} servidor aparcado.",
+      "other": "{count} servidores aparcados."
+    },
+    "parkedList": "Aparcados: {names}. Enciende uno más abajo para volver a usarlo.",
+    "keptList": "Nunca se aparcan: {names}.",
+    "clearKeep": "Quitar",
+    "builtin": "las herramientas integradas",
+    "saves": "Ahorra unos {tokens} tokens por turno.",
+    "hide": "Ocultar",
+    "switchAuto": "Pasar a automático",
+    "applied": {
+      "one": "{count} cambio aplicado.",
+      "other": "{count} cambios aplicados."
+    },
+    "wake": {
+      "label": "Cuando un agente pide una herramienta aparcada",
+      "auto": "Volver a encenderla",
+      "ask": "Preguntar antes"
+    },
+    "wakeHint": {
+      "auto": "Los agentes siguen encontrando las herramientas aparcadas al buscar. Al llamar a una, su servidor se vuelve a encender solo.",
+      "ask": "Los agentes siguen encontrando las herramientas aparcadas al buscar, y se les indica que te pregunten antes de volver a encender el servidor."
+    },
+    "changes": "Cambios en perfiles",
+    "changesAria": "Cambios en perfiles hechos por el montaje inteligente",
+    "change": {
+      "profile_unused": "{mount} oculto en «{profile}»",
+      "unused_tools": {
+        "one": "{count} herramienta de {mount} oculta en «{profile}»",
+        "other": "{count} herramientas de {mount} ocultas en «{profile}»"
+      },
+      "search_mode": "«{profile}» pasó a modo automático"
+    },
+    "undo": "Deshacer",
+    "undone": "Cambio deshecho.",
+    "week": "Últimos {days} días: {parked} aparcados, {woken} recuperados, {hidden} ocultos. Ahora se ahorran unos {tokens} tokens por turno.",
+    "weekUndone": {
+      "one": "{count} cambio deshecho.",
+      "other": "{count} cambios deshechos."
+    }
+  }
+}

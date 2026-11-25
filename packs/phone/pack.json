@@ -1,0 +1,70 @@
+{
+  "id": "phone",
+  "name": "Phone (Twilio and Vapi)",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Send and list text messages through Twilio, and place outbound AI phone calls through Vapi.",
+  "secrets": [
+    {
+      "name": "TWILIO_ACCOUNT_SID",
+      "label": "Twilio Account SID",
+      "helpUrl": "https://console.twilio.com",
+      "required": false
+    },
+    {
+      "name": "TWILIO_AUTH_TOKEN",
+      "label": "Twilio auth token",
+      "helpUrl": "https://console.twilio.com",
+      "required": false
+    },
+    {
+      "name": "VAPI_API_KEY",
+      "label": "Vapi private API key",
+      "helpUrl": "https://dashboard.vapi.ai/org/api-keys",
+      "required": false
+    }
+  ],
+  "permissions": {
+    "network": ["api.twilio.com", "api.vapi.ai"]
+  },
+  "settings": {
+    "type": "object",
+    "properties": {
+      "defaultFrom": {
+        "type": "string",
+        "title": "Default SMS sender",
+        "description": "Twilio number (E.164, such as +14155550100), short code or alphanumeric sender id used when twilio_send_sms gets no `from`."
+      },
+      "defaultMessagingServiceSid": {
+        "type": "string",
+        "title": "Default Messaging Service SID",
+        "description": "Twilio Messaging Service (MG...) used when twilio_send_sms gets no `from`. Takes precedence over the default sender."
+      },
+      "defaultAssistantId": {
+        "type": "string",
+        "title": "Default Vapi assistant id",
+        "description": "Assistant that runs calls placed by vapi_create_call when a call gives none."
+      },
+      "defaultPhoneNumberId": {
+        "type": "string",
+        "title": "Default Vapi phone number id",
+        "description": "Vapi phone number that places calls when a call gives none."
+      },
+      "allowedRecipients": {
+        "type": "array",
+        "items": { "type": "string" },
+        "title": "Allowed recipients",
+        "description": "E.164 numbers or prefixes (such as \"+1\") that twilio_send_sms and vapi_create_call may reach. Empty (the default) means any number, as before. Agents cannot change this setting.",
+        "default": []
+      },
+      "lockSender": {
+        "type": "boolean",
+        "title": "Lock sender",
+        "description": "When true and a default sender is configured (defaultFrom or defaultMessagingServiceSid for Twilio, defaultAssistantId plus defaultPhoneNumberId for Vapi), calls cannot override the sender fields. Default false.",
+        "default": false
+      }
+    }
+  },
+  "skills": "skills"
+}

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "plughive": {
+      "type": "http",
+      "url": "${PLUGHIVE_URL:-http://127.0.0.1:7777}/mcp",
+      "headers": {
+        "Authorization": "Bearer ${PLUGHIVE_ACCESS_KEY:-}"
+      }
+    }
+  }
+}

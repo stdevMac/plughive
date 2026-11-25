@@ -1,0 +1,20 @@
+{
+  "id": "exa",
+  "name": "Exa search",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Web search through Exa with your own key (search_web).",
+  "secrets": [
+    {
+      "name": "EXA_API_KEY",
+      "label": "Exa API key",
+      "helpUrl": "https://dashboard.exa.ai/api-keys",
+      "required": true
+    }
+  ],
+  "permissions": {
+    "network": ["api.exa.ai"]
+  },
+  "skills": "skills"
+}

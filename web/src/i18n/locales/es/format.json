@@ -1,0 +1,39 @@
+{
+  "bytes": {
+    "b": "{value} B",
+    "kb": "{value} KB",
+    "mb": "{value} MB",
+    "gb": "{value} GB",
+    "tb": "{value} TB"
+  },
+  "duration": {
+    "ms": "{value} ms",
+    "s": "{value} s",
+    "minSec": "{min} min {sec} s",
+    "hMin": "{h} h {min} min"
+  },
+  "names": {
+    "local": "Local",
+    "core": "Núcleo",
+    "media": "Multimedia",
+    "web": "Web",
+    "growth": "Crecimiento",
+    "machines": "Máquinas",
+    "mounts": "Servidores montados",
+    "email": "Correo",
+    "phone": "Teléfono",
+    "maps": "Mapas",
+    "social": "Redes sociales",
+    "calendar": "Calendario",
+    "memory": "Memoria",
+    "workflows": "Flujos de trabajo",
+    "financeData": "Datos de mercado",
+    "stock": "Imágenes de archivo",
+    "browser": "Navegadores en la nube",
+    "share": "Enlaces para compartir",
+    "sandbox": "Entornos aislados",
+    "cliBridge": "CLI de agentes",
+    "x402": "Pagos x402",
+    "headlessBrowser": "Navegador sin interfaz"
+  }
+}

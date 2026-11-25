@@ -1,0 +1,50 @@
+{
+  "id": "fal",
+  "name": "fal.ai",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Search and run fal.ai models (image, video, speech, music, transcription) with your own fal key. Outputs are saved to the library.",
+  "secrets": [
+    {
+      "name": "FAL_KEY",
+      "label": "fal.ai API key",
+      "helpUrl": "https://fal.ai/dashboard/keys",
+      "required": true
+    }
+  ],
+  "permissions": {
+    "network": ["api.fal.ai", "queue.fal.run", "fal.media", "*.fal.media"],
+    "library": "full"
+  },
+  "settings": {
+    "type": "object",
+    "properties": {
+      "models": {
+        "type": "string",
+        "title": "Model tools",
+        "description": "Comma-separated fal endpoint ids that get their own typed tool (for example fal-ai/flux/dev). Leave empty for none.",
+        "default": "fal-ai/flux/dev,fal-ai/nano-banana-pro,fal-ai/kling-video/v3/pro/image-to-video,fal-ai/minimax/speech-2.8-hd"
+      },
+      "cache_ttl_hours": {
+        "type": "integer",
+        "title": "Catalog cache (hours)",
+        "description": "How long model search results and schemas are cached on disk.",
+        "default": 24
+      },
+      "max_wait_minutes": {
+        "type": "integer",
+        "title": "Max wait (minutes)",
+        "description": "After this long the call stops waiting and asks the provider to cancel the job; the error says whether the cancel was accepted and how to collect the job later.",
+        "default": 30
+      },
+      "allow_url_inputs": {
+        "type": "boolean",
+        "title": "Allow URL file inputs",
+        "description": "Let model file inputs be https URLs. The provider fetches them, so anything in the link is shared with it. Off: library artifacts only (\"artifact:<id>\").",
+        "default": false
+      }
+    }
+  },
+  "skills": "skills"
+}

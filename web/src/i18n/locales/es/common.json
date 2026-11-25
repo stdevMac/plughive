@@ -1,0 +1,118 @@
+{
+  "time": {
+    "justNow": "ahora mismo"
+  },
+  "app": {
+    "pageLoading": "Cargando la página",
+    "connecting": "Conectando con el daemon",
+    "cannotReach": "No se puede contactar con el daemon",
+    "cannotReachHint": "Comprueba que plughive está en marcha y vuelve a intentarlo.",
+    "tryAgain": "Intentarlo de nuevo",
+    "sessionEnded": "Tu sesión ha terminado. Vuelve a iniciar sesión.",
+    "notFoundTitle": "Página no encontrada",
+    "notFoundBody": "No hay ninguna página en esta dirección.",
+    "notFoundHome": "Ir a Inicio",
+    "skipToContent": "Saltar al contenido",
+    "connectTitle": "Conectar un agente",
+    "connectDescription": "Pega esto en el agente que uses. Apunta a tus herramientas predeterminadas.",
+    "nav": {
+      "ariaLabel": "Principal",
+      "openMenu": "Abrir menú",
+      "closeMenu": "Cerrar menú",
+      "search": "Buscar…",
+      "pendingWaiting": "{count} en espera",
+      "groupSetup": "Configurar",
+      "home": "Inicio",
+      "playground": "Zona de pruebas",
+      "library": "Biblioteca",
+      "jobs": "Trabajos",
+      "triggers": "Disparadores",
+      "triggersTerm": "Programaciones y webhooks",
+      "usage": "Uso",
+      "approvals": "Aprobaciones",
+      "approvalsTerm": "Aprobaciones de gasto",
+      "packs": "Claves y paquetes",
+      "packsTerm": "Paquetes y claves de proveedor",
+      "software": "Software",
+      "softwareTerm": "Programas que ejecutan las herramientas: instalar, aprobar, eliminar",
+      "exposure": "Lo que ven los agentes",
+      "exposureTerm": "Perfiles de exposición",
+      "mounts": "Servidores remotos",
+      "mountsTerm": "Servidores montados: otros servidores MCP",
+      "capabilities": "Servicios preferidos",
+      "capabilitiesTerm": "Orden de proveedores por capacidad",
+      "settings": "Ajustes"
+    }
+  },
+  "ui": {
+    "loading": "Cargando",
+    "crashed": "Algo en esta página ha fallado.",
+    "reload": "Recargar",
+    "tryAgain": "Intentarlo de nuevo",
+    "details": "Detalles",
+    "fieldRequired": " (obligatorio)",
+    "searchPlaceholder": "Buscar",
+    "password": {
+      "show": "Mostrar {label}",
+      "hide": "Ocultar {label}"
+    },
+    "copy": {
+      "label": "Copiar",
+      "copied": "Copiado",
+      "copyWhat": "Copiar {what}",
+      "unavailable": "Aquí no se puede copiar. Selecciona el texto y cópialo."
+    },
+    "externalNewTab": " (se abre en una pestaña nueva)"
+  },
+  "dialog": {
+    "close": "Cerrar"
+  },
+  "toast": {
+    "undo": "Deshacer",
+    "dismiss": "Descartar"
+  },
+  "palette": {
+    "label": "Paleta de comandos",
+    "placeholder": "Ve a una página, paquete, herramienta o archivo…",
+    "results": "Resultados",
+    "empty": "Nada coincide con “{q}”. Prueba con el nombre de una página, una herramienta o un paquete.",
+    "footerMove": "mover",
+    "footerOpen": "abrir",
+    "group": {
+      "actions": "Acciones",
+      "pages": "Páginas",
+      "packs": "Paquetes",
+      "tools": "Herramientas",
+      "recentFiles": "Archivos recientes"
+    },
+    "action": {
+      "connect": "Conectar un agente",
+      "copyEndpoint": "Copiar endpoint",
+      "tryTool": "Probar una herramienta",
+      "addKey": "Añadir una clave de proveedor",
+      "addServer": "Añadir un servidor remoto",
+      "lightTheme": "Usar el tema claro",
+      "darkTheme": "Usar el tema oscuro",
+      "systemTheme": "Seguir el tema del sistema",
+      "signOut": "Cerrar sesión"
+    },
+    "endpointCopied": "Endpoint copiado",
+    "copyFailed": "No se pudo copiar. Selecciónalo en Inicio.",
+    "packOff": "Desactivado",
+    "toolsCount": {
+      "one": "{count} herramienta",
+      "other": "{count} herramientas"
+    }
+  },
+  "api": {
+    "signIn": "Inicia sesión para continuar.",
+    "refused": "El daemon ha rechazado esta solicitud.",
+    "notFound": "No encontrado.",
+    "tooLarge": "La solicitud es demasiado grande.",
+    "tooMany": "Demasiadas solicitudes. Espera un momento y vuelve a intentarlo.",
+    "internal": "El daemon ha tenido un error interno.",
+    "requestFailed": "La solicitud ha fallado (HTTP {status}).",
+    "network": "No se puede contactar con el daemon. Comprueba que está en marcha.",
+    "badResponse": "El daemon ha enviado una respuesta que esta página no puede leer."
+  }
+}

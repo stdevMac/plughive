@@ -1,0 +1,36 @@
+{
+  "id": "media",
+  "name": "Media",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Provider-neutral media, document, text and web tools: generate and edit images, video, speech, music and sound, transcribe, separate stems, clone voices, make 3D models, parse and convert documents, translate, embed, rerank, search and fetch the web. Each call goes to the best configured provider (local backends first, then paid APIs) and falls back on outages.",
+  "permissions": {
+    "tools": [
+      "cap:image.generate",
+      "cap:video.generate",
+      "cap:speech.generate",
+      "cap:music.generate",
+      "cap:audio.transcribe",
+      "cap:chat",
+      "cap:image.edit",
+      "cap:image.upscale",
+      "cap:image.remove_background",
+      "cap:video.upscale",
+      "cap:video.lipsync",
+      "cap:audio.separate_stems",
+      "cap:voice.clone",
+      "cap:sound.effect",
+      "cap:3d.generate",
+      "cap:document.parse",
+      "cap:document.convert",
+      "cap:text.translate",
+      "cap:text.embed",
+      "cap:text.rerank",
+      "cap:web.search",
+      "cap:web.fetch",
+      "cap:media.transcript"
+    ]
+  },
+  "skills": "skills"
+}

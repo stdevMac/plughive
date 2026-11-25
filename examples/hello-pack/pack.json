@@ -1,0 +1,19 @@
+{
+  "id": "hello-pack",
+  "name": "Hello pack",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Example pack: greets someone and saves a note to the artifact library.",
+  "secrets": [
+    {
+      "name": "HELLO_SIGNATURE",
+      "label": "Signature added to notes",
+      "required": false
+    }
+  ],
+  "permissions": {
+    "library": "write"
+  },
+  "skills": "skills"
+}

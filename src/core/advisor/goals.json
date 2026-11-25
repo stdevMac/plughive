@@ -1,0 +1,1190 @@
+{
+  "schema": 1,
+  "goals": [
+    {
+      "id": "short-videos",
+      "title": "Make short videos",
+      "summary": "Cut, caption and voice short clips for Reels, Shorts and TikTok.",
+      "match": [
+        "short video",
+        "shorts",
+        "reels",
+        "tiktok",
+        "clip",
+        "video edit",
+        "make videos",
+        "videos"
+      ],
+      "steps": [
+        {
+          "need": "Cut, resize and caption video",
+          "options": [
+            {
+              "needs": "install",
+              "id": "ffmpeg",
+              "cost": "free",
+              "local": true,
+              "why": "ffmpeg does the cutting, resizing and caption burn-in on this machine."
+            }
+          ]
+        },
+        {
+          "need": "Write captions from the speech",
+          "capability": "audio.transcribe",
+          "options": [
+            {
+              "needs": "install",
+              "id": "parakeet-mlx",
+              "cost": "free",
+              "local": true,
+              "why": "Fast, accurate transcription on Apple silicon, offline."
+            },
+            {
+              "needs": "install",
+              "id": "whisper.cpp",
+              "cost": "free",
+              "local": true,
+              "why": "Offline transcription that runs on any computer.",
+              "with": ["whisper-model-base"]
+            },
+            {
+              "needs": "key",
+              "id": "GEMINI_API_KEY",
+              "pack": "gemini",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Gemini transcribes in the cloud; its free tier covers short clips."
+            },
+            {
+              "needs": "key",
+              "id": "ELEVENLABS_API_KEY",
+              "pack": "elevenlabs",
+              "cost": "free_tier",
+              "local": false,
+              "why": "ElevenLabs Scribe transcribes in the cloud with word timings."
+            }
+          ]
+        },
+        {
+          "need": "Add a voice-over",
+          "capability": "speech.generate",
+          "optional": true,
+          "options": [
+            {
+              "needs": "install",
+              "id": "kokoro",
+              "cost": "free",
+              "local": true,
+              "why": "Kokoro speaks text aloud on this machine, no account."
+            },
+            {
+              "needs": "key",
+              "id": "ELEVENLABS_API_KEY",
+              "pack": "elevenlabs",
+              "cost": "free_tier",
+              "local": false,
+              "why": "The most natural voices; a free tier with a monthly allowance."
+            },
+            {
+              "needs": "key",
+              "id": "GEMINI_API_KEY",
+              "pack": "gemini",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Gemini speech with many voices."
+            }
+          ]
+        },
+        {
+          "need": "Grab source clips from the web",
+          "optional": true,
+          "options": [
+            {
+              "needs": "install",
+              "id": "yt-dlp",
+              "cost": "free",
+              "local": true,
+              "why": "Downloads clips you have the right to use from YouTube and other sites."
+            }
+          ]
+        },
+        {
+          "need": "Ready-made short-video workflow",
+          "optional": true,
+          "options": [
+            {
+              "needs": "enable_pack",
+              "id": "workflows",
+              "cost": "free",
+              "local": true,
+              "why": "Runs the whole short-video recipe in one call."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "transcribe-meetings",
+      "title": "Transcribe meetings",
+      "summary": "Turn recordings into text and summaries.",
+      "match": [
+        "transcribe",
+        "transcript",
+        "meeting",
+        "meetings",
+        "recording",
+        "subtitles",
+        "dictation",
+        "notes from calls"
+      ],
+      "steps": [
+        {
+          "need": "Read audio and video files",
+          "options": [
+            {
+              "needs": "install",
+              "id": "ffmpeg",
+              "cost": "free",
+              "local": true,
+              "why": "Converts any recording into the audio the transcriber reads."
+            }
+          ]
+        },
+        {
+          "need": "Turn speech into text",
+          "capability": "audio.transcribe",
+          "options": [
+            {
+              "needs": "install",
+              "id": "parakeet-mlx",
+              "cost": "free",
+              "local": true,
+              "why": "Fast, accurate and offline on Apple silicon: recordings never leave the machine."
+            },
+            {
+              "needs": "install",
+              "id": "whisper.cpp",
+              "cost": "free",
+              "local": true,
+              "why": "Offline transcription on any computer.",
+              "with": ["whisper-model-base"]
+            },
+            {
+              "needs": "install",
+              "id": "whisperx",
+              "cost": "free",
+              "local": true,
+              "why": "Offline transcription that also tells speakers apart (large download)."
+            },
+            {
+              "needs": "key",
+              "id": "GEMINI_API_KEY",
+              "pack": "gemini",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Cloud transcription with a free tier."
+            },
+            {
+              "needs": "key",
+              "id": "ELEVENLABS_API_KEY",
+              "pack": "elevenlabs",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Cloud transcription with speaker labels."
+            },
+            {
+              "needs": "key",
+              "id": "OPENROUTER_API_KEY",
+              "pack": "openrouter",
+              "cost": "paid",
+              "local": false,
+              "why": "Pay-as-you-go access to several transcription models."
+            }
+          ]
+        },
+        {
+          "need": "Summarise the transcript",
+          "capability": "chat",
+          "optional": true,
+          "options": [
+            {
+              "needs": "install",
+              "id": "ollama",
+              "cost": "free",
+              "local": true,
+              "why": "Runs a language model on this machine for private summaries."
+            },
+            {
+              "needs": "key",
+              "id": "GEMINI_API_KEY",
+              "pack": "gemini",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Gemini summarises long transcripts in the cloud."
+            }
+          ]
+        },
+        {
+          "need": "Dictate anywhere on your Mac",
+          "optional": true,
+          "options": [
+            {
+              "needs": "install",
+              "id": "hex",
+              "cost": "free",
+              "local": true,
+              "why": "Hold a key and talk; the text is typed where your cursor is."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "find-clients",
+      "title": "Find clients",
+      "summary": "Find leads, research them and draft outreach.",
+      "match": [
+        "clients",
+        "leads",
+        "prospects",
+        "sales",
+        "outreach",
+        "customers",
+        "cold email",
+        "lead gen"
+      ],
+      "steps": [
+        {
+          "need": "Find leads",
+          "options": [
+            {
+              "needs": "key",
+              "id": "APOLLO_API_KEY",
+              "pack": "growth",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Apollo searches people and companies by role, industry and size; the growth pack stores and scores them."
+            }
+          ]
+        },
+        {
+          "need": "Research a company's website",
+          "options": [
+            {
+              "needs": "key",
+              "id": "FIRECRAWL_API_KEY",
+              "pack": "web",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Reads and searches websites so drafts are about the prospect's real business."
+            },
+            {
+              "needs": "login",
+              "id": "mounts/exa",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Exa web search finds companies that match a description."
+            },
+            {
+              "needs": "login",
+              "id": "mounts/tavily",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Tavily web search with a free monthly allowance."
+            }
+          ]
+        },
+        {
+          "need": "Draft the emails",
+          "capability": "chat",
+          "options": [
+            {
+              "needs": "install",
+              "id": "ollama",
+              "cost": "free",
+              "local": true,
+              "why": "Drafts on this machine with a local model."
+            },
+            {
+              "needs": "key",
+              "id": "GEMINI_API_KEY",
+              "pack": "gemini",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Gemini writes drafts in the cloud."
+            },
+            {
+              "needs": "key",
+              "id": "OPENROUTER_API_KEY",
+              "pack": "openrouter",
+              "cost": "paid",
+              "local": false,
+              "why": "Any hosted model, pay as you go."
+            }
+          ]
+        },
+        {
+          "need": "Search rankings and keywords",
+          "optional": true,
+          "options": [
+            {
+              "needs": "key",
+              "id": "DATAFORSEO_LOGIN",
+              "pack": "seo",
+              "cost": "paid",
+              "local": false,
+              "why": "See who ranks for your keywords: often your future clients."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "edit-images",
+      "title": "Edit images",
+      "summary": "Resize, cut out, upscale and generate images.",
+      "match": [
+        "image",
+        "images",
+        "photo",
+        "photos",
+        "picture",
+        "pictures",
+        "background",
+        "upscale",
+        "thumbnail",
+        "design"
+      ],
+      "steps": [
+        {
+          "need": "Resize, crop and convert",
+          "options": [
+            {
+              "needs": "install",
+              "id": "imagemagick",
+              "cost": "free",
+              "local": true,
+              "why": "Resizes, crops and converts images on this machine."
+            }
+          ]
+        },
+        {
+          "need": "Remove backgrounds",
+          "optional": true,
+          "options": [
+            {
+              "needs": "install",
+              "id": "rembg",
+              "cost": "free",
+              "local": true,
+              "why": "Cuts the subject out of a photo, offline."
+            }
+          ]
+        },
+        {
+          "need": "Upscale small images",
+          "optional": true,
+          "options": [
+            {
+              "needs": "install",
+              "id": "realesrgan",
+              "cost": "free",
+              "local": true,
+              "why": "Makes small images 4x larger and sharper, offline."
+            }
+          ]
+        },
+        {
+          "need": "Generate new images",
+          "capability": "image.generate",
+          "optional": true,
+          "options": [
+            {
+              "needs": "install",
+              "id": "comfy-cli",
+              "cost": "free",
+              "local": true,
+              "why": "Runs ComfyUI image models on your own GPU (needs a capable graphics card)."
+            },
+            {
+              "needs": "key",
+              "id": "GEMINI_API_KEY",
+              "pack": "gemini",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Gemini image generation and editing."
+            },
+            {
+              "needs": "key",
+              "id": "FAL_KEY",
+              "pack": "fal",
+              "cost": "paid",
+              "local": false,
+              "why": "Hundreds of image models, pay per image."
+            },
+            {
+              "needs": "key",
+              "id": "REPLICATE_API_TOKEN",
+              "pack": "replicate",
+              "cost": "paid",
+              "local": false,
+              "why": "Thousands of open models, pay per run."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "research-web",
+      "title": "Research the web",
+      "summary": "Search, read and summarise web pages and documents.",
+      "match": [
+        "research",
+        "web",
+        "search",
+        "browse",
+        "scrape",
+        "crawl",
+        "read websites",
+        "articles",
+        "documents",
+        "pdf"
+      ],
+      "steps": [
+        {
+          "need": "Search and read web pages",
+          "options": [
+            {
+              "needs": "login",
+              "id": "mounts/deepwiki",
+              "cost": "free",
+              "local": false,
+              "why": "Free, no key: answers questions about public GitHub repositories."
+            },
+            {
+              "needs": "login",
+              "id": "mounts/jina",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Jina reads any page as clean text and searches the web."
+            },
+            {
+              "needs": "key",
+              "id": "FIRECRAWL_API_KEY",
+              "pack": "web",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Search, scrape, map and crawl whole sites."
+            },
+            {
+              "needs": "login",
+              "id": "mounts/exa",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Exa semantic search for finding pages by meaning."
+            },
+            {
+              "needs": "login",
+              "id": "mounts/tavily",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Tavily search built for agents."
+            },
+            {
+              "needs": "login",
+              "id": "mounts/perplexity",
+              "cost": "paid",
+              "local": false,
+              "why": "Perplexity answers with citations."
+            }
+          ]
+        },
+        {
+          "need": "Read PDFs and scanned documents",
+          "optional": true,
+          "options": [
+            {
+              "needs": "install",
+              "id": "ocrmypdf",
+              "cost": "free",
+              "local": true,
+              "why": "Makes scanned PDFs searchable, offline."
+            },
+            {
+              "needs": "install",
+              "id": "pandoc",
+              "cost": "free",
+              "local": true,
+              "why": "Converts between Markdown, Word, HTML and PDF."
+            }
+          ]
+        },
+        {
+          "need": "Summarise what you found",
+          "capability": "chat",
+          "optional": true,
+          "options": [
+            {
+              "needs": "install",
+              "id": "ollama",
+              "cost": "free",
+              "local": true,
+              "why": "A local model for private summaries."
+            },
+            {
+              "needs": "key",
+              "id": "GEMINI_API_KEY",
+              "pack": "gemini",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Gemini summarises long pages in the cloud."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "automate-apps",
+      "title": "Automate my apps",
+      "summary": "Let an agent work in GitHub, Linear, Notion and your machines, or in hundreds of apps through Composio, Pipedream or Zapier.",
+      "match": [
+        "automate",
+        "automation",
+        "apps",
+        "github",
+        "linear",
+        "notion",
+        "workflow",
+        "agent",
+        "machines",
+        "servers",
+        "zapier",
+        "composio",
+        "pipedream",
+        "jira",
+        "slack",
+        "hubspot"
+      ],
+      "steps": [
+        {
+          "need": "An agent to drive it",
+          "options": [
+            {
+              "needs": "install",
+              "id": "claude",
+              "cost": "free_tier",
+              "local": true,
+              "why": "Claude Code runs tasks on your computer with plughive's tools."
+            },
+            {
+              "needs": "install",
+              "id": "codex",
+              "cost": "free_tier",
+              "local": true,
+              "why": "OpenAI Codex CLI can use plughive's tools too."
+            },
+            {
+              "needs": "install",
+              "id": "opencode",
+              "cost": "free",
+              "local": true,
+              "why": "Open-source coding agent; bring any model."
+            }
+          ]
+        },
+        {
+          "need": "Connect the apps you use",
+          "options": [
+            {
+              "needs": "login",
+              "id": "mounts/github",
+              "cost": "free",
+              "local": false,
+              "why": "Issues, pull requests and code on GitHub (a personal access token)."
+            },
+            {
+              "needs": "login",
+              "id": "mounts/linear",
+              "cost": "free",
+              "local": false,
+              "why": "Read and update Linear issues."
+            },
+            {
+              "needs": "login",
+              "id": "mounts/linear-oauth",
+              "cost": "free",
+              "local": false,
+              "why": "Linear signed in with your account instead of an API key."
+            },
+            {
+              "needs": "login",
+              "id": "mounts/notion",
+              "cost": "free",
+              "local": false,
+              "why": "Read and write Notion pages."
+            },
+            {
+              "needs": "login",
+              "id": "mounts/atlassian",
+              "cost": "free",
+              "local": false,
+              "why": "Jira and Confluence: search, read and update issues and pages."
+            },
+            {
+              "needs": "login",
+              "id": "mounts/composio",
+              "cost": "free_tier",
+              "local": false,
+              "why": "One sign-in for hundreds of apps (Gmail, Slack, HubSpot, ...); you pick them at Composio."
+            },
+            {
+              "needs": "login",
+              "id": "mounts/pipedream",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Thousands of APIs; you connect your accounts while signing in."
+            },
+            {
+              "needs": "login",
+              "id": "mounts/zapier",
+              "cost": "free_tier",
+              "local": false,
+              "why": "The actions you enable at Zapier, across its whole app catalog."
+            }
+          ]
+        },
+        {
+          "need": "Ready-made workflows",
+          "optional": true,
+          "options": [
+            {
+              "needs": "enable_pack",
+              "id": "workflows",
+              "cost": "free",
+              "local": true,
+              "why": "Multi-step recipes such as issue triage."
+            },
+            {
+              "needs": "enable_pack",
+              "id": "machines",
+              "cost": "free",
+              "local": true,
+              "why": "Run commands and move files on your other computers over SSH."
+            }
+          ]
+        },
+        {
+          "need": "Get notified when it is done",
+          "optional": true,
+          "options": [
+            {
+              "needs": "key",
+              "id": "TELEGRAM_BOT_TOKEN",
+              "pack": "telegram",
+              "cost": "free",
+              "local": false,
+              "why": "A Telegram bot messages you results."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "send-emails-and-texts",
+      "title": "Send emails and texts",
+      "summary": "Send email, read and answer an agent inbox, text people and place AI phone calls.",
+      "match": [
+        "email",
+        "emails",
+        "inbox",
+        "newsletter",
+        "sms",
+        "texts",
+        "text message",
+        "phone call"
+      ],
+      "steps": [
+        {
+          "need": "Send email",
+          "options": [
+            {
+              "needs": "key",
+              "id": "RESEND_API_KEY",
+              "pack": "email",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Resend sends from your own verified domain; the free plan covers a few thousand emails a month."
+            },
+            {
+              "needs": "key",
+              "id": "AGENTMAIL_API_KEY",
+              "pack": "email",
+              "cost": "free_tier",
+              "local": false,
+              "why": "AgentMail gives the agent its own inbox to read, send and reply from."
+            },
+            {
+              "needs": "login",
+              "id": "mounts/composio",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Send from your own Gmail or Outlook through the Composio app gateway."
+            }
+          ]
+        },
+        {
+          "need": "Text people",
+          "optional": true,
+          "options": [
+            {
+              "needs": "key",
+              "id": "TWILIO_ACCOUNT_SID",
+              "pack": "phone",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Twilio sends and lists SMS (set TWILIO_AUTH_TOKEN too); trial credit, then pay per message."
+            }
+          ]
+        },
+        {
+          "need": "Place AI phone calls",
+          "optional": true,
+          "options": [
+            {
+              "needs": "key",
+              "id": "VAPI_API_KEY",
+              "pack": "phone",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Vapi places outbound calls with an AI voice assistant; starter credit, then pay per minute."
+            }
+          ]
+        },
+        {
+          "need": "Message yourself",
+          "optional": true,
+          "options": [
+            {
+              "needs": "key",
+              "id": "TELEGRAM_BOT_TOKEN",
+              "pack": "telegram",
+              "cost": "free",
+              "local": false,
+              "why": "A Telegram bot sends you results and alerts for free."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "post-to-social",
+      "title": "Post to social media",
+      "summary": "Publish and schedule posts to X, LinkedIn, Instagram, Bluesky and more, with free stock media.",
+      "match": [
+        "social",
+        "post to",
+        "schedule posts",
+        "linkedin",
+        "instagram",
+        "twitter",
+        "bluesky",
+        "facebook",
+        "stock photos"
+      ],
+      "steps": [
+        {
+          "need": "Publish and schedule posts",
+          "options": [
+            {
+              "needs": "key",
+              "id": "AYRSHARE_API_KEY",
+              "pack": "social",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Ayrshare posts to X, LinkedIn, Instagram, TikTok, Threads, Bluesky and more from one key."
+            }
+          ]
+        },
+        {
+          "need": "Find photos and video for posts",
+          "optional": true,
+          "options": [
+            {
+              "needs": "key",
+              "id": "PEXELS_API_KEY",
+              "pack": "stock",
+              "cost": "free",
+              "local": false,
+              "why": "Free stock photos and videos from Pexels, with attribution saved."
+            },
+            {
+              "needs": "key",
+              "id": "UNSPLASH_ACCESS_KEY",
+              "pack": "stock",
+              "cost": "free",
+              "local": false,
+              "why": "Free stock photos from Unsplash, with the credit line it requires."
+            },
+            {
+              "needs": "key",
+              "id": "FREESOUND_API_KEY",
+              "pack": "stock",
+              "cost": "free",
+              "local": false,
+              "why": "Free sounds and music clips from Freesound."
+            }
+          ]
+        },
+        {
+          "need": "Short links that count clicks",
+          "optional": true,
+          "options": [
+            {
+              "needs": "key",
+              "id": "DUB_API_KEY",
+              "pack": "dub",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Dub makes branded short links and counts the clicks from each post."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "schedule-meetings",
+      "title": "Schedule meetings",
+      "summary": "Find free slots, book and cancel meetings on your calendar.",
+      "match": [
+        "schedule",
+        "schedule meeting",
+        "book a meeting",
+        "calendar",
+        "booking",
+        "appointment",
+        "availability",
+        "cal.com"
+      ],
+      "steps": [
+        {
+          "need": "Book and cancel meetings",
+          "options": [
+            {
+              "needs": "key",
+              "id": "CALCOM_API_KEY",
+              "pack": "calendar",
+              "cost": "free",
+              "local": false,
+              "why": "Cal.com lists your event types, finds free slots and books meetings; its personal plan is free."
+            },
+            {
+              "needs": "login",
+              "id": "mounts/composio",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Google Calendar or Outlook through the Composio app gateway."
+            }
+          ]
+        },
+        {
+          "need": "Send confirmations",
+          "optional": true,
+          "options": [
+            {
+              "needs": "key",
+              "id": "RESEND_API_KEY",
+              "pack": "email",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Email the people you booked from your own domain."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "market-data",
+      "title": "Track market prices",
+      "summary": "Read stock, crypto and forex prices and price history. Read-only: no trading.",
+      "match": [
+        "stocks",
+        "stock price",
+        "share price",
+        "market data",
+        "crypto",
+        "forex",
+        "ticker",
+        "prices"
+      ],
+      "steps": [
+        {
+          "need": "Prices and price history",
+          "options": [
+            {
+              "needs": "key",
+              "id": "ALPHAVANTAGE_API_KEY",
+              "pack": "finance-data",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Alpha Vantage quotes and daily prices; a small free daily allowance."
+            },
+            {
+              "needs": "key",
+              "id": "POLYGON_API_KEY",
+              "pack": "finance-data",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Massive (formerly Polygon.io) previous close and price bars; free plan with delayed data."
+            }
+          ]
+        },
+        {
+          "need": "Summarise what moved",
+          "capability": "chat",
+          "optional": true,
+          "options": [
+            {
+              "needs": "install",
+              "id": "ollama",
+              "cost": "free",
+              "local": true,
+              "why": "A local model writes private market notes."
+            },
+            {
+              "needs": "key",
+              "id": "GEMINI_API_KEY",
+              "pack": "gemini",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Gemini writes the summary in the cloud."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "browse-sites",
+      "title": "Drive a web browser",
+      "summary": "Open sites in a cloud browser, click through pages and take screenshots.",
+      "match": [
+        "browser",
+        "web browser",
+        "headless",
+        "screenshot",
+        "fill in forms",
+        "click through",
+        "log in to sites"
+      ],
+      "steps": [
+        {
+          "need": "A browser the agent can drive",
+          "options": [
+            {
+              "needs": "key",
+              "id": "BROWSERBASE_API_KEY",
+              "pack": "browser",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Browserbase cloud browser sessions; a free monthly allowance."
+            },
+            {
+              "needs": "key",
+              "id": "STEEL_API_KEY",
+              "pack": "browser",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Steel cloud browsers that navigate and save screenshots to the library."
+            },
+            {
+              "needs": "login",
+              "id": "mounts/cloudflare-browser",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Cloudflare fetches pages as markdown and takes screenshots (sign in)."
+            },
+            {
+              "needs": "login",
+              "id": "mounts/browserbase",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Browserbase's own MCP server for clicking and typing in pages."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "share-files",
+      "title": "Share files by link",
+      "summary": "Publish files from the library as expiring public links.",
+      "match": [
+        "share files",
+        "share a file",
+        "share link",
+        "public link",
+        "download link",
+        "send a file"
+      ],
+      "steps": [
+        {
+          "need": "A bucket to share from",
+          "options": [
+            {
+              "needs": "key",
+              "id": "SHARE_S3_ACCESS_KEY_ID",
+              "pack": "share",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Cloudflare R2 (free tier) or AWS S3; also set the secret key, endpoint and bucket on the Packs page."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "run-code-safely",
+      "title": "Run code safely",
+      "summary": "Run code away from your files: throwaway Docker containers or cloud sandboxes.",
+      "match": ["sandbox", "run code", "execute code", "untrusted", "docker", "container"],
+      "steps": [
+        {
+          "need": "Docker",
+          "options": [
+            {
+              "needs": "install",
+              "id": "docker",
+              "cost": "free",
+              "local": true,
+              "why": "Docker runs the throwaway containers. Docker Desktop is free for personal use and small businesses; on Linux the Docker Engine package is used."
+            }
+          ]
+        },
+        {
+          "need": "Switch on sandboxes",
+          "options": [
+            {
+              "needs": "enable_pack",
+              "id": "sandbox",
+              "cost": "free",
+              "local": true,
+              "why": "Throwaway Docker containers on this computer (needs Docker), with no network and no access to your files."
+            }
+          ]
+        },
+        {
+          "need": "A cloud sandbox",
+          "optional": true,
+          "options": [
+            {
+              "needs": "key",
+              "id": "E2B_API_KEY",
+              "pack": "sandbox",
+              "cost": "free_tier",
+              "local": false,
+              "why": "E2B cloud sandboxes for running code and commands; free starter credit."
+            },
+            {
+              "needs": "key",
+              "id": "DAYTONA_API_KEY",
+              "pack": "sandbox",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Daytona cloud sandboxes; free starter credit."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "maps-and-places",
+      "title": "Find places and directions",
+      "summary": "Turn addresses into coordinates, search nearby places and get directions.",
+      "match": ["maps", "directions", "geocode", "addresses", "nearby", "places", "route"],
+      "steps": [
+        {
+          "need": "Maps, places and routes",
+          "options": [
+            {
+              "needs": "key",
+              "id": "MAPBOX_ACCESS_TOKEN",
+              "pack": "maps",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Mapbox geocoding and directions with a large free monthly allowance."
+            },
+            {
+              "needs": "key",
+              "id": "GOOGLE_MAPS_API_KEY",
+              "pack": "maps",
+              "cost": "free_tier",
+              "local": false,
+              "why": "Google Maps Platform places, geocoding and directions; monthly free credit."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "use-ai-subscriptions",
+      "title": "Use my AI subscriptions",
+      "summary": "Ask Claude Code, Codex, Gemini CLI and other agent CLIs you already pay for, from any agent.",
+      "match": [
+        "subscription",
+        "agent cli",
+        "claude code",
+        "codex",
+        "gemini cli",
+        "copilot",
+        "antigravity",
+        "opencode"
+      ],
+      "steps": [
+        {
+          "need": "An agent CLI signed in on this computer",
+          "options": [
+            {
+              "needs": "install",
+              "id": "claude",
+              "cost": "free_tier",
+              "local": true,
+              "why": "Claude Code, on your Claude subscription."
+            },
+            {
+              "needs": "install",
+              "id": "codex",
+              "cost": "free_tier",
+              "local": true,
+              "why": "OpenAI Codex CLI, on your ChatGPT subscription."
+            },
+            {
+              "needs": "install",
+              "id": "agy",
+              "cost": "free_tier",
+              "local": true,
+              "why": "Google Antigravity; it can also draw images into the library."
+            },
+            {
+              "needs": "install",
+              "id": "opencode",
+              "cost": "free",
+              "local": true,
+              "why": "Open-source agent CLI; bring any model."
+            }
+          ]
+        },
+        {
+          "need": "Switch on Agent CLIs",
+          "options": [
+            {
+              "needs": "enable_pack",
+              "id": "cli-bridge",
+              "cost": "free",
+              "local": true,
+              "why": "Lets agents ask the CLIs you signed in to, each in a scratch folder with a timeout."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

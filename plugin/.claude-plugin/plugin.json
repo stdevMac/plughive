@@ -1,0 +1,8 @@
+{
+  "name": "plughive",
+  "version": "0.1.0",
+  "description": "Connects Claude Code to a local plughive daemon and explains the search, describe, execute flow.",
+  "author": { "name": "plughive contributors" },
+  "license": "Apache-2.0",
+  "keywords": ["mcp", "gateway", "local", "media"]
+}

@@ -1,0 +1,3 @@
+# Keep LF in every checkout, also on Windows with core.autocrlf: biome checks
+# for LF, and tests and generated docs compare text byte for byte.
+* text=auto eol=lf

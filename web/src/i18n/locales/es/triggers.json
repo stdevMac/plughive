@@ -1,0 +1,112 @@
+{
+  "page": {
+    "title": "Disparadores",
+    "headerTitle": "Disparadores",
+    "description": "Ejecuta un flujo de trabajo con una programación, o cuando otro servicio llame a un webhook firmado.",
+    "newTrigger": "Nuevo disparador",
+    "listLabel": "Disparadores",
+    "emptyTitle": "Todavía no hay disparadores",
+    "emptyBefore": "Crea uno con ",
+    "emptyStrong": "Nuevo disparador",
+    "emptyAfter": " para ejecutar un flujo de trabajo cada mañana, o cada vez que se envíe un formulario.",
+    "created": "{name} creado.",
+    "deleted": "{name} eliminado."
+  },
+  "row": {
+    "runs": "Ejecuciones",
+    "webhookKind": "Con un webhook firmado",
+    "next": "Próxima",
+    "last": "Última",
+    "jobLink": "trabajo",
+    "notRunYet": "Aún no se ha ejecutado",
+    "reportsTo": "Informa a {target}",
+    "webhookCallback": "un webhook",
+    "webhookAddressFor": "Dirección del webhook de {name}",
+    "runNow": "Ejecutar ahora",
+    "newSecret": "Nuevo secreto",
+    "delete": "Eliminar",
+    "deleteFor": "Eliminar {name}",
+    "turnOn": "Activar {name}",
+    "turnOff": "Desactivar {name}",
+    "turned": "{name} se ha {state}.",
+    "on": "activado",
+    "off": "desactivado",
+    "started": "{name} iniciado. Míralo en la página Trabajos."
+  },
+  "dialog": {
+    "title": "Nuevo disparador",
+    "description": "Inicia un flujo de trabajo con una programación o desde otro servicio, como un trabajo en segundo plano.",
+    "cancel": "Cancelar",
+    "create": "Crear disparador"
+  },
+  "form": {
+    "startsWhen": "Empieza cuando",
+    "kindCron": "Con una programación",
+    "kindWebhook": "Llega un webhook",
+    "name": "Nombre",
+    "namePlaceholder": "Resumen de la mañana",
+    "workflow": "Flujo de trabajo",
+    "chooseWorkflow": "Elige un flujo de trabajo…",
+    "schedule": "Programación",
+    "scheduleHint": "Cron: minuto hora día mes día de la semana.",
+    "timezone": "Zona horaria",
+    "timezoneLocal": "La hora de este equipo",
+    "timezoneUtc": "UTC",
+    "catchUp": "Si se han perdido ejecuciones mientras el daemon estaba apagado, ejecutar una vez al arrancar",
+    "useBody": "Usar el cuerpo JSON de la petición como entrada del flujo de trabajo",
+    "args": "Entrada del flujo de trabajo (JSON)",
+    "argsHint": "Los campos del cuerpo de la petición tienen prioridad sobre estos.",
+    "callback": "Cuando termine el trabajo, informar a",
+    "callbackNone": "Nadie",
+    "callbackWebhook": "Un webhook (POST firmado)",
+    "callbackTelegram": "Telegram (necesita el paquete de Telegram)",
+    "callbackUrl": "Dirección de retorno",
+    "callbackUrlHint": "Solo direcciones públicas.",
+    "chatId": "Id del chat (opcional)",
+    "chatIdHint": "Si está vacío, se usa el chat predeterminado del paquete de Telegram.",
+    "noWorkflows": "No hay flujos de trabajo cargados. Añade uno a tu carpeta de flujos de trabajo primero.",
+    "inputDoesNotFit": "La entrada del flujo de trabajo no encaja: {message}",
+    "nameRequired": "Ponle un nombre.",
+    "workflowRequired": "Elige un flujo de trabajo.",
+    "scheduleInvalid": "Usa cinco campos: minuto hora día mes día de la semana.",
+    "argsNotJson": "Esto no es JSON válido.",
+    "argsNotObject": "Usa un objeto JSON, como {}.",
+    "callbackUrlInvalid": "Introduce una dirección http o https."
+  },
+  "presets": {
+    "every15Minutes": "Cada 15 minutos",
+    "everyHour": "Cada hora",
+    "everyDayAt9": "Todos los días a las 09:00",
+    "weekdaysAt9": "Entre semana a las 09:00",
+    "mondaysAt9": "Los lunes a las 09:00",
+    "firstOfMonth": "El primer día del mes"
+  },
+  "zone": {
+    "utc": "UTC",
+    "local": "hora local"
+  },
+  "lastRun": {
+    "error": "No se pudo iniciar",
+    "skipped": "Omitida (perdida)",
+    "started": "Iniciada"
+  },
+  "secret": {
+    "title": "Secreto de firma de {name}",
+    "fallbackName": "disparador",
+    "description": "Cópialo ahora. No se vuelve a mostrar; crea uno nuevo si lo pierdes.",
+    "copied": "Ya lo he copiado",
+    "webhookAddress": "Dirección del webhook",
+    "signingSecret": "Secreto de firma",
+    "hint1": "Quien llame envía ",
+    "hint2": " (segundos Unix) y",
+    "hint3": ", el HMAC-SHA256 de",
+    "hint4": " con este secreto. Las devoluciones al terminar el trabajo se firman igual."
+  },
+  "delete": {
+    "title": "¿Eliminar {name}?",
+    "fallbackName": "disparador",
+    "keep": "Mantenerlo",
+    "confirm": "Eliminar disparador",
+    "body": "Deja de ejecutarse y su dirección de webhook deja de funcionar. Los trabajos que ya ha iniciado se conservan."
+  }
+}

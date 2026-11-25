@@ -1,0 +1,12 @@
+{
+  "id": "memory",
+  "name": "Memory",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Long-term semantic memory for agents: remember text with tags and metadata, recall it by meaning, forget it. Embeddings come from your text.embed provider; vectors are stored locally in SQLite (sqlite-vec, with a pure JS fallback).",
+  "permissions": {
+    "tools": ["cap:text.embed"]
+  },
+  "skills": "skills"
+}

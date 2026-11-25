@@ -1,0 +1,20 @@
+{
+  "id": "parallel",
+  "name": "Parallel search",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Web search through the Parallel.ai Search API with your own key (search_web).",
+  "secrets": [
+    {
+      "name": "PARALLEL_API_KEY",
+      "label": "Parallel API key",
+      "helpUrl": "https://platform.parallel.ai",
+      "required": true
+    }
+  ],
+  "permissions": {
+    "network": ["api.parallel.ai"]
+  },
+  "skills": "skills"
+}

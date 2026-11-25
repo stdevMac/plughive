@@ -1,0 +1,20 @@
+{
+  "id": "deepl",
+  "name": "DeepL",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Translate text with DeepL and your own key, Free or Pro (translate_text).",
+  "secrets": [
+    {
+      "name": "DEEPL_API_KEY",
+      "label": "DeepL API key",
+      "helpUrl": "https://www.deepl.com/your-account/keys",
+      "required": true
+    }
+  ],
+  "permissions": {
+    "network": ["api.deepl.com", "api-free.deepl.com"]
+  },
+  "skills": "skills"
+}

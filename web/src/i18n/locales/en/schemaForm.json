@@ -1,0 +1,25 @@
+{
+  "arguments": "Arguments",
+  "required": " (required)",
+  "example": "e.g. {example}",
+  "choose": "Choose",
+  "notSet": "Not set",
+  "jsonPlaceholder": "JSON value",
+  "item": "Item {index}",
+  "removeItem": "Remove item {index} of {label}",
+  "addAnother": "Add another",
+  "addFirst": "Add an item",
+  "noArguments": "This tool takes no arguments.",
+  "optional": "Optional ({count})",
+  "errors": {
+    "required": "This field is required.",
+    "enterNumber": "Enter a number.",
+    "wholeNumber": "Enter a whole number.",
+    "min": "The smallest allowed value is {min}.",
+    "max": "The largest allowed value is {max}.",
+    "chooseOption": "Choose one of the options.",
+    "invalidJson": "This is not valid JSON.",
+    "maxItems": "Use at most {max} items.",
+    "maxChars": "Keep each item to {max} characters or fewer."
+  }
+}

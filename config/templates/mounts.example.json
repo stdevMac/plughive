@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "mounts": [
+    {
+      "id": "firecrawl",
+      "name": "Firecrawl",
+      "enabled": false,
+      "transport": "http",
+      "prefix": "firecrawl",
+      "url": "https://mcp.firecrawl.dev/mcp",
+      "headers": { "Authorization": "Bearer ${secret:FIRECRAWL_API_KEY}" }
+    },
+    {
+      "id": "github",
+      "name": "GitHub",
+      "enabled": false,
+      "transport": "http",
+      "prefix": "github",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": { "Authorization": "Bearer ${secret:GITHUB_PERSONAL_ACCESS_TOKEN}" }
+    }
+  ]
+}

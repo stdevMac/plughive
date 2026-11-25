@@ -1,0 +1,50 @@
+{
+  "id": "replicate",
+  "name": "Replicate",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Search and run Replicate models (image generation and editing, upscaling, background removal, video, lip-sync, speech, music, stems, sound effects, 3D, transcription) with your own Replicate API token. Outputs are saved to the library.",
+  "secrets": [
+    {
+      "name": "REPLICATE_API_TOKEN",
+      "label": "Replicate API token",
+      "helpUrl": "https://replicate.com/account/api-tokens",
+      "required": true
+    }
+  ],
+  "permissions": {
+    "network": ["api.replicate.com", "replicate.delivery", "*.replicate.delivery"],
+    "library": "full"
+  },
+  "settings": {
+    "type": "object",
+    "properties": {
+      "models": {
+        "type": "string",
+        "title": "Model tools",
+        "description": "Comma-separated Replicate models (owner/name) that get their own typed tool. Their schemas are fetched once with your token and cached. Leave empty for none.",
+        "default": "black-forest-labs/flux-schnell,google/nano-banana,minimax/video-01"
+      },
+      "cache_ttl_hours": {
+        "type": "integer",
+        "title": "Catalog cache (hours)",
+        "description": "How long model search results and schemas are cached on disk.",
+        "default": 24
+      },
+      "max_wait_minutes": {
+        "type": "integer",
+        "title": "Max wait (minutes)",
+        "description": "After this long the call stops waiting and asks Replicate to cancel the prediction (a Cancel-After header is also sent as a backstop); the error says whether the cancel was accepted and how to collect the prediction later.",
+        "default": 30
+      },
+      "allow_url_inputs": {
+        "type": "boolean",
+        "title": "Allow URL file inputs",
+        "description": "Let model file inputs be https URLs. The provider fetches them, so anything in the link is shared with it. Off: library artifacts only (\"artifact:<id>\").",
+        "default": false
+      }
+    }
+  },
+  "skills": "skills"
+}

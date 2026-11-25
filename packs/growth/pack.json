@@ -1,0 +1,23 @@
+{
+  "id": "growth",
+  "name": "Growth",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Find leads with a lead provider, keep them in a local store, score them against an ICP and draft cold email.",
+  "secrets": [
+    {
+      "name": "APOLLO_API_KEY",
+      "label": "Apollo API key",
+      "helpUrl": "https://docs.apollo.io/docs/create-api-key",
+      "required": false
+    }
+  ],
+  "permissions": {
+    "network": ["api.apollo.io"],
+    "llm": true,
+    "library": "write",
+    "tools": ["firecrawl_scrape", "dub_shorten_url"]
+  },
+  "skills": "skills"
+}

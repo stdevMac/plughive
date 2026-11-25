@@ -1,0 +1,48 @@
+{
+  "query": "flux",
+  "models": [
+    {
+      "model": {
+        "url": "https://replicate.com/black-forest-labs/flux-schnell",
+        "owner": "black-forest-labs",
+        "name": "flux-schnell",
+        "description": "The fastest image generation model tailored for local development and personal use",
+        "is_official": true,
+        "run_count": 500000000
+      },
+      "metadata": {
+        "generated_description": "Fast text-to-image model",
+        "score": 0.98,
+        "tags": ["text-to-image", "flux"]
+      }
+    },
+    {
+      "model": {
+        "url": "https://replicate.com/acme/flux-video-thing",
+        "owner": "acme",
+        "name": "flux-video-thing",
+        "description": "Animate a still into a short video clip",
+        "is_official": false,
+        "run_count": 1200
+      },
+      "metadata": {
+        "generated_description": "Image to video",
+        "score": 0.6,
+        "tags": ["image-to-video"]
+      }
+    },
+    {
+      "model": {
+        "url": "https://evil.example/x",
+        "owner": "acme",
+        "name": "flux-tts",
+        "description": "Text to speech voice model",
+        "run_count": 5
+      },
+      "metadata": { "tags": [] }
+    },
+    { "model": { "name": "no-owner" }, "metadata": {} }
+  ],
+  "collections": [],
+  "pages": []
+}

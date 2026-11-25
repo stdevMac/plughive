@@ -1,0 +1,118 @@
+{
+  "time": {
+    "justNow": "just now"
+  },
+  "app": {
+    "pageLoading": "Loading the page",
+    "connecting": "Connecting to the daemon",
+    "cannotReach": "Cannot reach the daemon",
+    "cannotReachHint": "Check that plughive is running, then try again.",
+    "tryAgain": "Try again",
+    "sessionEnded": "Your session ended. Sign in again.",
+    "notFoundTitle": "Page not found",
+    "notFoundBody": "There is no page at this address.",
+    "notFoundHome": "Go to Home",
+    "skipToContent": "Skip to content",
+    "connectTitle": "Connect an agent",
+    "connectDescription": "Paste this into the agent you use. It points at your default tools.",
+    "nav": {
+      "ariaLabel": "Main",
+      "openMenu": "Open menu",
+      "closeMenu": "Close menu",
+      "search": "Search…",
+      "pendingWaiting": "{count} waiting",
+      "groupSetup": "Set up",
+      "home": "Home",
+      "playground": "Playground",
+      "library": "Library",
+      "jobs": "Jobs",
+      "triggers": "Triggers",
+      "triggersTerm": "Schedules and webhooks",
+      "usage": "Usage",
+      "approvals": "Approvals",
+      "approvalsTerm": "Spend approvals",
+      "packs": "Keys & packs",
+      "packsTerm": "Packs and provider keys",
+      "software": "Software",
+      "softwareTerm": "Programs tools run: install, approve, remove",
+      "exposure": "What agents see",
+      "exposureTerm": "Exposure profiles",
+      "mounts": "Remote servers",
+      "mountsTerm": "Mounts: other MCP servers",
+      "capabilities": "Preferred services",
+      "capabilitiesTerm": "Capability provider order",
+      "settings": "Settings"
+    }
+  },
+  "ui": {
+    "loading": "Loading",
+    "crashed": "Something in this page crashed.",
+    "reload": "Reload",
+    "tryAgain": "Try again",
+    "details": "Details",
+    "fieldRequired": " (required)",
+    "searchPlaceholder": "Search",
+    "password": {
+      "show": "Show {label}",
+      "hide": "Hide {label}"
+    },
+    "copy": {
+      "label": "Copy",
+      "copied": "Copied",
+      "copyWhat": "Copy {what}",
+      "unavailable": "Copying is not available here. Select the text and copy it."
+    },
+    "externalNewTab": " (opens in a new tab)"
+  },
+  "dialog": {
+    "close": "Close"
+  },
+  "toast": {
+    "undo": "Undo",
+    "dismiss": "Dismiss"
+  },
+  "palette": {
+    "label": "Command palette",
+    "placeholder": "Go to a page, pack, tool or file…",
+    "results": "Results",
+    "empty": "Nothing matches “{q}”. Try a page name, a tool or a pack.",
+    "footerMove": "move",
+    "footerOpen": "open",
+    "group": {
+      "actions": "Actions",
+      "pages": "Pages",
+      "packs": "Packs",
+      "tools": "Tools",
+      "recentFiles": "Recent files"
+    },
+    "action": {
+      "connect": "Connect an agent",
+      "copyEndpoint": "Copy endpoint",
+      "tryTool": "Try a tool",
+      "addKey": "Add a provider key",
+      "addServer": "Add a remote server",
+      "lightTheme": "Use light theme",
+      "darkTheme": "Use dark theme",
+      "systemTheme": "Match system theme",
+      "signOut": "Sign out"
+    },
+    "endpointCopied": "Endpoint copied",
+    "copyFailed": "Could not copy. Select it on Home instead.",
+    "packOff": "Off",
+    "toolsCount": {
+      "one": "{count} tool",
+      "other": "{count} tools"
+    }
+  },
+  "api": {
+    "signIn": "Sign in to continue.",
+    "refused": "The daemon refused this request.",
+    "notFound": "Not found.",
+    "tooLarge": "The request is too large.",
+    "tooMany": "Too many requests. Wait a moment and try again.",
+    "internal": "The daemon hit an internal error.",
+    "requestFailed": "The request failed (HTTP {status}).",
+    "network": "Cannot reach the daemon. Check that it is running.",
+    "badResponse": "The daemon sent a response this page cannot read."
+  }
+}

@@ -1,0 +1,76 @@
+# plughive with Docker Compose.
+#
+# 1. Create a folder named secrets next to this file with three files, one
+#    value each (for example: openssl rand -hex 32 > secrets/access_key):
+#
+#      secrets/access_key           MCP clients send it
+#      secrets/admin_token          24+ characters; it signs you in to the dashboard
+#      secrets/secrets_passphrase   encrypts saved provider keys
+#
+#    Keep the folder private (chmod 700 secrets). The files must be readable
+#    by uid 1000, the node user in the image: Docker Desktop maps this for you;
+#    on Linux run sudo chown 1000 secrets/* && sudo chmod 400 secrets/*.
+#    They reach the container as files under /run/secrets, not as environment
+#    variables, so `docker inspect` does not show them.
+#
+# 2. docker compose up -d --build
+#
+# 3. Get the dashboard sign-in link:
+#
+#      docker compose exec plughive plughive dashboard --print
+#
+#    It is http://127.0.0.1:7777/#token=<admin token>.
+#
+# 4. Point MCP clients at http://127.0.0.1:7777/mcp with the header
+#    "Authorization: Bearer <access key>".
+#
+# The daemon binds 0.0.0.0 inside the container, which is why the access key is
+# required. The port is published on the host loopback only. The container
+# runs as the unprivileged node user with a read-only root file system, no
+# capabilities and no privilege escalation; only /data and /tmp are writable.
+services:
+  plughive:
+    build:
+      context: .
+      args:
+        # Set to 1 to include Chromium for screenshot_url.
+        WITH_CHROMIUM: "0"
+    image: plughive:local
+    init: false # the image runs tini itself
+    ports:
+      - "127.0.0.1:7777:7777"
+    environment:
+      PLUGHIVE_ACCESS_KEY_FILE: /run/secrets/access_key
+      PLUGHIVE_ADMIN_TOKEN_FILE: /run/secrets/admin_token
+      PLUGHIVE_SECRETS: file
+      PLUGHIVE_SECRETS_PASSPHRASE_FILE: /run/secrets/secrets_passphrase
+      # The origin you open in the browser. Change it with the published port.
+      PLUGHIVE_PUBLIC_URL: ${PLUGHIVE_PUBLIC_URL:-http://127.0.0.1:7777}
+    secrets:
+      - access_key
+      - admin_token
+      - secrets_passphrase
+    volumes:
+      - plughive-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+      - /home/node:size=64m,uid=1000,gid=1000,mode=0700
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 2g
+    pids_limit: 512
+    restart: unless-stopped
+
+secrets:
+  access_key:
+    file: ./secrets/access_key
+  admin_token:
+    file: ./secrets/admin_token
+  secrets_passphrase:
+    file: ./secrets/secrets_passphrase
+
+volumes:
+  plughive-data:

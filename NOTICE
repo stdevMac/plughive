@@ -1,0 +1,12 @@
+plughive
+Copyright 2026 The plughive Authors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+The built dashboard (dist/web/dist) bundles React and React DOM, which are
+Copyright (c) Meta Platforms, Inc. and affiliates and licensed under the MIT
+License.
+
+At run time the daemon loads third-party packages from node_modules under
+their own licenses. Run "pnpm licenses" for the list. sharp loads libvips,
+which is licensed under the LGPL-3.0-or-later, as a separate shared library.

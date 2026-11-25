@@ -1,0 +1,122 @@
+{
+  "title": "Uso",
+  "description": "Lo que cuestan tus herramientas y cuántas veces se ejecutaron, contado en este ordenador.",
+  "builtIn": "Integrado",
+  "estimatedSpend": "Gasto estimado",
+  "calls": "Llamadas",
+  "failed": "Fallidas",
+  "range": {
+    "label": "Intervalo de tiempo",
+    "option": {
+      "today": "Hoy",
+      "7d": "7 días",
+      "30d": "30 días",
+      "all": "Todo el tiempo"
+    },
+    "sub": {
+      "today": "hoy",
+      "7d": "en los últimos 7 días",
+      "30d": "en los últimos 30 días",
+      "all": "desde el principio"
+    }
+  },
+  "measure": {
+    "label": "Medir",
+    "cost": "Gasto"
+  },
+  "totals": "Totales",
+  "stat": {
+    "cached": "Reutilizado de la caché",
+    "fallback": "{count} usó un servicio de respaldo",
+    "errorRate": "{rate}% de las llamadas",
+    "noCalls": "Aún no hay llamadas",
+    "noCharge": "Sin cargo nuevo"
+  },
+  "callCount": {
+    "one": "{count} llamada",
+    "other": "{count} llamadas"
+  },
+  "failedCount": "{count} fallidas",
+  "empty": {
+    "allTitle": "Todavía no se ha usado nada",
+    "rangeTitle": "No hay llamadas en este intervalo",
+    "openPlayground": "Abrir la zona de pruebas",
+    "showAll": "Mostrar todo el tiempo",
+    "allBody": "Cada llamada de la zona de pruebas y de tus agentes se cuenta aquí, con su coste estimado.",
+    "rangeBody": "No se ejecutó nada en este intervalo."
+  },
+  "chart": {
+    "titleCost": "Gasto estimado por día",
+    "titleCalls": "Llamadas por día",
+    "aria": "por día, {days} días, {total} en total",
+    "showTable": "Mostrar como tabla",
+    "tableCaption": "Uso por día",
+    "day": "Día",
+    "noSpend": "No hay gasto registrado en este intervalo.",
+    "noCallsProvider": "No hay llamadas en este intervalo para este proveedor."
+  },
+  "provider": {
+    "label": "Proveedor",
+    "showOne": "Mostrar un solo proveedor",
+    "all": "Todos los proveedores",
+    "title": "Por proveedor",
+    "list": "Uso por proveedor",
+    "empty": "No hay llamadas a proveedores en este intervalo. Las llamadas que no usan proveedor se cuentan solo en herramientas."
+  },
+  "tool": {
+    "title": "Por herramienta",
+    "list": "Uso por herramienta",
+    "more": "Mostrando las {shown} más usadas de {total} herramientas."
+  },
+  "health": {
+    "title": "Servicios ocupados",
+    "rateLimited": "Límite alcanzado, reintenta {when}",
+    "available": "Disponible",
+    "lastAway": "Último rechazo {when}"
+  },
+  "footnote": "El gasto es una estimación a partir de los precios de tarifa de cada proveedor; la factura de tu proveedor es la cifra real. Los días empiezan a medianoche UTC.",
+  "caps": {
+    "title": "Límites de gasto",
+    "edit": "Editar límites",
+    "saved": "Límites de gasto guardados.",
+    "none": "Sin límites. Añade uno para limitar cuánto pueden gastar las herramientas.",
+    "noneSet": "No hay límites: las herramientas gastan sin límite. Añade un límite diario o mensual que bloquee o te pregunte antes.",
+    "cap": "Límite {n}",
+    "capPeriod": "Periodo del límite {n}",
+    "capScope": "El límite {n} se aplica a",
+    "capProviderId": "Id de proveedor del límite {n}",
+    "capProfileId": "Id de perfil del límite {n}",
+    "capLimit": "Importe del límite {n} en dólares",
+    "capMode": "Qué hace el límite {n} al alcanzarse",
+    "remove": "Quitar el límite {n}",
+    "profileIdPlaceholder": "id de perfil",
+    "period": {
+      "daily": "Diario",
+      "monthly": "Mensual"
+    },
+    "scope": {
+      "global": "Todo",
+      "provider": "Un proveedor",
+      "profile": "Un perfil"
+    },
+    "mode": {
+      "ask": "y luego pregúntame",
+      "block": "y luego bloquea"
+    },
+    "badgeAsk": "pregunta",
+    "badgeBlock": "bloquea",
+    "add": "Añadir un límite",
+    "cancel": "Cancelar",
+    "save": "Guardar límites",
+    "help": "Los ids de proveedor son los nombres de la lista \"Por proveedor\" (por ejemplo fal o replicate). Los días y los meses empiezan en UTC.",
+    "brokenTitle": "policy.json está dañado",
+    "invalid": "No pasa la validación.",
+    "brokenBody": "Hasta que se arregle o se elimine, se rechazan las llamadas que puedan costar dinero. Desde aquí nunca se sobrescribe, así que corrige el archivo a mano.",
+    "unreadable": "Gasto ilegible",
+    "used": "{cap} usado",
+    "of": " de {amount}",
+    "footBefore": "Un límite que pregunta envía las peticiones a ",
+    "footLink": "Aprobaciones",
+    "footAfter": ". Un límite que bloquea rechaza la llamada; otro proveedor aún podría ejecutarla."
+  }
+}

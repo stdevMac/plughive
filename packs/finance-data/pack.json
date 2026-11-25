@@ -1,0 +1,26 @@
+{
+  "id": "finance-data",
+  "name": "Market data (Massive/Polygon and Alpha Vantage)",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Read-only stock, crypto and forex prices: previous close and price bars from Massive (formerly Polygon.io), quotes and daily prices from Alpha Vantage. No trading.",
+  "secrets": [
+    {
+      "name": "POLYGON_API_KEY",
+      "label": "Massive (Polygon.io) API key",
+      "helpUrl": "https://massive.com/dashboard/api-keys",
+      "required": false
+    },
+    {
+      "name": "ALPHAVANTAGE_API_KEY",
+      "label": "Alpha Vantage API key",
+      "helpUrl": "https://www.alphavantage.co/support/#api-key",
+      "required": false
+    }
+  ],
+  "permissions": {
+    "network": ["api.massive.com", "www.alphavantage.co"]
+  },
+  "skills": "skills"
+}

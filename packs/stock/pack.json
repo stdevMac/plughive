@@ -1,0 +1,53 @@
+{
+  "id": "stock",
+  "name": "Stock media (Pexels, Unsplash, Freesound)",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Search free stock photos and videos (Pexels, Unsplash) and sounds (Freesound), and download them into the library with their attribution.",
+  "secrets": [
+    {
+      "name": "PEXELS_API_KEY",
+      "label": "Pexels API key",
+      "helpUrl": "https://www.pexels.com/api/new/",
+      "required": false
+    },
+    {
+      "name": "UNSPLASH_ACCESS_KEY",
+      "label": "Unsplash access key",
+      "helpUrl": "https://unsplash.com/oauth/applications",
+      "required": false
+    },
+    {
+      "name": "FREESOUND_API_KEY",
+      "label": "Freesound API key",
+      "helpUrl": "https://freesound.org/apiv2/apply/",
+      "required": false
+    }
+  ],
+  "permissions": {
+    "network": [
+      "api.pexels.com",
+      "images.pexels.com",
+      "videos.pexels.com",
+      "static-videos.pexels.com",
+      "player.vimeo.com",
+      "api.unsplash.com",
+      "images.unsplash.com",
+      "freesound.org",
+      "cdn.freesound.org"
+    ],
+    "library": "write"
+  },
+  "settings": {
+    "type": "object",
+    "properties": {
+      "unsplashAppName": {
+        "type": "string",
+        "title": "Unsplash app name",
+        "description": "Your Unsplash application name, used as utm_source in the attribution links Unsplash requires. Default: plughive."
+      }
+    }
+  },
+  "skills": "skills"
+}

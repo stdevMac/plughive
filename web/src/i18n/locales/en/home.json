@@ -1,0 +1,131 @@
+{
+  "title": "Home",
+  "getStarted": "Get started",
+  "getStartedDescription": "Four steps, about a minute. Nothing is charged until you run a paid tool.",
+  "setupGuide": "Setup guide",
+  "openPlayground": "Open playground",
+  "backHome": "Back to Home",
+  "skipSetup": "Skip setup",
+  "header": {
+    "connectAgent": "Connect an agent"
+  },
+  "providers": {
+    "openrouter": "Hundreds of chat, image, video and speech models behind one key.",
+    "fal": "Fast image and video models such as FLUX, Kling and Nano Banana.",
+    "replicate": "Run open models for images, video, speech and music.",
+    "gemini": "Google's image, video, music and transcription models.",
+    "elevenlabs": "Speech, music, dubbing, transcription and voice isolation.",
+    "local": "ffmpeg, ComfyUI, Ollama and Whisper on this computer. No key needed."
+  },
+  "provider": {
+    "notInstalled": "Not installed",
+    "offLink": "Off: turn on in Keys & packs",
+    "needsAttention": "Needs attention",
+    "noKeyNeeded": "No key needed",
+    "keyAdded": "Key added",
+    "close": "Close",
+    "addKey": "Add key",
+    "forName": " for {name}"
+  },
+  "check": {
+    "done": ", done",
+    "todo": ", to do"
+  },
+  "checklist": {
+    "connect": {
+      "title": "Connect your agent",
+      "summaryTodo": "Paste one snippet into Claude, Cursor or another agent.",
+      "waiting": "Waiting for your agent. This updates by itself.",
+      "body": "Your agent gets this server's tools once you add it. Pick your agent, copy the snippet, then restart or reload the agent.",
+      "cta": "Connect an agent",
+      "later": "Do this later"
+    },
+    "goal": {
+      "title": "Say what you want to do",
+      "body": "Pick a goal to see what this computer still needs for it. Free options that keep your files here come first; nothing installs until you approve it.",
+      "next": "Next",
+      "openSoftware": "Open Software",
+      "skip": "Skip: I'll decide later"
+    },
+    "key": {
+      "title": "Add one key",
+      "body": "One provider key unlocks its image, video and speech tools. You can skip this: free and local tools work without a key.",
+      "skip": "Skip: use free tools only"
+    },
+    "try": {
+      "title": "Run a tool in the playground",
+      "summaryDone": "Done. Anything a tool makes shows up in the Library.",
+      "summaryTodo": "Fill in a short form and press Run.",
+      "bodyStatus": "Start with the free status check. It runs on this computer and costs nothing.",
+      "bodyImage": "Make an image with {provider}: type a prompt and press Run. What it makes lands in the Library.",
+      "bodyTool": "Try a {provider} tool: fill in the form and press Run. Files it makes land in the Library.",
+      "openPlayground": "Open the playground",
+      "seeLibrary": "See the Library"
+    },
+    "goalSummary": {
+      "picked": "{title}. Its setup plan is on the Software page.",
+      "skipped": "Skipped. Ask your agent to call setup_plan any time.",
+      "prompt": "Pick what you want to do; see what this computer still needs."
+    },
+    "keySummary": {
+      "added": "Key added for {providers}.",
+      "skipped": "Skipped. Free and local tools work without a key.",
+      "prompt": "One key unlocks image, video and speech tools."
+    },
+    "doneTitle": "You're set.",
+    "doneBody": "Ask your agent for an image or a voice-over; it runs here.",
+    "hideGuide": "Hide this guide",
+    "progress": "{done} of {total} done. You can leave and come back: this list remembers where you are."
+  },
+  "attention": {
+    "title": "Needs attention",
+    "notLoaded": "{name} did not load.",
+    "notLoadedAction": "See why",
+    "rateLimited": "{name} is rate limiting. It is skipped until {until}.",
+    "rateLimitedAction": "Preferred services",
+    "noKey": "No provider key yet, so only free and local tools run.",
+    "noKeyAction": "Add a key"
+  },
+  "overview": {
+    "agentsTitle": "Connected agents",
+    "agentsNone": "None yet. Connect one and it shows up here.",
+    "endpointTitle": "Endpoint",
+    "endpointUrl": "endpoint URL",
+    "endpointHintBefore": "Agents connect here.",
+    "endpointHintLink": "Choose what they see",
+    "weekTitle": "This week",
+    "usageAction": "Usage",
+    "callsEstimated": {
+      "one": "{count} call, estimated",
+      "other": "{count} calls, estimated"
+    },
+    "spendLabel": "Spend per day this week",
+    "callsLabel": "Calls per day this week",
+    "runningTitle": "Running now",
+    "allJobs": "All jobs",
+    "runningEmpty": "Nothing running. Long tasks such as video show their progress here.",
+    "recentTitle": "Recent files",
+    "libraryAction": "Library",
+    "filesEmptyBefore": "No files yet. Images, video and audio your tools make are kept here.",
+    "filesEmptyLink": "Try a tool",
+    "artifactLabel": "{kind} from {source}, {when}",
+    "aTool": "a tool"
+  },
+  "plan": {
+    "listLabel": "Goals",
+    "fewer": "Fewer goals",
+    "more": "More goals ({count})",
+    "ready": "Ready: everything {title} needs is set up.",
+    "stepsLeft": {
+      "one": "{count} required step left. Free options that run on this computer come first.",
+      "other": "{count} required steps left. Free options that run on this computer come first."
+    },
+    "optional": "Optional",
+    "doneWith": "Done with {name}.",
+    "optionWhy": ": {why}",
+    "sizeSep": " · {size}",
+    "orAlternatives": " · or {names}",
+    "noOptions": "Nothing offered on this computer.",
+    "officialPage": "Official page"
+  }
+}

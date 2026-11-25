@@ -1,0 +1,153 @@
+{
+  "groups": {
+    "images": "Imágenes",
+    "video": "Vídeo",
+    "audio": "Audio y voz",
+    "text": "Texto y lenguaje",
+    "documents": "Documentos",
+    "web": "Web",
+    "other": "Otros"
+  },
+  "labels": {
+    "imageGenerate": { "title": "Crear imágenes", "blurb": "Imágenes a partir de una descripción" },
+    "imageEdit": { "title": "Editar imágenes", "blurb": "Cambia una imagen con una instrucción" },
+    "imageUpscale": { "title": "Ampliar imágenes", "blurb": "Imágenes más grandes y nítidas" },
+    "imageRemoveBackground": { "title": "Quitar fondos", "blurb": "Recorta el sujeto" },
+    "3dGenerate": {
+      "title": "Crear modelos 3D",
+      "blurb": "Modelos a partir de texto o una imagen"
+    },
+    "videoGenerate": {
+      "title": "Crear vídeos",
+      "blurb": "Clips a partir de una descripción o una imagen"
+    },
+    "videoUpscale": { "title": "Ampliar vídeos", "blurb": "Clips con más resolución" },
+    "videoLipsync": {
+      "title": "Sincronizar los labios",
+      "blurb": "Una cara habla con una pista de audio nueva"
+    },
+    "mediaTranscript": {
+      "title": "Transcripciones de vídeo",
+      "blurb": "Lo que dice un enlace de vídeo o pódcast"
+    },
+    "speechGenerate": {
+      "title": "Leer texto en voz alta",
+      "blurb": "Voz natural a partir de texto"
+    },
+    "musicGenerate": { "title": "Crear música", "blurb": "Canciones y fondos musicales" },
+    "audioTranscribe": {
+      "title": "Transcribir audio",
+      "blurb": "Habla grabada convertida en texto"
+    },
+    "audioSeparateStems": {
+      "title": "Separar una canción",
+      "blurb": "Voz, batería, bajo y el resto por separado"
+    },
+    "voiceClone": {
+      "title": "Clonar una voz",
+      "blurb": "Una voz reutilizable a partir de muestras"
+    },
+    "soundEffect": { "title": "Efectos de sonido", "blurb": "Sonidos a partir de una descripción" },
+    "chat": {
+      "title": "Modelo de lenguaje",
+      "blurb": "Paquetes que piden a un modelo que escriba o responda"
+    },
+    "textTranslate": { "title": "Traducir", "blurb": "Texto en otro idioma" },
+    "textEmbed": { "title": "Embeddings", "blurb": "Texto como vectores, para búsqueda y memoria" },
+    "textRerank": { "title": "Reordenar", "blurb": "Ordena los resultados por relevancia" },
+    "documentParse": { "title": "Leer documentos", "blurb": "Texto de PDF y escaneos" },
+    "documentConvert": {
+      "title": "Convertir documentos",
+      "blurb": "PDF, Word, HTML, Markdown y más"
+    },
+    "webSearch": { "title": "Buscar en la web", "blurb": "Encuentra páginas en la web" },
+    "webFetch": { "title": "Leer páginas web", "blurb": "Una página como texto limpio" }
+  },
+  "cost": {
+    "local": "Gratis, en este equipo",
+    "account": "Usa tu propia cuenta",
+    "paid": "Se paga por uso"
+  },
+  "badge": {
+    "paid": "De pago",
+    "account": "Tu cuenta",
+    "free": "Gratis"
+  },
+  "skip": {
+    "notInstalled": "No está instalado o no está en marcha",
+    "notSetup": "Sin configurar",
+    "needsKey": "Necesita una clave",
+    "rateLimited": "Límite de peticiones, vuelve {when}",
+    "namedOnly": "Solo cuando se pide por su nombre"
+  },
+  "setup": {
+    "install": "Instalar",
+    "addKey": "Añadir clave",
+    "setUp": "Configurar"
+  },
+  "row": {
+    "uses": "Usa ",
+    "noService": "Ningún servicio",
+    "nothingSetUp": "Nada configurado",
+    "moved": "{label} es ahora el número {position} de {total} para {capability}.",
+    "usedNow": "En uso",
+    "moveUp": "Subir {provider} para {capability}",
+    "moveDown": "Bajar {provider} para {capability}",
+    "listLabel": "Servicios para {capability}, el primero se prueba antes"
+  },
+  "panel": {
+    "emptyTitle": "Ningún servicio ofrece esto todavía",
+    "emptyBefore": "Activa un paquete que pueda {capability} en la página ",
+    "emptyLink": "Claves y paquetes",
+    "emptyAfter": ".",
+    "hintSetup": "Para {capability}, configura uno de estos.",
+    "hintFree": " {provider} es gratis y se ejecuta en este equipo.",
+    "fallbackOrder": "Se prueban de arriba abajo. Si uno está ocupado o caído, pasa el siguiente antes de que se te cobre nada.",
+    "resetOrder": "Usar el orden predeterminado",
+    "resetSaid": "{capability} vuelve a usar el orden predeterminado."
+  },
+  "page": {
+    "title": "Servicios preferidos",
+    "description": "Cada trabajo lo hace un servicio. Los servicios gratis de este equipo pueden ir primero; los de pago entran cuando faltan o están ocupados.",
+    "freeFirst": "Gratis y local primero",
+    "resetAll": "Restablecer todo",
+    "ofTotal": " de {total}",
+    "jobsReady": "trabajos listos",
+    "runFree": "se ejecutan gratis",
+    "needSetup": "necesitan configuración",
+    "show": "Mostrar",
+    "filterAll": "Todos",
+    "filterSetup": "Necesitan configuración",
+    "filterPaid": "De pago",
+    "filterFree": "Gratis",
+    "searchLabel": "Buscar trabajos y servicios",
+    "searchPlaceholder": "Buscar",
+    "noMatchTitle": "Nada coincide",
+    "showEverything": "Mostrar todo",
+    "backToOrder": "{capability} vuelve al orden que tenía.",
+    "earlierOrderBack": "Ha vuelto el orden anterior."
+  },
+  "preset": {
+    "freeAlready": "Los servicios gratis ya van primero en todas partes.",
+    "defaultAlready": "Todos los trabajos usan ya el orden predeterminado.",
+    "freeApplied": {
+      "one": "Los servicios gratis ya van primero para {count} trabajo.",
+      "other": "Los servicios gratis ya van primero para {count} trabajos."
+    },
+    "defaultApplied": {
+      "one": "{count} trabajo vuelve a usar el orden predeterminado.",
+      "other": "{count} trabajos vuelven a usar el orden predeterminado."
+    }
+  },
+  "composer": {
+    "contextShare": {
+      "about": "unos {pct}% de un contexto de {contextK}k",
+      "lessThanOne": "menos del 1% de un contexto de {contextK}k"
+    },
+    "threshold": {
+      "enterNumber": "Escribe un número.",
+      "wholeNumber": "Usa un número entero, como 8000.",
+      "atLeastOne": "Usa un número de al menos 1."
+    }
+  }
+}

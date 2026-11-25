@@ -1,0 +1,67 @@
+{
+  "page": {
+    "title": "Playground",
+    "description": "Try any tool by hand, with the same checks your agents go through."
+  },
+  "picker": {
+    "searchLabel": "Search tools",
+    "searchPlaceholder": {
+      "one": "Search {count} tool",
+      "other": "Search {count} tools"
+    },
+    "shown": {
+      "one": "{count} tool shown",
+      "other": "{count} tools shown"
+    },
+    "listLabel": "Tools",
+    "builtIn": "Built in",
+    "noMatch": "No tool matches. Try another word."
+  },
+  "job": {
+    "took": "Took {duration}",
+    "soFar": "{duration} so far",
+    "openInJobs": "Open in Jobs",
+    "stop": "Stop job",
+    "failed": "The job failed.",
+    "unknownTitle": "Not sure the provider got it",
+    "unknownBody": "The connection dropped while sending. Check the provider's own dashboard before running it again, so you are not charged twice."
+  },
+  "errors": {
+    "invalidInputs": "Some inputs are not valid"
+  },
+  "runner": {
+    "editAs": "Edit arguments as",
+    "modeForm": "Form",
+    "modeJson": "JSON",
+    "longRunning": "Runs as a background job",
+    "needsSecrets": "Needs {secrets}",
+    "mayCost": "May cost money with the provider",
+    "argsLabel": "Arguments (JSON)",
+    "jsonPlaceholder": "JSON value",
+    "argsNotObject": "The arguments must be a JSON object.",
+    "notValidJson": "Not valid JSON: {message}",
+    "fixJsonFirst": "Fix the JSON before going back to the form: {message}",
+    "started": "Started as a background job. You can leave this page; it keeps running.",
+    "clearResult": "Clear result",
+    "run": "Run",
+    "noArguments": "This tool takes no arguments.",
+    "resultTitle": "Result",
+    "idleHint": "Run the tool to see its result here. Files it makes are saved to the Library.",
+    "running": "Running",
+    "copyToolName": "tool name"
+  },
+  "empty": {
+    "noToolsTitle": "No tools yet",
+    "noToolsAction": "Turn on a pack",
+    "noToolsBody": "Tools come from packs and mounts.",
+    "unavailableTitle": "That tool is not available",
+    "unavailableClear": "Clear",
+    "unavailableBody": " is not loaded. Its pack may be off.",
+    "pickTitle": "Pick a tool",
+    "pickBefore": "Choose a tool on the left, or start with a free one: ",
+    "pickLinkStatus": "server status",
+    "pickOr": " or ",
+    "pickLinkFiles": "list your files",
+    "pickAfter": "."
+  }
+}

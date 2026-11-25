@@ -1,0 +1,49 @@
+{
+  "id": "email",
+  "name": "Email (Resend and AgentMail)",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Send email through Resend, and list, read and reply to AgentMail inboxes.",
+  "secrets": [
+    {
+      "name": "RESEND_API_KEY",
+      "label": "Resend API key",
+      "helpUrl": "https://resend.com/api-keys",
+      "required": false
+    },
+    {
+      "name": "AGENTMAIL_API_KEY",
+      "label": "AgentMail API key",
+      "helpUrl": "https://console.agentmail.to",
+      "required": false
+    }
+  ],
+  "permissions": {
+    "network": ["api.resend.com", "api.agentmail.to"]
+  },
+  "settings": {
+    "type": "object",
+    "properties": {
+      "defaultFrom": {
+        "type": "string",
+        "title": "Default sender",
+        "description": "Sender used by resend_send_email when a call gives no `from`, for example \"Acme <hello@acme.com>\". Its domain must be verified in Resend."
+      },
+      "allowedRecipients": {
+        "type": "array",
+        "items": { "type": "string" },
+        "title": "Allowed recipients",
+        "description": "Addresses (user@example.com) or \"@domain\" rules that resend_send_email may send to (to, cc, bcc, reply_to). Empty (the default) means any address, as before. Agents cannot change this setting.",
+        "default": []
+      },
+      "lockSender": {
+        "type": "boolean",
+        "title": "Lock sender",
+        "description": "When true and a defaultFrom is configured, calls cannot override the `from` field. Default false.",
+        "default": false
+      }
+    }
+  },
+  "skills": "skills"
+}

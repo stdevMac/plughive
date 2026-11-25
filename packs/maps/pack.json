@@ -1,0 +1,31 @@
+{
+  "id": "maps",
+  "name": "Maps (Google Maps and Mapbox)",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Geocode addresses, search places and get directions with Google Maps Platform and Mapbox.",
+  "secrets": [
+    {
+      "name": "GOOGLE_MAPS_API_KEY",
+      "label": "Google Maps Platform API key",
+      "helpUrl": "https://console.cloud.google.com/google/maps-apis/credentials",
+      "required": false
+    },
+    {
+      "name": "MAPBOX_ACCESS_TOKEN",
+      "label": "Mapbox access token",
+      "helpUrl": "https://console.mapbox.com/account/access-tokens/",
+      "required": false
+    }
+  ],
+  "permissions": {
+    "network": [
+      "maps.googleapis.com",
+      "places.googleapis.com",
+      "routes.googleapis.com",
+      "api.mapbox.com"
+    ]
+  },
+  "skills": "skills"
+}

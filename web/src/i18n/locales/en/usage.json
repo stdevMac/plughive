@@ -1,0 +1,122 @@
+{
+  "title": "Usage",
+  "description": "What your tools cost and how often they ran, counted on this computer.",
+  "builtIn": "Built in",
+  "estimatedSpend": "Estimated spend",
+  "calls": "Calls",
+  "failed": "Failed",
+  "range": {
+    "label": "Time range",
+    "option": {
+      "today": "Today",
+      "7d": "7 days",
+      "30d": "30 days",
+      "all": "All time"
+    },
+    "sub": {
+      "today": "today",
+      "7d": "in the last 7 days",
+      "30d": "in the last 30 days",
+      "all": "since the start"
+    }
+  },
+  "measure": {
+    "label": "Measure",
+    "cost": "Spend"
+  },
+  "totals": "Totals",
+  "stat": {
+    "cached": "Reused from cache",
+    "fallback": "{count} used a backup service",
+    "errorRate": "{rate}% of calls",
+    "noCalls": "No calls yet",
+    "noCharge": "No new charge"
+  },
+  "callCount": {
+    "one": "{count} call",
+    "other": "{count} calls"
+  },
+  "failedCount": "{count} failed",
+  "empty": {
+    "allTitle": "Nothing used yet",
+    "rangeTitle": "No calls in this range",
+    "openPlayground": "Open the playground",
+    "showAll": "Show all time",
+    "allBody": "Every call from the playground and your agents is counted here, with its estimated cost.",
+    "rangeBody": "Nothing ran in this range."
+  },
+  "chart": {
+    "titleCost": "Estimated spend per day",
+    "titleCalls": "Calls per day",
+    "aria": "per day, {days} days, {total} in total",
+    "showTable": "Show as a table",
+    "tableCaption": "Usage per day",
+    "day": "Day",
+    "noSpend": "No spend recorded in this range.",
+    "noCallsProvider": "No calls in this range for this provider."
+  },
+  "provider": {
+    "label": "Provider",
+    "showOne": "Show one provider",
+    "all": "All providers",
+    "title": "By provider",
+    "list": "Usage by provider",
+    "empty": "No provider calls in this range. Calls that use no provider count under tools only."
+  },
+  "tool": {
+    "title": "By tool",
+    "list": "Usage by tool",
+    "more": "Showing the {shown} most used of {total} tools."
+  },
+  "health": {
+    "title": "Busy services",
+    "rateLimited": "Rate limited, retry {when}",
+    "available": "Available",
+    "lastAway": "Last turned away {when}"
+  },
+  "footnote": "Spend is an estimate from each provider's list prices; your provider's bill is the real figure. Days start at midnight UTC.",
+  "caps": {
+    "title": "Spend caps",
+    "edit": "Edit caps",
+    "saved": "Spend caps saved.",
+    "none": "No caps. Add one to limit what tools may spend.",
+    "noneSet": "No caps set: tools spend without a limit. Add a daily or monthly cap that blocks or asks you first.",
+    "cap": "Cap {n}",
+    "capPeriod": "Cap {n} period",
+    "capScope": "Cap {n} applies to",
+    "capProviderId": "Cap {n} provider id",
+    "capProfileId": "Cap {n} profile id",
+    "capLimit": "Cap {n} limit in dollars",
+    "capMode": "Cap {n} when reached",
+    "remove": "Remove cap {n}",
+    "profileIdPlaceholder": "profile id",
+    "period": {
+      "daily": "Daily",
+      "monthly": "Monthly"
+    },
+    "scope": {
+      "global": "Everything",
+      "provider": "One provider",
+      "profile": "One profile"
+    },
+    "mode": {
+      "ask": "then ask me",
+      "block": "then block"
+    },
+    "badgeAsk": "asks",
+    "badgeBlock": "blocks",
+    "add": "Add a cap",
+    "cancel": "Cancel",
+    "save": "Save caps",
+    "help": "Provider ids are the names in the \"By provider\" list (for example fal or replicate). Days and months start in UTC.",
+    "brokenTitle": "policy.json is broken",
+    "invalid": "It does not validate.",
+    "brokenBody": "Until it is fixed or removed, calls that may cost money are refused. It is never overwritten from here, so fix the file by hand.",
+    "unreadable": "Spend unreadable",
+    "used": "{cap} used",
+    "of": " of {amount}",
+    "footBefore": "A cap that asks sends requests to ",
+    "footLink": "Approvals",
+    "footAfter": ". A cap that blocks refuses the call; another provider may still run it."
+  }
+}

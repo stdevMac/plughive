@@ -1,0 +1,358 @@
+{
+  "id": "mounts",
+  "name": "Remote MCP servers",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "description": "Preconfigured remote MCP servers. Every one is off until you switch it on and set its key (or sign in, for the OAuth ones). Their tools appear as <prefix>__<tool>; what they return is untrusted data.",
+  "secrets": [
+    {
+      "name": "FIRECRAWL_API_KEY",
+      "label": "Firecrawl API key",
+      "helpUrl": "https://docs.firecrawl.dev/mcp-server",
+      "required": false
+    },
+    {
+      "name": "EXA_API_KEY",
+      "label": "Exa API key",
+      "helpUrl": "https://dashboard.exa.ai/api-keys",
+      "required": false
+    },
+    {
+      "name": "BROWSERBASE_API_KEY",
+      "label": "Browserbase API key",
+      "helpUrl": "https://www.browserbase.com/overview",
+      "required": false
+    },
+    {
+      "name": "TAVILY_API_KEY",
+      "label": "Tavily API key",
+      "helpUrl": "https://app.tavily.com",
+      "required": false
+    },
+    {
+      "name": "PERPLEXITY_API_KEY",
+      "label": "Perplexity API key",
+      "helpUrl": "https://docs.perplexity.ai/docs/getting-started/integrations/mcp-server",
+      "required": false
+    },
+    {
+      "name": "JINA_API_KEY",
+      "label": "Jina AI API key",
+      "helpUrl": "https://jina.ai",
+      "required": false
+    },
+    {
+      "name": "APIFY_TOKEN",
+      "label": "Apify API token",
+      "helpUrl": "https://docs.apify.com/platform/integrations/mcp",
+      "required": false
+    },
+    {
+      "name": "GITHUB_MCP_PAT",
+      "label": "GitHub personal access token",
+      "helpUrl": "https://github.com/settings/personal-access-tokens/new",
+      "required": false
+    },
+    {
+      "name": "LINEAR_API_KEY",
+      "label": "Linear API key",
+      "helpUrl": "https://linear.app/docs/mcp",
+      "required": false
+    },
+    {
+      "name": "CONTEXT7_API_KEY",
+      "label": "Context7 API key",
+      "helpUrl": "https://context7.com/dashboard",
+      "required": false
+    },
+    {
+      "name": "RUNPOD_API_KEY",
+      "label": "Runpod API key",
+      "helpUrl": "https://docs.runpod.io/get-started/mcp-servers",
+      "required": false
+    },
+    {
+      "name": "HF_TOKEN",
+      "label": "Hugging Face token",
+      "helpUrl": "https://huggingface.co/settings/mcp",
+      "required": false
+    }
+  ],
+  "mounts": [
+    {
+      "id": "firecrawl",
+      "name": "Firecrawl",
+      "description": "Web search, scraping and document parsing.",
+      "transport": "http",
+      "url": "https://mcp.firecrawl.dev/v2/mcp",
+      "headers": { "Authorization": "Bearer ${secret:FIRECRAWL_API_KEY}" },
+      "prefix": "firecrawl",
+      "auth": "header",
+      "docsUrl": "https://docs.firecrawl.dev/mcp-server",
+      "enabledByDefault": false
+    },
+    {
+      "id": "exa",
+      "name": "Exa",
+      "description": "Web search and page fetch (web_search_exa, web_fetch_exa).",
+      "transport": "http",
+      "url": "https://mcp.exa.ai/mcp",
+      "headers": { "x-api-key": "${secret:EXA_API_KEY}" },
+      "prefix": "exa",
+      "auth": "header",
+      "docsUrl": "https://docs.exa.ai/reference/exa-mcp",
+      "enabledByDefault": false
+    },
+    {
+      "id": "browserbase",
+      "name": "Browserbase",
+      "description": "Cloud browser sessions: navigate, act, observe, extract. The key travels in the URL query, which upstream logs may record.",
+      "transport": "http",
+      "url": "https://mcp.browserbase.com/mcp?browserbaseApiKey=${secret:BROWSERBASE_API_KEY}",
+      "prefix": "browserbase",
+      "auth": "query",
+      "docsUrl": "https://docs.browserbase.com/integrations/mcp/setup",
+      "enabledByDefault": false
+    },
+    {
+      "id": "tavily",
+      "name": "Tavily",
+      "description": "Search, extract, crawl, map and research the web.",
+      "transport": "http",
+      "url": "https://mcp.tavily.com/mcp/",
+      "headers": { "Authorization": "Bearer ${secret:TAVILY_API_KEY}" },
+      "prefix": "tavily",
+      "auth": "header",
+      "docsUrl": "https://docs.tavily.com/documentation/mcp",
+      "enabledByDefault": false
+    },
+    {
+      "id": "perplexity",
+      "name": "Perplexity",
+      "description": "Search, ask, research and reason with Perplexity (billed at API pricing).",
+      "transport": "http",
+      "url": "https://api.perplexity.ai/mcp",
+      "headers": { "Authorization": "Bearer ${secret:PERPLEXITY_API_KEY}" },
+      "prefix": "perplexity",
+      "auth": "header",
+      "docsUrl": "https://docs.perplexity.ai/docs/getting-started/integrations/mcp-server",
+      "enabledByDefault": false
+    },
+    {
+      "id": "jina",
+      "name": "Jina AI",
+      "description": "Read URLs, screenshots, web, arXiv and image search, PDF extraction.",
+      "transport": "http",
+      "url": "https://mcp.jina.ai/v1",
+      "headers": { "Authorization": "Bearer ${secret:JINA_API_KEY}" },
+      "prefix": "jina",
+      "auth": "header",
+      "docsUrl": "https://github.com/jina-ai/MCP",
+      "enabledByDefault": false
+    },
+    {
+      "id": "apify",
+      "name": "Apify",
+      "description": "Find and run Apify Actors, web search and fetch.",
+      "transport": "http",
+      "url": "https://mcp.apify.com",
+      "headers": { "Authorization": "Bearer ${secret:APIFY_TOKEN}" },
+      "prefix": "apify",
+      "auth": "header",
+      "docsUrl": "https://docs.apify.com/platform/integrations/mcp",
+      "enabledByDefault": false
+    },
+    {
+      "id": "github",
+      "name": "GitHub",
+      "description": "GitHub repositories, issues and pull requests with a personal access token.",
+      "transport": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": { "Authorization": "Bearer ${secret:GITHUB_MCP_PAT}" },
+      "prefix": "github",
+      "auth": "header",
+      "docsUrl": "https://github.com/github/github-mcp-server",
+      "enabledByDefault": false
+    },
+    {
+      "id": "linear",
+      "name": "Linear",
+      "description": "Linear issues and projects with an API key.",
+      "transport": "http",
+      "url": "https://mcp.linear.app/mcp",
+      "headers": { "Authorization": "Bearer ${secret:LINEAR_API_KEY}" },
+      "prefix": "linear",
+      "auth": "header",
+      "docsUrl": "https://linear.app/docs/mcp",
+      "enabledByDefault": false
+    },
+    {
+      "id": "context7",
+      "name": "Context7",
+      "description": "Up-to-date library documentation (resolve-library-id, query-docs).",
+      "transport": "http",
+      "url": "https://mcp.context7.com/mcp",
+      "headers": { "Authorization": "Bearer ${secret:CONTEXT7_API_KEY}" },
+      "prefix": "context7",
+      "auth": "header",
+      "docsUrl": "https://github.com/upstash/context7",
+      "enabledByDefault": false
+    },
+    {
+      "id": "runpod",
+      "name": "Runpod",
+      "description": "Manage Runpod pods, serverless endpoints, templates and volumes. Actions can cost money.",
+      "transport": "http",
+      "url": "https://mcp.runpod.io/",
+      "headers": { "Authorization": "Bearer ${secret:RUNPOD_API_KEY}" },
+      "prefix": "runpod",
+      "auth": "header",
+      "docsUrl": "https://docs.runpod.io/get-started/mcp-servers",
+      "enabledByDefault": false
+    },
+    {
+      "id": "huggingface",
+      "name": "Hugging Face",
+      "description": "Hub search for models, datasets, Spaces and papers. The bearer-token form is not confirmed by Hugging Face docs.",
+      "transport": "http",
+      "url": "https://huggingface.co/mcp",
+      "headers": { "Authorization": "Bearer ${secret:HF_TOKEN}" },
+      "prefix": "hf",
+      "auth": "header",
+      "docsUrl": "https://huggingface.co/docs/hub/en/hf-mcp-server",
+      "enabledByDefault": false
+    },
+    {
+      "id": "deepwiki",
+      "name": "DeepWiki",
+      "description": "Read and ask questions about public GitHub repository wikis. No key needed.",
+      "transport": "http",
+      "url": "https://mcp.deepwiki.com/mcp",
+      "prefix": "deepwiki",
+      "auth": "none",
+      "docsUrl": "https://docs.devin.ai/work-with-devin/deepwiki-mcp",
+      "enabledByDefault": false
+    },
+    {
+      "id": "sentry",
+      "name": "Sentry",
+      "description": "Sentry errors and issue triage. Sign in from the dashboard (Remote servers, Connect).",
+      "transport": "http",
+      "url": "https://mcp.sentry.dev/mcp",
+      "prefix": "sentry",
+      "auth": "oauth",
+      "docsUrl": "https://mcp.sentry.dev/",
+      "enabledByDefault": false
+    },
+    {
+      "id": "cloudflare-browser",
+      "name": "Cloudflare Browser Run",
+      "description": "Fetch pages, convert to markdown, take screenshots. Sign in from the dashboard (Remote servers, Connect).",
+      "transport": "http",
+      "url": "https://browser.mcp.cloudflare.com/mcp",
+      "prefix": "cfbrowser",
+      "auth": "oauth",
+      "docsUrl": "https://developers.cloudflare.com/agents/model-context-protocol/mcp-servers-for-cloudflare/",
+      "enabledByDefault": false
+    },
+    {
+      "id": "notion",
+      "name": "Notion",
+      "description": "Notion pages and databases. Sign in from the dashboard (Remote servers, Connect).",
+      "transport": "http",
+      "url": "https://mcp.notion.com/mcp",
+      "prefix": "notion",
+      "auth": "oauth",
+      "docsUrl": "https://developers.notion.com/docs/get-started-with-mcp",
+      "enabledByDefault": false
+    },
+    {
+      "id": "context-dev",
+      "name": "Context.dev",
+      "description": "Web, news, scraping and brand data. Sign in from the dashboard (Remote servers, Connect).",
+      "transport": "http",
+      "url": "https://mcp.context.dev/mcp",
+      "prefix": "contextdev",
+      "auth": "oauth",
+      "docsUrl": "https://docs.context.dev/mcp",
+      "enabledByDefault": false
+    },
+    {
+      "id": "linear-oauth",
+      "name": "Linear (sign-in)",
+      "description": "Linear issues, projects and comments, signed in with your Linear account instead of an API key. Sign in from the dashboard (Remote servers, Connect).",
+      "transport": "http",
+      "url": "https://mcp.linear.app/mcp",
+      "prefix": "linearo",
+      "auth": "oauth",
+      "docsUrl": "https://linear.app/docs/mcp",
+      "enabledByDefault": false
+    },
+    {
+      "id": "atlassian",
+      "name": "Atlassian Rovo",
+      "description": "Jira and Confluence: search, read and update issues and pages. Sign in from the dashboard (Remote servers, Connect).",
+      "transport": "http",
+      "url": "https://mcp.atlassian.com/v2/mcp",
+      "prefix": "atlassian",
+      "auth": "oauth",
+      "docsUrl": "https://support.atlassian.com/atlassian-rovo-mcp-server/docs/getting-started-with-the-atlassian-remote-mcp-server/",
+      "enabledByDefault": false
+    },
+    {
+      "id": "stripe",
+      "name": "Stripe",
+      "description": "Stripe customers, payments, invoices and the Stripe docs. Sign in from the dashboard (Remote servers, Connect).",
+      "transport": "http",
+      "url": "https://mcp.stripe.com",
+      "prefix": "stripe",
+      "auth": "oauth",
+      "docsUrl": "https://docs.stripe.com/mcp",
+      "enabledByDefault": false
+    },
+    {
+      "id": "cloudflare",
+      "name": "Cloudflare API",
+      "description": "The whole Cloudflare API: Workers, DNS, R2, zones and account settings. Sign in from the dashboard (Remote servers, Connect).",
+      "transport": "http",
+      "url": "https://mcp.cloudflare.com/mcp",
+      "prefix": "cloudflare",
+      "auth": "oauth",
+      "docsUrl": "https://developers.cloudflare.com/agents/model-context-protocol/mcp-servers-for-cloudflare/",
+      "enabledByDefault": false
+    },
+    {
+      "id": "composio",
+      "name": "Composio Connect",
+      "description": "App gateway: hundreds of apps (Gmail, Slack, GitHub, HubSpot, ...) behind one sign-in; you connect the apps at Composio. Sign in from the dashboard (Remote servers, Connect).",
+      "transport": "http",
+      "url": "https://connect.composio.dev/mcp",
+      "prefix": "composio",
+      "auth": "oauth",
+      "docsUrl": "https://docs.composio.dev/docs/composio-connect",
+      "enabledByDefault": false
+    },
+    {
+      "id": "pipedream",
+      "name": "Pipedream",
+      "description": "App gateway: thousands of APIs; you pick the apps and connect your accounts while signing in. Sign in from the dashboard (Remote servers, Connect).",
+      "transport": "http",
+      "url": "https://mcp.pipedream.net/v2",
+      "prefix": "pipedream",
+      "auth": "oauth",
+      "docsUrl": "https://pipedream.com/docs/connect/mcp/users",
+      "enabledByDefault": false
+    },
+    {
+      "id": "zapier",
+      "name": "Zapier",
+      "description": "App gateway: the actions you enable at Zapier across its app catalog. Sign in from the dashboard (Remote servers, Connect).",
+      "transport": "http",
+      "url": "https://mcp.zapier.com/api/v1/connect",
+      "prefix": "zapier",
+      "auth": "oauth",
+      "docsUrl": "https://docs.zapier.com/mcp/get-started/connect/other",
+      "enabledByDefault": false
+    }
+  ]
+}

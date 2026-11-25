@@ -1,0 +1,62 @@
+{
+  "id": "openrouter",
+  "name": "OpenRouter",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Chat with any OpenRouter text model and generate images, video and speech or transcribe audio through OpenRouter, with your own OpenRouter API key. Outputs are saved to the library.",
+  "secrets": [
+    {
+      "name": "OPENROUTER_API_KEY",
+      "label": "OpenRouter API key",
+      "helpUrl": "https://openrouter.ai/settings/keys",
+      "required": true
+    }
+  ],
+  "permissions": {
+    "network": ["openrouter.ai"],
+    "library": "full"
+  },
+  "settings": {
+    "type": "object",
+    "properties": {
+      "models": {
+        "type": "string",
+        "title": "Model tools",
+        "description": "Comma-separated OpenRouter video, image or speech models (vendor/name) that get their own typed tool. Leave empty for none.",
+        "default": "google/veo-3.1-fast,google/gemini-nano-banana-2.1,openai/gpt-image-2,elevenlabs/eleven-v3"
+      },
+      "chat_model": {
+        "type": "string",
+        "title": "Default chat model",
+        "description": "Model openrouter_chat uses when a call names none.",
+        "default": "minimax/minimax-m2.7"
+      },
+      "cache_ttl_hours": {
+        "type": "integer",
+        "title": "Catalog cache (hours)",
+        "description": "How long model catalogs and search results are cached on disk.",
+        "default": 24
+      },
+      "max_wait_minutes": {
+        "type": "integer",
+        "title": "Max wait (minutes)",
+        "description": "How long to wait for a video job before the call stops waiting. OpenRouter cannot cancel jobs, so the job keeps running and is billed; the error quotes its id for openrouter_video_result.",
+        "default": 20
+      },
+      "max_chat_tokens": {
+        "type": "integer",
+        "title": "Chat max_tokens ceiling",
+        "description": "openrouter_chat refuses calls whose max_tokens is above this.",
+        "default": 32768
+      },
+      "allow_url_inputs": {
+        "type": "boolean",
+        "title": "Allow URL file inputs",
+        "description": "Let model file inputs be https URLs. OpenRouter and the model provider fetch them, so anything in the link is shared with them. Off: library artifacts only.",
+        "default": false
+      }
+    }
+  },
+  "skills": "skills"
+}

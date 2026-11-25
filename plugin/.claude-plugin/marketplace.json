@@ -1,0 +1,16 @@
+{
+  "name": "plughive-local",
+  "owner": {
+    "name": "plughive"
+  },
+  "metadata": {
+    "description": "Local marketplace for the plughive plugin in this folder."
+  },
+  "plugins": [
+    {
+      "name": "plughive",
+      "source": "./",
+      "description": "Connects Claude Code to a local plughive daemon."
+    }
+  ]
+}

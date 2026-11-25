@@ -1,0 +1,25 @@
+{
+  "arguments": "Argumentos",
+  "required": " (obligatorio)",
+  "example": "p. ej. {example}",
+  "choose": "Elegir",
+  "notSet": "Sin definir",
+  "jsonPlaceholder": "Valor JSON",
+  "item": "Elemento {index}",
+  "removeItem": "Quitar el elemento {index} de {label}",
+  "addAnother": "Añadir otro",
+  "addFirst": "Añadir un elemento",
+  "noArguments": "Esta herramienta no recibe argumentos.",
+  "optional": "Opcionales ({count})",
+  "errors": {
+    "required": "Este campo es obligatorio.",
+    "enterNumber": "Escribe un número.",
+    "wholeNumber": "Escribe un número entero.",
+    "min": "El valor más pequeño permitido es {min}.",
+    "max": "El valor más grande permitido es {max}.",
+    "chooseOption": "Elige una de las opciones.",
+    "invalidJson": "Esto no es JSON válido.",
+    "maxItems": "Usa como máximo {max} elementos.",
+    "maxChars": "No pases de {max} caracteres por elemento."
+  }
+}

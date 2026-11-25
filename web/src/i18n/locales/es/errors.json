@@ -1,0 +1,50 @@
+{
+  "somethingWentWrong": "Algo salió mal.",
+  "missingSecret": {
+    "what": "{name} necesita primero una clave de API.",
+    "whatNoName": "Esto necesita primero una clave de API.",
+    "whyLabel": "{label} aún no está definido.",
+    "why": "La clave aún no está definida.",
+    "next": "Añade tu clave de {name}"
+  },
+  "network": {
+    "what": "El panel no pudo contactar con el servidor.",
+    "why": "Puede que se haya parado o reiniciado.",
+    "next": "Recarga la página"
+  },
+  "invalidArguments": "Algunos valores no son válidos.",
+  "unknownTool": {
+    "what": "Esa herramienta no está disponible.",
+    "why": "Puede que su paquete esté desactivado o se haya quitado.",
+    "next": "Abrir Claves y paquetes"
+  },
+  "cancelled": "El trabajo se detuvo.",
+  "auth": {
+    "what": "{name} no aceptó la clave.",
+    "whatNoName": "El servicio no aceptó la clave.",
+    "why": "Puede que esté mal, haya caducado o le falte un permiso.",
+    "next": "Sustituye la clave de {name}"
+  },
+  "credit": {
+    "what": "{name} dice que la cuenta se quedó sin saldo.",
+    "whatNoName": "El servicio dice que la cuenta se quedó sin saldo.",
+    "why": "Añade saldo con el proveedor y vuelve a intentarlo."
+  },
+  "rateLimited": {
+    "what": "El servicio está limitando las peticiones.",
+    "why": "Espera un minuto y vuelve a intentarlo."
+  },
+  "timeout": {
+    "what": "El servicio tardó demasiado en responder.",
+    "why": "Vuelve a intentarlo; los trabajos largos pueden necesitar una entrada más pequeña."
+  },
+  "serverError": {
+    "what": "El servicio tuvo un problema por su parte.",
+    "why": "Suele ser temporal. Vuelve a intentarlo en un momento."
+  },
+  "noProvider": {
+    "what": "No hay ningún servicio configurado para esto.",
+    "why": "Añade la clave de uno que pueda hacerlo.",
+    "next": "Añadir una clave de proveedor"
+  }
+}

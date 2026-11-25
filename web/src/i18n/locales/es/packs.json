@@ -1,0 +1,190 @@
+{
+  "page": {
+    "title": "Claves y paquetes",
+    "description": "Los paquetes añaden herramientas. Añade las claves que necesitan y actívalos o desactívalos.",
+    "searchLabel": "Buscar paquetes",
+    "searchPlaceholder": "Buscar paquetes y herramientas",
+    "missingCount": {
+      "one": "{count} paquete",
+      "other": "{count} paquetes"
+    },
+    "missingVerb": {
+      "one": "necesita",
+      "other": "necesitan"
+    },
+    "missingSuffix": {
+      "one": "una clave",
+      "other": "claves"
+    },
+    "showAll": "Ver todos los paquetes",
+    "showThese": "Ver estos",
+    "noMatch": "Ningún paquete coincide",
+    "noMatchHint": "Limpia la búsqueda para ver todos los paquetes.",
+    "listLabel": "Paquetes",
+    "serviceCount": {
+      "one": "{count} servicio",
+      "other": "{count} servicios"
+    },
+    "toolCount": {
+      "one": "{count} herramienta",
+      "other": "{count} herramientas"
+    },
+    "yourPackSuffix": " · tu paquete",
+    "needsKey": "Necesita una clave",
+    "chooseTitle": "Elige un paquete",
+    "chooseHint": "Elige un paquete de la lista para ver qué puede hacer, sus claves y sus herramientas."
+  },
+  "consent": {
+    "title": "¿Activar {name}?",
+    "description": "Este paquete no viene con plughive. Revisa qué puede hacer antes de activarlo.",
+    "cancel": "Cancelar",
+    "confirm": "Actívalo",
+    "confirmHighRisk": "Lo entiendo, actívalo",
+    "loading": "Cargando la revisión",
+    "errorChanged": "Los archivos del paquete han cambiado desde que se cargó esta revisión. Revisa los permisos actualizados abajo.",
+    "errorConsentRequired": "El daemon necesita una revisión nueva antes de activar este paquete.",
+    "broadAccessTitle": "Este paquete pide acceso amplio",
+    "broadAccessBody": "Puede ejecutar programas o conectarse con cualquier sitio web. Actívalo solo si te fías de su origen.",
+    "fullRightsTitle": "Su código se ejecuta con todos tus derechos",
+    "fullRightsBody": "Activar este paquete deja que su código se ejecute en este equipo con todos tus derechos: puede hacer lo mismo que tú. Las líneas de abajo describen lo que plughive intermedia para él, no un entorno aislado.",
+    "meta": "{name} {version}, de tu carpeta de paquetes.",
+    "mayTitle": "Puede",
+    "mayNothing": "Nada más allá de trabajar con lo que le pasas.",
+    "keysTitle": "Claves que puede leer",
+    "keysHint": "El paquete solo ve las claves que permitas aquí.",
+    "requiredSuffix": " (necesaria para sus herramientas)"
+  },
+  "settings": {
+    "title": "Ajustes",
+    "save": "Guardar ajustes",
+    "saved": "Ajustes de {name} guardados."
+  },
+  "detail": {
+    "versionTitle": "Versión {version}",
+    "builtin": "Integrado",
+    "yourPack": "Tu paquete",
+    "packId": "Id del paquete",
+    "turnOn": "Activar {name}",
+    "turnOff": "Desactivar {name}",
+    "turnedOn": "{name} activado.",
+    "turnedOff": "{name} desactivado.",
+    "turnedOffUndo": "{name} desactivado. Sus herramientas desaparecen de todos los perfiles.",
+    "undo": "Deshacer",
+    "reloaded": "{name} recargado.",
+    "noticeTitle": "Antes de activarlo",
+    "loadErrorTitle": "No se pudo cargar este paquete",
+    "loadAgain": "Volver a cargar",
+    "reviewTitle": "Revisión necesaria",
+    "reviewBody": "El paquete ha cambiado o pide acceso nuevo. Revísalo para volver a activarlo.",
+    "review": "Revisar",
+    "permsTitle": "Qué puede hacer",
+    "keysTitle": "Claves",
+    "howToKeep": "Cómo conservarlas",
+    "howToFix": "Cómo arreglar esto",
+    "servicesTitle": "Servicios ({count})",
+    "servicesHintBefore": "Trabajos que tu agente pide a través de las herramientas compartidas, que este paquete puede hacer. Elige qué servicio va primero en ",
+    "servicesHintLink": "Servicios preferidos",
+    "servicesHintAfter": ".",
+    "toolsTitle": "Herramientas ({count})",
+    "noToolsShared": "No tiene herramientas propias: los agentes lo usan a través de las herramientas compartidas de sus servicios.",
+    "noTools": "Este paquete no tiene herramientas ahora mismo.",
+    "noToolsOff": "Activa el paquete para cargar sus herramientas.",
+    "tryTool": "Probar {tool} en la zona de pruebas"
+  },
+  "secret": {
+    "source": {
+      "keychain": "llavero del sistema",
+      "file": "archivo de secretos",
+      "memory": "memoria",
+      "env": "variable de entorno"
+    },
+    "errorPasteFirst": "Pega la clave primero.",
+    "saved": "Guardado: {label}.",
+    "removed": "Quitado: {label}.",
+    "set": "Definida",
+    "setIn": " en {source}",
+    "notSet": "Sin definir",
+    "notSetOptional": "Sin definir (opcional)",
+    "notGranted": "No concedida a este paquete",
+    "placeholderNew": "Pega la clave nueva",
+    "placeholderFirst": "Pega la clave",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "getKey": "Obtener una clave",
+    "replace": "Reemplazar",
+    "setKey": "Definir clave",
+    "replaceAria": "Reemplazar {label}",
+    "setAria": "Definir {label}",
+    "remove": "Quitar",
+    "removeAria": "Quitar {label}",
+    "envNote": "Esta clave viene de una variable de entorno. Una clave guardada aquí ocupa su lugar.",
+    "removeTitle": "¿Quitar {label}?",
+    "keepIt": "Mantenerla",
+    "removeKey": "Quitar clave",
+    "removeBody": "Las herramientas que necesitan esta clave dejan de funcionar hasta que la definas otra vez. El valor guardado se borra y no se puede volver a mostrar."
+  },
+  "storage": {
+    "secretsFileFallback": "secrets.json en la carpeta de datos de plughive",
+    "words": {
+      "keychain": "Las claves se guardan en el Llavero de macOS de este equipo.",
+      "keychainService": "Las claves se guardan en el Llavero de macOS de este equipo, con el nombre de servicio {service}.",
+      "keyring": "Las claves se guardan en el almacén de credenciales de este equipo (Administrador de credenciales de Windows o el llavero del sistema).",
+      "fileEncrypted": "Las claves se guardan cifradas en {file}, legibles solo por tu cuenta de usuario.",
+      "filePlain": "Las claves se guardan en {file} sin cifrar. Solo tu cuenta de usuario puede leer el archivo, pero las claves que contiene están en texto plano.",
+      "memory": "Las claves se guardan solo en memoria y se pierden cuando el daemon se reinicia.",
+      "fileUnknown": "Las claves se guardan en {file}, legibles solo por tu cuenta de usuario. El archivo solo está cifrado cuando defines PLUGHIVE_SECRETS_PASSPHRASE.",
+      "daemon": "Las claves las guarda el daemon.",
+      "daemonBackend": "Las claves las guarda el daemon ({backend})."
+    },
+    "label": {
+      "keychain": "Llavero de macOS",
+      "keyring": "Almacén de credenciales del sistema",
+      "fileEncrypted": "Archivo cifrado",
+      "filePlain": "Archivo, sin cifrar",
+      "memory": "Solo en memoria, se pierden al reiniciar"
+    },
+    "memoryAlertTitle": "Las claves que añadas ahora no sobreviven a un reinicio",
+    "memoryNote": {
+      "beforeKeychain": "Este daemon guarda las claves solo en memoria. Para conservarlas, reinícialo con ",
+      "macos": " (macOS), ",
+      "windowsLinux": " (Windows, escritorio Linux) o ",
+      "afterFile": ". Con la opción de archivo, define también ",
+      "toEncrypt": " para cifrar el archivo."
+    },
+    "plainAlertTitle": "Las claves se guardan en un archivo sin cifrar",
+    "plainNote": {
+      "afterWords": " Cualquier cosa que pueda leer tus archivos, como una copia de seguridad u otro programa que se ejecute como tú, puede leerlas. En un Mac, reinicia con ",
+      "afterKeychain": "; en Windows o en un escritorio Linux, ",
+      "afterKeyring": ". Si no, reinicia con ",
+      "afterPassphrase": " definida. El daemon no reutiliza un archivo sin cifrar cuando hay una frase de contraseña definida, así que aparta el archivo antiguo y vuelve a añadir las claves."
+    },
+    "savedKeyNeverShown": "Una clave guardada no se vuelve a mostrar."
+  },
+  "library": {
+    "read": "Lee los archivos que creó en la biblioteca",
+    "readAll": "Lee todos los archivos de la biblioteca",
+    "write": "Guarda archivos nuevos en la biblioteca",
+    "full": "Lee, guarda y quita archivos de la biblioteca"
+  },
+  "permissions": {
+    "networkAny": "Se conecta con cualquier sitio web",
+    "network": "Se conecta con {list}",
+    "networkMore": "Se conecta con {list} y {count} más",
+    "local": "Se conecta con servicios de este equipo o de esta red: {list}",
+    "localMore": "Se conecta con servicios de este equipo o de esta red: {list} y {count} más",
+    "spawn": "Ejecuta programas en este equipo: {list}",
+    "spawnMore": "Ejecuta programas en este equipo: {list} y {count} más",
+    "userHome": "Los programas que ejecuta pueden leer y escribir en tu carpeta personal",
+    "llm": "Pide un modelo de lenguaje a través del daemon",
+    "tools": "Llama a otras herramientas: {list}",
+    "toolsMore": "Llama a otras herramientas: {list} y {count} más",
+    "none": "Sin red, programas ni archivos: trabaja con lo que le pasas"
+  },
+  "state": {
+    "off": "Desactivado",
+    "on": "Activado",
+    "needsReview": "Necesita revisión",
+    "invalid": "No válido",
+    "failedLoad": "No se pudo cargar"
+  }
+}

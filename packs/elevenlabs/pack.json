@@ -1,0 +1,21 @@
+{
+  "id": "elevenlabs",
+  "name": "ElevenLabs",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Text to speech, sound effects, music, dubbing, transcription and voice isolation through ElevenLabs with your own key.",
+  "secrets": [
+    {
+      "name": "ELEVENLABS_API_KEY",
+      "label": "ElevenLabs API key",
+      "helpUrl": "https://elevenlabs.io/app/settings/api-keys",
+      "required": true
+    }
+  ],
+  "permissions": {
+    "network": ["api.elevenlabs.io", "storage.googleapis.com"],
+    "library": "full"
+  },
+  "skills": "skills"
+}

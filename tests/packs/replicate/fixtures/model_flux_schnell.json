@@ -1,0 +1,97 @@
+{
+  "url": "https://replicate.com/black-forest-labs/flux-schnell",
+  "owner": "black-forest-labs",
+  "name": "flux-schnell",
+  "description": "The fastest image generation model tailored for local development and personal use",
+  "visibility": "public",
+  "is_official": true,
+  "run_count": 500000000,
+  "default_example": {
+    "input": {
+      "prompt": "black forest gateau cake spelling out the words \"FLUX SCHNELL\"",
+      "num_outputs": 1
+    }
+  },
+  "latest_version": {
+    "id": "c846a69991daf4c0e5d016514849d14ee5b2e6846ce6b9d6f21369e564cfe51e",
+    "created_at": "2025-01-01T00:00:00Z",
+    "cog_version": "0.9.0",
+    "openapi_schema": {
+      "openapi": "3.0.2",
+      "info": { "title": "Cog", "version": "0.1.0" },
+      "paths": {},
+      "components": {
+        "schemas": {
+          "Input": {
+            "type": "object",
+            "title": "Input",
+            "required": ["prompt"],
+            "properties": {
+              "prompt": {
+                "type": "string",
+                "title": "Prompt",
+                "x-order": 0,
+                "description": "Prompt for generated image"
+              },
+              "aspect_ratio": {
+                "allOf": [{ "$ref": "#/components/schemas/aspect_ratio" }],
+                "default": "1:1",
+                "x-order": 1,
+                "description": "Aspect ratio for the generated image"
+              },
+              "num_outputs": {
+                "type": "integer",
+                "title": "Num Outputs",
+                "default": 1,
+                "minimum": 1,
+                "maximum": 4,
+                "x-order": 2
+              },
+              "seed": {
+                "type": "integer",
+                "title": "Seed",
+                "x-order": 3,
+                "description": "Random seed"
+              },
+              "output_format": {
+                "allOf": [{ "$ref": "#/components/schemas/output_format" }],
+                "default": "webp",
+                "x-order": 4
+              },
+              "go_fast": { "type": "boolean", "title": "Go Fast", "default": true, "x-order": 5 }
+            }
+          },
+          "aspect_ratio": {
+            "enum": [
+              "1:1",
+              "16:9",
+              "21:9",
+              "3:2",
+              "2:3",
+              "4:5",
+              "5:4",
+              "3:4",
+              "4:3",
+              "9:16",
+              "9:21"
+            ],
+            "type": "string",
+            "title": "aspect_ratio",
+            "description": "An enumeration."
+          },
+          "output_format": {
+            "enum": ["webp", "jpg", "png"],
+            "type": "string",
+            "title": "output_format",
+            "description": "An enumeration."
+          },
+          "Output": {
+            "type": "array",
+            "items": { "type": "string", "format": "uri" },
+            "title": "Output"
+          }
+        }
+      }
+    }
+  }
+}

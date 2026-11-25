@@ -1,0 +1,37 @@
+{
+  "id": "browser",
+  "name": "Cloud browsers (Browserbase, Steel)",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Start and close Browserbase and Steel cloud browser sessions, fetch pages, and navigate and screenshot with Steel into the library.",
+  "secrets": [
+    {
+      "name": "BROWSERBASE_API_KEY",
+      "label": "Browserbase API key",
+      "helpUrl": "https://www.browserbase.com/settings",
+      "required": false
+    },
+    {
+      "name": "STEEL_API_KEY",
+      "label": "Steel API key",
+      "helpUrl": "https://app.steel.dev/settings/api-keys",
+      "required": false
+    }
+  ],
+  "permissions": {
+    "network": ["api.browserbase.com", "api.steel.dev"],
+    "library": "write"
+  },
+  "settings": {
+    "type": "object",
+    "properties": {
+      "browserbaseProjectId": {
+        "type": "string",
+        "title": "Browserbase project id",
+        "description": "Project to start Browserbase sessions in. Default: the API key's project."
+      }
+    }
+  },
+  "skills": "skills"
+}

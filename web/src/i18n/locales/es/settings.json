@@ -1,0 +1,57 @@
+{
+  "language": {
+    "label": "Idioma",
+    "help": "Para el panel y el menú de la app de escritorio."
+  },
+  "title": "Ajustes",
+  "description": "Tu endpoint, cómo se ve el panel y cómo está configurado este servidor.",
+  "endpoint": {
+    "title": "Endpoint",
+    "connect": "Conectar un cliente",
+    "label": "Endpoint MCP para todas las herramientas",
+    "hintBefore": "Los agentes se conectan aquí. Si quieres darle menos herramientas a un agente, crea un perfil en la página ",
+    "hintLink": "Lo que ven los agentes",
+    "hintAfter": "."
+  },
+  "appearance": {
+    "title": "Aspecto"
+  },
+  "theme": {
+    "label": "Tema",
+    "help": "Sistema sigue el ajuste claro u oscuro de tu ordenador.",
+    "system": "Sistema",
+    "light": "Claro",
+    "dark": "Oscuro"
+  },
+  "server": {
+    "title": "Este servidor",
+    "refresh": "Actualizar",
+    "version": "Versión",
+    "listeningOn": "Escuchando en",
+    "localOnly": "Solo este ordenador",
+    "network": "Accesible desde tu red",
+    "accessKey": "Clave de acceso",
+    "keySet": "Definida, los agentes deben enviarla",
+    "keyNotNeeded": "No hace falta (solo se puede conectar este ordenador)",
+    "keyNotSet": "Sin definir",
+    "dataFolder": "Carpeta de datos",
+    "dataFolderPath": "Ruta de la carpeta de datos",
+    "notReported": "No informado",
+    "providerKeys": "Claves de proveedor",
+    "runningFor": "En marcha desde hace",
+    "nodejs": "Node.js",
+    "danger": "Cualquiera en tu red puede usar este servidor. Define PLUGHIVE_ACCESS_KEY y reinícialo."
+  },
+  "help": {
+    "title": "Ayuda",
+    "mcp": "Qué es MCP y cómo lo usan los agentes",
+    "connectClaude": "Conectar un servidor MCP a Claude Desktop",
+    "health": "Comprobación de estado",
+    "healthNote": "(estado simple, para scripts y monitorización)"
+  },
+  "session": {
+    "title": "Sesión",
+    "hint": "Al cerrar sesión termina la sesión de este navegador. Para volver, abre de nuevo el enlace de inicio de sesión desde la terminal.",
+    "signOut": "Cerrar sesión"
+  }
+}

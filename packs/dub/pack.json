@@ -1,0 +1,20 @@
+{
+  "id": "dub",
+  "name": "Dub short links",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "description": "Create Dub.co short links.",
+  "secrets": [
+    {
+      "name": "DUB_API_KEY",
+      "label": "Dub API key",
+      "helpUrl": "https://app.dub.co/settings/tokens",
+      "required": true
+    }
+  ],
+  "permissions": {
+    "network": ["api.dub.co"]
+  },
+  "skills": "skills"
+}

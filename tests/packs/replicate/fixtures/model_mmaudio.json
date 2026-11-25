@@ -1,0 +1,1134 @@
+{
+  "url": "https://replicate.com/zsxkib/mmaudio",
+  "owner": "zsxkib",
+  "name": "mmaudio",
+  "description": "",
+  "visibility": "public",
+  "is_official": false,
+  "run_count": 1,
+  "default_example": null,
+  "latest_version": {
+    "id": "62871fb59889b2d7c13777f08deb3b36bdff88f7e1d53a50ad7694548a41b484",
+    "created_at": "2025-01-01T00:00:00Z",
+    "cog_version": "0.0.0",
+    "openapi_schema": {
+      "info": {
+        "title": "Cog",
+        "version": "0.1.0"
+      },
+      "paths": {
+        "/": {
+          "get": {
+            "summary": "Root",
+            "responses": {
+              "200": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "title": "Response Root  Get"
+                    }
+                  }
+                },
+                "description": "Successful Response"
+              }
+            },
+            "operationId": "root__get"
+          }
+        },
+        "/shutdown": {
+          "post": {
+            "summary": "Start Shutdown",
+            "responses": {
+              "200": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "title": "Response Start Shutdown Shutdown Post"
+                    }
+                  }
+                },
+                "description": "Successful Response"
+              }
+            },
+            "operationId": "start_shutdown_shutdown_post"
+          }
+        },
+        "/predictions": {
+          "post": {
+            "summary": "Predict",
+            "responses": {
+              "200": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "title": "PredictionResponse",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "title": "Id"
+                        },
+                        "logs": {
+                          "type": "string",
+                          "title": "Logs",
+                          "default": ""
+                        },
+                        "error": {
+                          "type": "string",
+                          "title": "Error"
+                        },
+                        "input": {
+                          "type": "object",
+                          "title": "Input",
+                          "properties": {
+                            "seed": {
+                              "type": "integer",
+                              "title": "Seed",
+                              "minimum": -1,
+                              "x-order": 6,
+                              "description": "Random seed. Use -1 or leave blank to randomize the seed"
+                            },
+                            "image": {
+                              "type": "string",
+                              "title": "Image",
+                              "format": "uri",
+                              "x-order": 7,
+                              "description": "Optional image file for image-to-audio generation (experimental)"
+                            },
+                            "video": {
+                              "type": "string",
+                              "title": "Video",
+                              "format": "uri",
+                              "x-order": 2,
+                              "description": "Optional video file for video-to-audio generation"
+                            },
+                            "prompt": {
+                              "type": "string",
+                              "title": "Prompt",
+                              "default": "",
+                              "x-order": 0,
+                              "description": "Text prompt for generated audio"
+                            },
+                            "duration": {
+                              "type": "number",
+                              "title": "Duration",
+                              "default": 8,
+                              "minimum": 1,
+                              "x-order": 3,
+                              "description": "Duration of output in seconds"
+                            },
+                            "num_steps": {
+                              "type": "integer",
+                              "title": "Num Steps",
+                              "default": 25,
+                              "x-order": 4,
+                              "description": "Number of inference steps"
+                            },
+                            "cfg_strength": {
+                              "type": "number",
+                              "title": "Cfg Strength",
+                              "default": 4.5,
+                              "minimum": 1,
+                              "x-order": 5,
+                              "description": "Guidance strength (CFG)"
+                            },
+                            "negative_prompt": {
+                              "type": "string",
+                              "title": "Negative Prompt",
+                              "default": "music",
+                              "x-order": 1,
+                              "description": "Negative prompt to avoid certain sounds"
+                            }
+                          }
+                        },
+                        "output": {
+                          "type": "string",
+                          "title": "Output",
+                          "format": "uri"
+                        },
+                        "status": {
+                          "enum": ["starting", "processing", "succeeded", "canceled", "failed"],
+                          "type": "string",
+                          "title": "Status",
+                          "description": "An enumeration."
+                        },
+                        "metrics": {
+                          "type": "object",
+                          "title": "Metrics",
+                          "additionalProperties": true
+                        },
+                        "version": {
+                          "type": "string",
+                          "title": "Version"
+                        },
+                        "created_at": {
+                          "type": "string",
+                          "title": "Created At",
+                          "format": "date-time"
+                        },
+                        "started_at": {
+                          "type": "string",
+                          "title": "Started At",
+                          "format": "date-time"
+                        },
+                        "completed_at": {
+                          "type": "string",
+                          "title": "Completed At",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                },
+                "description": "Successful Response"
+              },
+              "422": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "title": "HTTPValidationError",
+                      "properties": {
+                        "detail": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "title": "ValidationError",
+                            "required": ["loc", "msg", "type"],
+                            "properties": {
+                              "loc": {
+                                "type": "array",
+                                "items": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "integer"
+                                    }
+                                  ]
+                                },
+                                "title": "Location"
+                              },
+                              "msg": {
+                                "type": "string",
+                                "title": "Message"
+                              },
+                              "type": {
+                                "type": "string",
+                                "title": "Error Type"
+                              }
+                            }
+                          },
+                          "title": "Detail"
+                        }
+                      }
+                    }
+                  }
+                },
+                "description": "Validation Error"
+              }
+            },
+            "parameters": [
+              {
+                "in": "header",
+                "name": "prefer",
+                "schema": {
+                  "type": "string",
+                  "title": "Prefer"
+                },
+                "required": false
+              }
+            ],
+            "description": "Run a single prediction on the model",
+            "operationId": "predict_predictions_post",
+            "requestBody": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "title": "PredictionRequest",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "title": "Id"
+                      },
+                      "input": {
+                        "type": "object",
+                        "title": "Input",
+                        "properties": {
+                          "seed": {
+                            "type": "integer",
+                            "title": "Seed",
+                            "minimum": -1,
+                            "x-order": 6,
+                            "description": "Random seed. Use -1 or leave blank to randomize the seed"
+                          },
+                          "image": {
+                            "type": "string",
+                            "title": "Image",
+                            "format": "uri",
+                            "x-order": 7,
+                            "description": "Optional image file for image-to-audio generation (experimental)"
+                          },
+                          "video": {
+                            "type": "string",
+                            "title": "Video",
+                            "format": "uri",
+                            "x-order": 2,
+                            "description": "Optional video file for video-to-audio generation"
+                          },
+                          "prompt": {
+                            "type": "string",
+                            "title": "Prompt",
+                            "default": "",
+                            "x-order": 0,
+                            "description": "Text prompt for generated audio"
+                          },
+                          "duration": {
+                            "type": "number",
+                            "title": "Duration",
+                            "default": 8,
+                            "minimum": 1,
+                            "x-order": 3,
+                            "description": "Duration of output in seconds"
+                          },
+                          "num_steps": {
+                            "type": "integer",
+                            "title": "Num Steps",
+                            "default": 25,
+                            "x-order": 4,
+                            "description": "Number of inference steps"
+                          },
+                          "cfg_strength": {
+                            "type": "number",
+                            "title": "Cfg Strength",
+                            "default": 4.5,
+                            "minimum": 1,
+                            "x-order": 5,
+                            "description": "Guidance strength (CFG)"
+                          },
+                          "negative_prompt": {
+                            "type": "string",
+                            "title": "Negative Prompt",
+                            "default": "music",
+                            "x-order": 1,
+                            "description": "Negative prompt to avoid certain sounds"
+                          }
+                        }
+                      },
+                      "webhook": {
+                        "type": "string",
+                        "title": "Webhook",
+                        "format": "uri",
+                        "maxLength": 65536,
+                        "minLength": 1
+                      },
+                      "created_at": {
+                        "type": "string",
+                        "title": "Created At",
+                        "format": "date-time"
+                      },
+                      "output_file_prefix": {
+                        "type": "string",
+                        "title": "Output File Prefix"
+                      },
+                      "webhook_events_filter": {
+                        "type": "array",
+                        "items": {
+                          "enum": ["start", "output", "logs", "completed"],
+                          "type": "string",
+                          "title": "WebhookEvent",
+                          "description": "An enumeration."
+                        },
+                        "default": ["start", "output", "logs", "completed"]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "/health-check": {
+          "get": {
+            "summary": "Healthcheck",
+            "responses": {
+              "200": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "title": "Response Healthcheck Health Check Get"
+                    }
+                  }
+                },
+                "description": "Successful Response"
+              }
+            },
+            "operationId": "healthcheck_health_check_get"
+          }
+        },
+        "/predictions/{prediction_id}": {
+          "put": {
+            "summary": "Predict Idempotent",
+            "responses": {
+              "200": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "title": "PredictionResponse",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "title": "Id"
+                        },
+                        "logs": {
+                          "type": "string",
+                          "title": "Logs",
+                          "default": ""
+                        },
+                        "error": {
+                          "type": "string",
+                          "title": "Error"
+                        },
+                        "input": {
+                          "type": "object",
+                          "title": "Input",
+                          "properties": {
+                            "seed": {
+                              "type": "integer",
+                              "title": "Seed",
+                              "minimum": -1,
+                              "x-order": 6,
+                              "description": "Random seed. Use -1 or leave blank to randomize the seed"
+                            },
+                            "image": {
+                              "type": "string",
+                              "title": "Image",
+                              "format": "uri",
+                              "x-order": 7,
+                              "description": "Optional image file for image-to-audio generation (experimental)"
+                            },
+                            "video": {
+                              "type": "string",
+                              "title": "Video",
+                              "format": "uri",
+                              "x-order": 2,
+                              "description": "Optional video file for video-to-audio generation"
+                            },
+                            "prompt": {
+                              "type": "string",
+                              "title": "Prompt",
+                              "default": "",
+                              "x-order": 0,
+                              "description": "Text prompt for generated audio"
+                            },
+                            "duration": {
+                              "type": "number",
+                              "title": "Duration",
+                              "default": 8,
+                              "minimum": 1,
+                              "x-order": 3,
+                              "description": "Duration of output in seconds"
+                            },
+                            "num_steps": {
+                              "type": "integer",
+                              "title": "Num Steps",
+                              "default": 25,
+                              "x-order": 4,
+                              "description": "Number of inference steps"
+                            },
+                            "cfg_strength": {
+                              "type": "number",
+                              "title": "Cfg Strength",
+                              "default": 4.5,
+                              "minimum": 1,
+                              "x-order": 5,
+                              "description": "Guidance strength (CFG)"
+                            },
+                            "negative_prompt": {
+                              "type": "string",
+                              "title": "Negative Prompt",
+                              "default": "music",
+                              "x-order": 1,
+                              "description": "Negative prompt to avoid certain sounds"
+                            }
+                          }
+                        },
+                        "output": {
+                          "type": "string",
+                          "title": "Output",
+                          "format": "uri"
+                        },
+                        "status": {
+                          "enum": ["starting", "processing", "succeeded", "canceled", "failed"],
+                          "type": "string",
+                          "title": "Status",
+                          "description": "An enumeration."
+                        },
+                        "metrics": {
+                          "type": "object",
+                          "title": "Metrics",
+                          "additionalProperties": true
+                        },
+                        "version": {
+                          "type": "string",
+                          "title": "Version"
+                        },
+                        "created_at": {
+                          "type": "string",
+                          "title": "Created At",
+                          "format": "date-time"
+                        },
+                        "started_at": {
+                          "type": "string",
+                          "title": "Started At",
+                          "format": "date-time"
+                        },
+                        "completed_at": {
+                          "type": "string",
+                          "title": "Completed At",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                },
+                "description": "Successful Response"
+              },
+              "422": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "title": "HTTPValidationError",
+                      "properties": {
+                        "detail": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "title": "ValidationError",
+                            "required": ["loc", "msg", "type"],
+                            "properties": {
+                              "loc": {
+                                "type": "array",
+                                "items": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "integer"
+                                    }
+                                  ]
+                                },
+                                "title": "Location"
+                              },
+                              "msg": {
+                                "type": "string",
+                                "title": "Message"
+                              },
+                              "type": {
+                                "type": "string",
+                                "title": "Error Type"
+                              }
+                            }
+                          },
+                          "title": "Detail"
+                        }
+                      }
+                    }
+                  }
+                },
+                "description": "Validation Error"
+              }
+            },
+            "parameters": [
+              {
+                "in": "path",
+                "name": "prediction_id",
+                "schema": {
+                  "type": "string",
+                  "title": "Prediction ID"
+                },
+                "required": true
+              },
+              {
+                "in": "header",
+                "name": "prefer",
+                "schema": {
+                  "type": "string",
+                  "title": "Prefer"
+                },
+                "required": false
+              }
+            ],
+            "description": "Run a single prediction on the model (idempotent creation).",
+            "operationId": "predict_idempotent_predictions__prediction_id__put",
+            "requestBody": {
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "allOf": [
+                      {
+                        "type": "object",
+                        "title": "PredictionRequest",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "title": "Id"
+                          },
+                          "input": {
+                            "type": "object",
+                            "title": "Input",
+                            "properties": {
+                              "seed": {
+                                "type": "integer",
+                                "title": "Seed",
+                                "minimum": -1,
+                                "x-order": 6,
+                                "description": "Random seed. Use -1 or leave blank to randomize the seed"
+                              },
+                              "image": {
+                                "type": "string",
+                                "title": "Image",
+                                "format": "uri",
+                                "x-order": 7,
+                                "description": "Optional image file for image-to-audio generation (experimental)"
+                              },
+                              "video": {
+                                "type": "string",
+                                "title": "Video",
+                                "format": "uri",
+                                "x-order": 2,
+                                "description": "Optional video file for video-to-audio generation"
+                              },
+                              "prompt": {
+                                "type": "string",
+                                "title": "Prompt",
+                                "default": "",
+                                "x-order": 0,
+                                "description": "Text prompt for generated audio"
+                              },
+                              "duration": {
+                                "type": "number",
+                                "title": "Duration",
+                                "default": 8,
+                                "minimum": 1,
+                                "x-order": 3,
+                                "description": "Duration of output in seconds"
+                              },
+                              "num_steps": {
+                                "type": "integer",
+                                "title": "Num Steps",
+                                "default": 25,
+                                "x-order": 4,
+                                "description": "Number of inference steps"
+                              },
+                              "cfg_strength": {
+                                "type": "number",
+                                "title": "Cfg Strength",
+                                "default": 4.5,
+                                "minimum": 1,
+                                "x-order": 5,
+                                "description": "Guidance strength (CFG)"
+                              },
+                              "negative_prompt": {
+                                "type": "string",
+                                "title": "Negative Prompt",
+                                "default": "music",
+                                "x-order": 1,
+                                "description": "Negative prompt to avoid certain sounds"
+                              }
+                            }
+                          },
+                          "webhook": {
+                            "type": "string",
+                            "title": "Webhook",
+                            "format": "uri",
+                            "maxLength": 65536,
+                            "minLength": 1
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "title": "Created At",
+                            "format": "date-time"
+                          },
+                          "output_file_prefix": {
+                            "type": "string",
+                            "title": "Output File Prefix"
+                          },
+                          "webhook_events_filter": {
+                            "type": "array",
+                            "items": {
+                              "enum": ["start", "output", "logs", "completed"],
+                              "type": "string",
+                              "title": "WebhookEvent",
+                              "description": "An enumeration."
+                            },
+                            "default": ["start", "output", "logs", "completed"]
+                          }
+                        }
+                      }
+                    ],
+                    "title": "Prediction Request"
+                  }
+                }
+              },
+              "required": true
+            }
+          }
+        },
+        "/predictions/{prediction_id}/cancel": {
+          "post": {
+            "summary": "Cancel",
+            "responses": {
+              "200": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "title": "Response Cancel Predictions  Prediction Id  Cancel Post"
+                    }
+                  }
+                },
+                "description": "Successful Response"
+              },
+              "422": {
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "title": "HTTPValidationError",
+                      "properties": {
+                        "detail": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "title": "ValidationError",
+                            "required": ["loc", "msg", "type"],
+                            "properties": {
+                              "loc": {
+                                "type": "array",
+                                "items": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "integer"
+                                    }
+                                  ]
+                                },
+                                "title": "Location"
+                              },
+                              "msg": {
+                                "type": "string",
+                                "title": "Message"
+                              },
+                              "type": {
+                                "type": "string",
+                                "title": "Error Type"
+                              }
+                            }
+                          },
+                          "title": "Detail"
+                        }
+                      }
+                    }
+                  }
+                },
+                "description": "Validation Error"
+              }
+            },
+            "parameters": [
+              {
+                "in": "path",
+                "name": "prediction_id",
+                "schema": {
+                  "type": "string",
+                  "title": "Prediction ID"
+                },
+                "required": true
+              }
+            ],
+            "description": "Cancel a running prediction",
+            "operationId": "cancel_predictions__prediction_id__cancel_post"
+          }
+        }
+      },
+      "openapi": "3.0.2",
+      "components": {
+        "schemas": {
+          "Input": {
+            "type": "object",
+            "title": "Input",
+            "properties": {
+              "seed": {
+                "type": "integer",
+                "title": "Seed",
+                "minimum": -1,
+                "x-order": 6,
+                "description": "Random seed. Use -1 or leave blank to randomize the seed"
+              },
+              "image": {
+                "type": "string",
+                "title": "Image",
+                "format": "uri",
+                "x-order": 7,
+                "description": "Optional image file for image-to-audio generation (experimental)"
+              },
+              "video": {
+                "type": "string",
+                "title": "Video",
+                "format": "uri",
+                "x-order": 2,
+                "description": "Optional video file for video-to-audio generation"
+              },
+              "prompt": {
+                "type": "string",
+                "title": "Prompt",
+                "default": "",
+                "x-order": 0,
+                "description": "Text prompt for generated audio"
+              },
+              "duration": {
+                "type": "number",
+                "title": "Duration",
+                "default": 8,
+                "minimum": 1,
+                "x-order": 3,
+                "description": "Duration of output in seconds"
+              },
+              "num_steps": {
+                "type": "integer",
+                "title": "Num Steps",
+                "default": 25,
+                "x-order": 4,
+                "description": "Number of inference steps"
+              },
+              "cfg_strength": {
+                "type": "number",
+                "title": "Cfg Strength",
+                "default": 4.5,
+                "minimum": 1,
+                "x-order": 5,
+                "description": "Guidance strength (CFG)"
+              },
+              "negative_prompt": {
+                "type": "string",
+                "title": "Negative Prompt",
+                "default": "music",
+                "x-order": 1,
+                "description": "Negative prompt to avoid certain sounds"
+              }
+            }
+          },
+          "Output": {
+            "type": "string",
+            "title": "Output",
+            "format": "uri"
+          },
+          "Status": {
+            "enum": ["starting", "processing", "succeeded", "canceled", "failed"],
+            "type": "string",
+            "title": "Status",
+            "description": "An enumeration."
+          },
+          "WebhookEvent": {
+            "enum": ["start", "output", "logs", "completed"],
+            "type": "string",
+            "title": "WebhookEvent",
+            "description": "An enumeration."
+          },
+          "ValidationError": {
+            "type": "object",
+            "title": "ValidationError",
+            "required": ["loc", "msg", "type"],
+            "properties": {
+              "loc": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer"
+                    }
+                  ]
+                },
+                "title": "Location"
+              },
+              "msg": {
+                "type": "string",
+                "title": "Message"
+              },
+              "type": {
+                "type": "string",
+                "title": "Error Type"
+              }
+            }
+          },
+          "PredictionRequest": {
+            "type": "object",
+            "title": "PredictionRequest",
+            "properties": {
+              "id": {
+                "type": "string",
+                "title": "Id"
+              },
+              "input": {
+                "type": "object",
+                "title": "Input",
+                "properties": {
+                  "seed": {
+                    "type": "integer",
+                    "title": "Seed",
+                    "minimum": -1,
+                    "x-order": 6,
+                    "description": "Random seed. Use -1 or leave blank to randomize the seed"
+                  },
+                  "image": {
+                    "type": "string",
+                    "title": "Image",
+                    "format": "uri",
+                    "x-order": 7,
+                    "description": "Optional image file for image-to-audio generation (experimental)"
+                  },
+                  "video": {
+                    "type": "string",
+                    "title": "Video",
+                    "format": "uri",
+                    "x-order": 2,
+                    "description": "Optional video file for video-to-audio generation"
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "title": "Prompt",
+                    "default": "",
+                    "x-order": 0,
+                    "description": "Text prompt for generated audio"
+                  },
+                  "duration": {
+                    "type": "number",
+                    "title": "Duration",
+                    "default": 8,
+                    "minimum": 1,
+                    "x-order": 3,
+                    "description": "Duration of output in seconds"
+                  },
+                  "num_steps": {
+                    "type": "integer",
+                    "title": "Num Steps",
+                    "default": 25,
+                    "x-order": 4,
+                    "description": "Number of inference steps"
+                  },
+                  "cfg_strength": {
+                    "type": "number",
+                    "title": "Cfg Strength",
+                    "default": 4.5,
+                    "minimum": 1,
+                    "x-order": 5,
+                    "description": "Guidance strength (CFG)"
+                  },
+                  "negative_prompt": {
+                    "type": "string",
+                    "title": "Negative Prompt",
+                    "default": "music",
+                    "x-order": 1,
+                    "description": "Negative prompt to avoid certain sounds"
+                  }
+                }
+              },
+              "webhook": {
+                "type": "string",
+                "title": "Webhook",
+                "format": "uri",
+                "maxLength": 65536,
+                "minLength": 1
+              },
+              "created_at": {
+                "type": "string",
+                "title": "Created At",
+                "format": "date-time"
+              },
+              "output_file_prefix": {
+                "type": "string",
+                "title": "Output File Prefix"
+              },
+              "webhook_events_filter": {
+                "type": "array",
+                "items": {
+                  "enum": ["start", "output", "logs", "completed"],
+                  "type": "string",
+                  "title": "WebhookEvent",
+                  "description": "An enumeration."
+                },
+                "default": ["start", "output", "logs", "completed"]
+              }
+            }
+          },
+          "PredictionResponse": {
+            "type": "object",
+            "title": "PredictionResponse",
+            "properties": {
+              "id": {
+                "type": "string",
+                "title": "Id"
+              },
+              "logs": {
+                "type": "string",
+                "title": "Logs",
+                "default": ""
+              },
+              "error": {
+                "type": "string",
+                "title": "Error"
+              },
+              "input": {
+                "type": "object",
+                "title": "Input",
+                "properties": {
+                  "seed": {
+                    "type": "integer",
+                    "title": "Seed",
+                    "minimum": -1,
+                    "x-order": 6,
+                    "description": "Random seed. Use -1 or leave blank to randomize the seed"
+                  },
+                  "image": {
+                    "type": "string",
+                    "title": "Image",
+                    "format": "uri",
+                    "x-order": 7,
+                    "description": "Optional image file for image-to-audio generation (experimental)"
+                  },
+                  "video": {
+                    "type": "string",
+                    "title": "Video",
+                    "format": "uri",
+                    "x-order": 2,
+                    "description": "Optional video file for video-to-audio generation"
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "title": "Prompt",
+                    "default": "",
+                    "x-order": 0,
+                    "description": "Text prompt for generated audio"
+                  },
+                  "duration": {
+                    "type": "number",
+                    "title": "Duration",
+                    "default": 8,
+                    "minimum": 1,
+                    "x-order": 3,
+                    "description": "Duration of output in seconds"
+                  },
+                  "num_steps": {
+                    "type": "integer",
+                    "title": "Num Steps",
+                    "default": 25,
+                    "x-order": 4,
+                    "description": "Number of inference steps"
+                  },
+                  "cfg_strength": {
+                    "type": "number",
+                    "title": "Cfg Strength",
+                    "default": 4.5,
+                    "minimum": 1,
+                    "x-order": 5,
+                    "description": "Guidance strength (CFG)"
+                  },
+                  "negative_prompt": {
+                    "type": "string",
+                    "title": "Negative Prompt",
+                    "default": "music",
+                    "x-order": 1,
+                    "description": "Negative prompt to avoid certain sounds"
+                  }
+                }
+              },
+              "output": {
+                "type": "string",
+                "title": "Output",
+                "format": "uri"
+              },
+              "status": {
+                "enum": ["starting", "processing", "succeeded", "canceled", "failed"],
+                "type": "string",
+                "title": "Status",
+                "description": "An enumeration."
+              },
+              "metrics": {
+                "type": "object",
+                "title": "Metrics",
+                "additionalProperties": true
+              },
+              "version": {
+                "type": "string",
+                "title": "Version"
+              },
+              "created_at": {
+                "type": "string",
+                "title": "Created At",
+                "format": "date-time"
+              },
+              "started_at": {
+                "type": "string",
+                "title": "Started At",
+                "format": "date-time"
+              },
+              "completed_at": {
+                "type": "string",
+                "title": "Completed At",
+                "format": "date-time"
+              }
+            }
+          },
+          "HTTPValidationError": {
+            "type": "object",
+            "title": "HTTPValidationError",
+            "properties": {
+              "detail": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "title": "ValidationError",
+                  "required": ["loc", "msg", "type"],
+                  "properties": {
+                    "loc": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "integer"
+                          }
+                        ]
+                      },
+                      "title": "Location"
+                    },
+                    "msg": {
+                      "type": "string",
+                      "title": "Message"
+                    },
+                    "type": {
+                      "type": "string",
+                      "title": "Error Type"
+                    }
+                  }
+                },
+                "title": "Detail"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

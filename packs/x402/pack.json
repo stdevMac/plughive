@@ -1,0 +1,54 @@
+{
+  "id": "x402",
+  "name": "x402 payments",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "entry": "./index.js",
+  "enabledByDefault": false,
+  "description": "Pay per call for x402 paid APIs in USDC from a small wallet you dedicate to it, with a person's approval every time and hard per-call and daily limits (x402_quote, x402_fetch, x402_wallet).",
+  "notice": "This pack signs real USDC payments from the wallet whose private key you store as X402_PRIVATE_KEY. Use a new wallet that holds only a few dollars, never your main one: anyone who gets that key can spend what is on it. Every payment asks you to approve it first, is capped by max_usd, the per-call limit and the 24-hour limit below, and is logged in the pack's data folder. Payments on chain cannot be reversed. Start on Base Sepolia (testnet USDC, free from a faucet) to try it.",
+  "secrets": [
+    {
+      "name": "X402_PRIVATE_KEY",
+      "label": "x402 wallet private key (a small, dedicated wallet)",
+      "helpUrl": "https://docs.x402.org",
+      "required": false
+    }
+  ],
+  "permissions": {
+    "network": ["*"],
+    "library": "write"
+  },
+  "settings": {
+    "type": "object",
+    "properties": {
+      "allowedNetworks": {
+        "type": "array",
+        "items": { "type": "string" },
+        "title": "Allowed networks",
+        "description": "CAIP-2 ids of the chains the wallet may pay on, in USDC only: eip155:8453 (Base), eip155:84532 (Base Sepolia testnet), eip155:1 (Ethereum), eip155:137 (Polygon), eip155:42161 (Arbitrum), eip155:10 (OP Mainnet), eip155:43114 (Avalanche). Default Base and Base Sepolia.",
+        "default": ["eip155:8453", "eip155:84532"]
+      },
+      "maxPerCallUsd": {
+        "type": "number",
+        "title": "Most per payment (USD)",
+        "description": "No single payment can be above this, whatever max_usd a call asks for. Default 0.10, at most 25.",
+        "default": 0.1
+      },
+      "dailyCapUsd": {
+        "type": "number",
+        "title": "Most per 24 hours (USD)",
+        "description": "Total that may be signed in any rolling 24 hours. Every signed payment counts, even one the server then refuses. Default 1, at most 250.",
+        "default": 1
+      },
+      "allowedHosts": {
+        "type": "array",
+        "items": { "type": "string" },
+        "title": "Allowed hosts",
+        "description": "Optional: only pay these hosts (api.example.com or *.example.com). Empty means any https host.",
+        "default": []
+      }
+    }
+  },
+  "skills": "skills"
+}

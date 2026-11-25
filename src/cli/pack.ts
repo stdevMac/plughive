@@ -59,7 +59,9 @@ Commands:
   consent <id>            what the pack asks for (network hosts, programs,
                           folders, library, secrets), high-risk items flagged
   enable <id>             show what it asks for, ask, then enable it
-      --grant SECRET      grant the pack a stored secret (repeatable)
+      --grant SECRET      grant the pack a stored secret (repeatable); secrets
+                          it already has, or requires, stay granted
+      --revoke SECRET     take a granted secret away (repeatable)
       -y, --yes           do not ask
   disable <id>            turn the pack off (its tools disappear)
   reload <id>             read the pack from disk again
@@ -277,8 +279,11 @@ async function add(spec: string, env: NodeJS.ProcessEnv, io: CliIo): Promise<num
     } else {
       io.out("No daemon is running; it will find the pack on its next start, disabled.");
     }
-    io.out('Review it before you enable it: run "plughive dashboard", open Packs, read what');
-    io.out("the pack asks for (network, programs, secrets, library) and enable it there.");
+    io.out(`Review it before you enable it: "plughive pack consent ${manifest.id}" shows what`);
+    io.out(
+      `it asks for (network, programs, secrets, library); "plughive pack enable ${manifest.id}"`,
+    );
+    io.out("turns it on. The dashboard's Packs page does the same.");
     return EXIT_OK;
   } finally {
     if (cleanup) rmSync(cleanup, { recursive: true, force: true });
@@ -456,19 +461,29 @@ async function packSub(
         "pack enable",
         argv,
         io,
-        { grant: { type: "string", multiple: true }, yes: { type: "boolean", short: "y" } },
-        { min: 1, max: 1, usage: "<id> [--grant SECRET ...] [--yes]" },
+        {
+          grant: { type: "string", multiple: true },
+          revoke: { type: "string", multiple: true },
+          yes: { type: "boolean", short: "y" },
+        },
+        { min: 1, max: 1, usage: "<id> [--grant SECRET ...] [--revoke SECRET ...] [--yes]" },
       );
       const id = positionals[0] ?? "";
       const { consent } = await ctx
         .api()
         .get<{ consent: ConsentView }>(`/api/packs/${enc(id)}/consent`);
-      const grants = values.grant ?? [];
-      for (const g of grants) {
+      // Like the dashboard: keep what the pack already has (and what it
+      // requires), add --grant, take away --revoke.
+      const revoke = values.revoke ?? [];
+      for (const g of [...(values.grant ?? []), ...revoke]) {
         const s = consent.secrets.find((x) => x.name === g);
         if (!s) throw new CliError(`${id} does not ask for a secret named ${g}`, EXIT_USAGE);
         if (!s.grantable) throw new CliError(`${g} cannot be granted to ${id}`, EXIT_USAGE);
       }
+      const kept = consent.secrets.filter((s) => s.granted || s.required).map((s) => s.name);
+      const grants = [...new Set([...kept, ...(values.grant ?? [])])].filter(
+        (g) => !revoke.includes(g),
+      );
       if (!ctx.json || !values.yes) printConsent(ctx.json ? { ...io, out: io.err } : io, consent);
       if (grants.length) {
         io.err(`\nGranting: ${grants.join(", ")}`);

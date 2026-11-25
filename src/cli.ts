@@ -20,7 +20,7 @@ Commands:
   dashboard     open the dashboard, signed in (--print to print the link)
   doctor        check that this machine can run the daemon
   status        show whether the daemon runs, with pack and tool counts
-  pack          packs: list, show, consent, enable, disable, settings, add, remove
+  pack          packs: list, show, consent, enable, disable, reload, settings, add, remove
   cursor-link   print a link that adds the daemon to Cursor
   clients       list MCP clients on this computer and their state
   connect       add the daemon to a client (claude-code, cursor, codex, ...)
@@ -29,7 +29,7 @@ Commands:
 
 What the dashboard shows and does (the daemon must run):
   tools         list, show and call tools (the Playground)
-  jobs          list, follow, wait for and cancel background jobs
+  jobs          list, show, wait for and cancel background jobs
   artifacts     list, download and delete generated files (the Library)
   approvals     pending spend requests: approve or deny them
   policy        spend caps and approval rules

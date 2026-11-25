@@ -176,7 +176,7 @@ export async function runApprovals(argv: string[], io: CliIo): Promise<number> {
 
 export const POLICY_HELP = `Usage: plughive policy <command> [options]
 
-The spend policy: caps (a limit in USD per day, week or month, for all calls,
+The spend policy: caps (a limit in USD per day or month, for all calls,
 one provider or one profile) and the rules that decide when to ask.
 
 Commands:
@@ -200,14 +200,14 @@ interface PolicyReport {
       id?: string | null;
       period: string;
       limit_usd: number;
-      action?: string;
+      mode?: string;
     }[];
     rules: Record<string, unknown>;
     profiles: Record<string, unknown>;
     [k: string]: unknown;
   };
   caps: {
-    cap: { scope: string; id?: string | null; period: string; limit_usd: number; action?: string };
+    cap: { scope: string; id?: string | null; period: string; limit_usd: number; mode?: string };
     since: number | string;
     spent_usd: number | null;
     remaining_usd: number;
@@ -232,7 +232,7 @@ function printPolicy(ctx: Ctx, r: PolicyReport): void {
         usd(c.cap.limit_usd),
         c.spent_usd === null ? "unknown" : usd(c.spent_usd) || "$0.00",
         usd(c.remaining_usd) || "$0.00",
-        c.cap.action ?? "",
+        c.cap.mode ?? "",
       ]),
     );
   } else io.out("Caps: none");
@@ -266,6 +266,10 @@ export async function runPolicy(argv: string[], io: CliIo): Promise<number> {
       get: async (args) => {
         const { ctx } = sub("policy get", args, io, {});
         const r = await ctx.api().get<PolicyReport>("/api/policy");
+        if (!r.valid)
+          io.err(
+            `The policy file is not valid (${r.error ?? "?"}); this is the default policy that applies meanwhile.`,
+          );
         ctx.printJson(r.policy);
         return EXIT_OK;
       },

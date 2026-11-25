@@ -79,7 +79,7 @@ export async function runGroup(
   if (sub === undefined || sub.startsWith("-")) {
     if (defaultSub === undefined) {
       io.out(help);
-      return sub === undefined ? EXIT_USAGE : EXIT_USAGE;
+      return EXIT_USAGE;
     }
     sub = defaultSub;
     rest = argv;
@@ -297,10 +297,14 @@ export function assertSafeKey(key: string): void {
 /**
  * `key=value` pairs into an object. `key=value` is a string, `key:=json` a
  * JSON value (number, boolean, array, object, null). Dotted keys nest:
- * `a.b=1` gives {a: {b: "1"}}.
+ * `a.b=1` gives {a: {b: "1"}}. Pairs are merged into a copy of `base`, so
+ * `a.b=1` over {a: {c: 2}} gives {a: {c: 2, b: "1"}}.
  */
-export function parseAssignments(pairs: string[]): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
+export function parseAssignments(
+  pairs: string[],
+  base: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const out: Record<string, unknown> = structuredClone(base);
   for (const pair of pairs) {
     const m = /^([^=:]+?)(:?)=(.*)$/s.exec(pair);
     if (!m) {

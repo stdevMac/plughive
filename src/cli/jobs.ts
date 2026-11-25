@@ -5,7 +5,7 @@
 //   plughive usage [--since DATE]
 //
 // The Jobs, Library and Usage pages of the dashboard, through the same /api.
-import { constants, closeSync, createWriteStream } from "node:fs";
+import { constants, closeSync, createWriteStream, rmSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -39,7 +39,17 @@ export interface JobView {
   updated_at: string;
 }
 
-export const FINISHED = new Set(["succeeded", "failed", "cancelled", "expired"]);
+/**
+ * The statuses a job never leaves, as the daemon defines them (src/lib/jobs.ts):
+ * submission_unknown is final until someone reconciles it by hand.
+ */
+export const FINISHED = new Set([
+  "succeeded",
+  "failed",
+  "cancelled",
+  "expired",
+  "submission_unknown",
+]);
 
 const pct = (p: number | null) => (p === null || p === undefined ? "" : `${Math.round(p * 100)}%`);
 const errorText = (e: JobView["error"]) =>
@@ -409,7 +419,11 @@ export async function runArtifacts(argv: string[], io: CliIo): Promise<number> {
           );
         } catch (e) {
           closeSync(fd);
-          throw e;
+          // Leave no half-written file behind to block the retry.
+          rmSync(dest, { force: true });
+          throw new CliError(
+            `could not save ${a.id} to ${dest}: ${e instanceof Error ? e.message : String(e)}`,
+          );
         }
         if (ctx.json) ctx.printJson({ id: a.id, path: dest, bytes: a.bytes });
         else io.out(`Saved ${a.id} to ${dest}`);

@@ -180,6 +180,18 @@ export async function readBody(res: Response, max = MAX_RESPONSE_BYTES): Promise
   return text + decoder.decode();
 }
 
+/**
+ * The daemon's validation issues ({path, message}, path a zod array or a
+ * string) as "  a.b: message" lines.
+ */
+export function issueLines(issues: unknown): string[] {
+  if (!Array.isArray(issues)) return [];
+  return issues.slice(0, 20).map((i: { path?: unknown; message?: unknown }) => {
+    const path = Array.isArray(i?.path) ? i.path.join(".") : String(i?.path ?? "");
+    return `  ${path || "(arguments)"}: ${String(i?.message ?? "not valid")}`;
+  });
+}
+
 /** A client for /api/*. Writes carry the CSRF header the daemon requires. */
 export function apiClient(baseUrl: string, token: string, timeoutMs = 10_000): ApiClient {
   assertTokenTransport(baseUrl);
@@ -213,12 +225,16 @@ export function apiClient(baseUrl: string, token: string, timeoutMs = 10_000): A
       }
       throw unreachable();
     }
+    // JSON when it is JSON, else the text (an HTML error page, a proxy's
+    // message), else null.
     let parsed: unknown = null;
     const text = await readBody(res);
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      // Not JSON: reported with the status.
+    if (text) {
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        parsed = text;
+      }
     }
     if (res.status === 401) {
       throw new CliError(
@@ -238,8 +254,11 @@ export function apiClient(baseUrl: string, token: string, timeoutMs = 10_000): A
       const error = (res.body as { error?: { message?: unknown; code?: unknown } } | null)?.error;
       const message = error?.message ?? `HTTP ${res.status}`;
       const code = typeof error?.code === "string" ? error.code : null;
+      const issues = issueLines((error as { issues?: unknown } | undefined)?.issues);
       throw new ApiError(
-        `${method} ${path} failed: ${String(message)}${code ? ` (${code})` : ""}`,
+        `${method} ${path} failed: ${String(message)}${code ? ` (${code})` : ""}${
+          issues.length ? `\n${issues.join("\n")}` : ""
+        }`,
         res.status,
         code,
         res.body,

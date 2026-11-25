@@ -105,7 +105,8 @@ async function install(
   const force = values.force ? { force: true } : {};
   let start = (await ctx.api().post<{ result: InstallStart }>(path, force)).result;
   if (start.status === "approval_required") {
-    io.err(`${start.message} (${start.size_mb} MB, ${start.license})`);
+    // The daemon's message points at the dashboard; here the question is ours.
+    io.err(`${id} is ${start.size_mb} MB, licence ${start.license}.`);
     await confirm(io, "Install it?", values.yes === true);
     start = (await ctx.api().post<{ result: InstallStart }>(path, { ...force, approve: true }))
       .result;
@@ -286,6 +287,7 @@ with the free and local options first.
 Commands:
   goals                 the goals it knows (the default)
   plan <goal>           the steps for a goal: done or not, and how to do each
+  <goal>                the same as "plan <goal>"
                         (the goal is an id, a title or a few words)
 
 ${COMMON_HELP}`;
@@ -300,7 +302,13 @@ function cliHint(o: PlanOption): string | null {
   return null;
 }
 
-export async function runSetup(argv: string[], io: CliIo): Promise<number> {
+export async function runSetup(input: string[], io: CliIo): Promise<number> {
+  // "plughive setup make music" is "plughive setup plan make music".
+  const first = input[0];
+  const argv =
+    first !== undefined && !first.startsWith("-") && !["goals", "plan", "help"].includes(first)
+      ? ["plan", ...input]
+      : input;
   return runGroup(
     "setup",
     SETUP_HELP,

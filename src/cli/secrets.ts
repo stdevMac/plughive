@@ -6,7 +6,7 @@
 // prompt or from stdin, never from the command line (where it would land in
 // the shell history and the process list), and it is never printed.
 import { CliError, type CliIo, EXIT_OK, EXIT_USAGE } from "./args.js";
-import { COMMON_HELP, enc, printTable, readStdin, runGroup, sub } from "./common.js";
+import { COMMON_HELP, confirm, enc, printTable, readStdin, runGroup, sub } from "./common.js";
 
 interface SecretRow {
   pack: string;
@@ -30,7 +30,7 @@ Commands:
       --missing         only the ones not set
   set <pack> <NAME>     store a value; you type it at a hidden prompt, or pipe
                         it: printf %s "$KEY" | plughive secrets set <pack> <NAME>
-  unset <pack> <NAME>   delete the stored value
+  unset <pack> <NAME>   delete the stored value; asks first (-y to skip)
 
 <pack> is the pack that asks for it ("plughive secrets list" shows it), or
 "user" for a secret a mount of yours uses.
@@ -99,14 +99,19 @@ export async function runSecrets(argv: string[], io: CliIo): Promise<number> {
         return EXIT_OK;
       },
       unset: async (args) => {
-        const { positionals, ctx } = sub(
+        const { values, positionals, ctx } = sub(
           "secrets unset",
           args,
           io,
-          {},
-          { min: 2, max: 2, usage: "<pack> <NAME>" },
+          { yes: { type: "boolean", short: "y" } },
+          { min: 2, max: 2, usage: "<pack> <NAME> [--yes]" },
         );
         const [pack = "", name = ""] = positionals;
+        await confirm(
+          io,
+          `Delete the stored ${name} of ${pack}? It cannot be recovered.`,
+          values.yes === true,
+        );
         const body = await ctx
           .api()
           .delete<{ pack: string; name: string; present: boolean }>(

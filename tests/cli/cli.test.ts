@@ -594,6 +594,61 @@ describe("dashboard commands against a daemon", () => {
           });
         if (req.method === "PUT" && url === "/api/preferences")
           return json(200, { ok: true, preferences: JSON.parse(body) });
+        const trigger = {
+          id: "trg_1",
+          name: "Nightly",
+          enabled: true,
+          kind: "cron",
+          workflow: "wf",
+          args: { prompt: "a cat", size: { w: 512, h: 512 } },
+          schedule: "0 3 * * *",
+          timezone: "UTC",
+          catch_up: false,
+          webhook_url: null,
+          use_body: false,
+          profile: null,
+          callback: null,
+        };
+        if (req.method === "GET" && url === "/api/triggers/trg_1")
+          return json(200, { ok: true, trigger, runs: [] });
+        if (req.method === "PATCH" && url === "/api/triggers/trg_1")
+          return json(200, { ok: true, trigger: { ...trigger, ...JSON.parse(body) } });
+        if (req.method === "GET" && url === "/api/packs/p1/consent")
+          return json(200, {
+            ok: true,
+            consent: {
+              id: "p1",
+              name: "P1",
+              version: "1.0.0",
+              source: "user",
+              items: [],
+              highRisk: false,
+              runsCode: false,
+              secrets: [
+                { name: "OLD_KEY", required: false, granted: true, grantable: true, stored: true },
+                { name: "NEW_KEY", required: false, granted: false, grantable: true, stored: true },
+                { name: "MUST", required: true, granted: false, grantable: true, stored: true },
+              ],
+              manifestHash: "m",
+              entryHash: "e",
+              review: null,
+            },
+          });
+        if (req.method === "POST" && url === "/api/packs/p1/enable")
+          return json(200, { ok: true, pack: { id: "p1", state: "ready", tools: [] } });
+        if (req.method === "POST" && url === "/api/mounts/smart/park")
+          return json(200, { ok: true, parked: [], skipped: JSON.parse(body).ids ?? [] });
+        if (req.method === "POST" && url === "/api/tools/bad/call")
+          return json(400, {
+            ok: false,
+            error: {
+              code: "INVALID_ARGUMENTS",
+              message: "bad arguments",
+              issues: [{ path: ["size", "w"], message: "Expected number" }],
+            },
+          });
+        if (req.method === "GET" && url === "/api/text")
+          return res.writeHead(502, { "content-type": "text/plain" }), res.end("bad gateway");
         json(404, { ok: false, error: { code: "NOT_FOUND", message: "no such route" } });
       });
     });
@@ -656,6 +711,63 @@ describe("dashboard commands against a daemon", () => {
 
   it("api rejects an unknown method with exit code 2", async () => {
     expect(await runCli(["api", "FETCH", "/api/jobs"], io())).toBe(2);
+  });
+
+  it("triggers update merges k=v into the stored arguments", async () => {
+    expect(await runCli(["triggers", "update", "trg_1", "size.w:=1024"], io())).toBe(0);
+    const sent = JSON.parse(seen.find((r) => r.method === "PATCH")?.body ?? "{}");
+    expect(sent.args).toEqual({ prompt: "a cat", size: { w: 1024, h: 512 } });
+  });
+
+  it("triggers update --replace-args drops the stored arguments", async () => {
+    expect(
+      await runCli(["triggers", "update", "trg_1", "--replace-args", "prompt=a dog"], io()),
+    ).toBe(0);
+    const sent = JSON.parse(seen.find((r) => r.method === "PATCH")?.body ?? "{}");
+    expect(sent.args).toEqual({ prompt: "a dog" });
+  });
+
+  it("triggers rotate-secret refuses a cron trigger", async () => {
+    const c = io();
+    expect(await runCli(["triggers", "rotate-secret", "trg_1", "-y"], c)).toBe(1);
+    expect(c.stderr.join("\n")).toContain("only webhooks have a secret");
+    expect(seen.some((r) => r.url.endsWith("/rotate-secret"))).toBe(false);
+  });
+
+  it("pack enable keeps granted and required secrets, adds --grant, drops --revoke", async () => {
+    expect(await runCli(["pack", "enable", "p1", "--grant", "NEW_KEY", "-y"], io())).toBe(0);
+    expect(await runCli(["pack", "enable", "p1", "--revoke", "OLD_KEY", "-y"], io())).toBe(0);
+    const grants = seen
+      .filter((r) => r.url === "/api/packs/p1/enable")
+      .map((r) => JSON.parse(r.body).grants.sort());
+    expect(grants).toEqual([["MUST", "NEW_KEY", "OLD_KEY"], ["MUST"]]);
+  });
+
+  it("mounts smart park exits 1 and names what it could not park", async () => {
+    const c = io();
+    expect(await runCli(["mounts", "smart", "park", "user/x"], c)).toBe(1);
+    expect(c.stderr.join("\n")).toContain("user/x");
+  });
+
+  it("destructive commands ask first and refuse without a terminal or -y", async () => {
+    expect(await runCli(["secrets", "unset", "user", "KEY"], io())).not.toBe(0);
+    expect(await runCli(["mounts", "remove", "x"], io())).not.toBe(0);
+    expect(seen.some((r) => r.method === "DELETE")).toBe(false);
+  });
+
+  it("tools call shows a nested issue path", async () => {
+    const c = io();
+    expect(await runCli(["tools", "call", "bad", "size.w=x"], c)).toBe(2);
+    expect(c.stderr.join("\n")).toContain("size.w: Expected number");
+  });
+
+  it("api takes a lone path as a GET and prints a text error", async () => {
+    expect(await runCli(["api", "jobs"], io())).toBe(0);
+    expect(seen.at(-1)).toMatchObject({ method: "GET", url: "/api/jobs" });
+    const c = io();
+    expect(await runCli(["api", "/api/text"], c)).toBe(1);
+    expect(c.stderr.join("\n")).toContain("bad gateway");
+    expect(await runCli(["api", "DELETE", "/api/jobs/x", "--data", "{}"], io())).toBe(2);
   });
 
   it("never prints the admin token", async () => {

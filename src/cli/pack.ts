@@ -1,13 +1,14 @@
 // src/cli/pack.ts
 //
-//   plughive pack list
+//   plughive pack list | show | consent | enable | disable | reload | settings
 //   plughive pack add <dir | git-url>
 //   plughive pack remove <id>
 //
 // add copies a pack into $PLUGHIVE_HOME/packs/<id> and asks a running daemon
-// to look again. A new user pack is discovered disabled: the user reviews
-// what it asks for and enables it in the dashboard. This command never
-// enables a pack and never grants anything.
+// to look again. A new user pack is discovered disabled. enable shows what the
+// pack asks for (the same consent the dashboard shows), asks, and sends the
+// reviewed hashes, so the daemon refuses if the pack changed in between.
+// Secrets are granted only by name with --grant.
 import { execFile } from "node:child_process";
 import {
   cpSync,
@@ -25,22 +26,43 @@ import { fileURLToPath } from "node:url";
 import { ManifestError, parseManifestText } from "../core/packs/manifest.js";
 import { apiClient, connect, daemonTarget, daemonUp, readAdminToken } from "./api.js";
 import { CliError, type CliIo, EXIT_OK, EXIT_USAGE, parse } from "./args.js";
+import {
+  COMMON_HELP,
+  COMMON_OPTIONS,
+  type Ctx,
+  confirm,
+  enc,
+  homeEnv,
+  parseAssignments,
+  printFields,
+  printTable,
+  runGroup,
+  sub,
+} from "./common.js";
 
 export const PACK_HELP = `Usage: plughive pack <command> [options]
 
 Commands:
-  list               list the packs of the running daemon
-  add <dir|git-url>  copy a pack into $PLUGHIVE_HOME/packs and register it
-  remove <id>        disable a user pack and move it to packs/.removed
+  list                    the packs of the running daemon: state, tools
+  show <id>               everything about one pack: tools, providers,
+                          workflows, mounts, secrets, errors
+  consent <id>            what the pack asks for (network hosts, programs,
+                          folders, library, secrets), high-risk items flagged
+  enable <id>             show what it asks for, ask, then enable it
+      --grant SECRET      grant the pack a stored secret (repeatable)
+      -y, --yes           do not ask
+  disable <id>            turn the pack off (its tools disappear)
+  reload <id>             read the pack from disk again
+  settings <id>           show the pack's settings
+  settings <id> k=v ...   change them: k=v for text, k:=json for numbers,
+                          booleans, lists; --unset k to clear one
+  add <dir|git-url>       copy a pack into $PLUGHIVE_HOME/packs and register it
+  remove <id>             disable a user pack and move it to packs/.removed
 
-Options:
-  --home DIR    data directory of the daemon (PLUGHIVE_HOME)
-  --json        (list) print JSON
-  -h, --help    show this help
+${COMMON_HELP}
 
-A pack you add starts disabled. Open the dashboard (plughive dashboard),
-read what the pack asks for (network hosts, programs, secrets, library
-access) and enable it there. Code in a pack runs with your user's rights.`;
+A pack you add starts disabled. Read what it asks for ("plughive pack consent
+<id>") before you enable it. Code in a pack runs with your user's rights.`;
 
 /** The bundled packs: <repo>/packs from src/cli, dist/packs from dist/src/cli. */
 export function builtinPacksDir(): string {
@@ -98,15 +120,6 @@ function copyPack(from: string, to: string, skipped: string[]): void {
       return true;
     },
   });
-}
-
-function homeEnv(io: CliIo, home: string | undefined): NodeJS.ProcessEnv {
-  const env = { ...io.env };
-  if (home !== undefined) {
-    env.PLUGHIVE_HOME = resolve(home);
-    env.PLUGHIVE_ROOT = env.PLUGHIVE_HOME;
-  }
-  return env;
 }
 
 /** A client when a daemon runs, else null (add and remove work without one). */
@@ -223,40 +236,273 @@ async function remove(id: string, env: NodeJS.ProcessEnv, io: CliIo): Promise<nu
   return EXIT_OK;
 }
 
-export async function runPack(argv: string[], io: CliIo): Promise<number> {
-  const { values, positionals } = parse(
-    "pack",
-    argv,
-    {
-      home: { type: "string" },
-      json: { type: "boolean" },
-      help: { type: "boolean", short: "h" },
-    },
-    true,
-  );
-  const [sub, arg, ...rest] = positionals;
-  if (values.help || sub === undefined) {
-    io.out(PACK_HELP);
-    return values.help ? EXIT_OK : EXIT_USAGE;
+// ---- review, enable, disable, settings ---------------------------------------
+
+interface PackView {
+  id: string;
+  name: string | null;
+  version: string | null;
+  description: string | null;
+  notice: string | null;
+  source: string;
+  enabled: boolean;
+  state: string;
+  error: string | null;
+  tools: string[];
+  providers: string[];
+  secrets: { name: string; present?: boolean; granted?: boolean; required?: boolean }[];
+  skills: string[];
+  workflows: string[];
+  workflowErrors: { name: string; error: string }[];
+  mounts: string[];
+  review: unknown;
+}
+
+interface ConsentView {
+  id: string;
+  name: string;
+  version: string;
+  source: string;
+  items: { kind: string; text: string; risk: string }[];
+  highRisk: boolean;
+  runsCode: boolean;
+  secrets: {
+    name: string;
+    label?: string;
+    required: boolean;
+    granted: boolean;
+    grantable: boolean;
+    stored: boolean;
+  }[];
+  manifestHash: string;
+  entryHash: string;
+  review: unknown;
+}
+
+async function findPack(ctx: Ctx, id: string): Promise<PackView> {
+  const { packs } = await ctx.api().get<{ packs: PackView[] }>("/api/packs");
+  const pack = packs.find((p) => p.id === id);
+  if (!pack) throw new CliError(`no pack "${id}"; "plughive pack list" shows them`);
+  return pack;
+}
+
+function printConsent(io: CliIo, c: ConsentView): void {
+  io.out(`${c.name} ${c.version} (${c.id}, ${c.source} pack) asks for:`);
+  for (const item of c.items) {
+    io.out(`  ${item.risk === "high" ? "[high-risk] " : ""}${item.text}`);
   }
-  const env = homeEnv(io, values.home);
-  const tooMany = () => new CliError(`too many arguments for "pack ${sub}"`, EXIT_USAGE);
-  switch (sub) {
-    case "list":
-      if (arg !== undefined) throw tooMany();
-      return list(env, io, values.json === true);
-    case "add":
-      if (arg === undefined) throw new CliError("pack add needs a folder or a git URL", EXIT_USAGE);
-      if (rest.length) throw tooMany();
-      return add(arg, env, io);
-    case "remove":
-      if (arg === undefined) throw new CliError("pack remove needs a pack id", EXIT_USAGE);
-      if (rest.length) throw tooMany();
-      return remove(arg, env, io);
-    default:
+  if (!c.items.length) io.out("  nothing");
+  if (c.runsCode) {
+    io.out("\nThis pack ships code. It runs inside the daemon with your user's rights;");
+    io.out("the items above are what the daemon mediates, not a sandbox.");
+  }
+  if (c.secrets.length) {
+    io.out("\nSecrets it can be granted (--grant NAME):");
+    for (const s of c.secrets) {
+      const notes = [
+        s.required ? "required" : "optional",
+        s.granted ? "granted" : null,
+        s.stored ? "a value is stored" : null,
+        s.grantable ? null : "cannot be granted to this pack",
+      ].filter(Boolean);
+      io.out(`  ${s.name}${s.label ? ` (${s.label})` : ""}: ${notes.join(", ")}`);
+    }
+  }
+  if (c.review) io.out("\nThe pack changed since you last enabled it; review it again.");
+}
+
+async function packSub(
+  name: "show" | "consent" | "enable" | "disable" | "reload" | "settings",
+  argv: string[],
+  io: CliIo,
+): Promise<number> {
+  switch (name) {
+    case "show": {
+      const { positionals, ctx } = sub(
+        "pack show",
+        argv,
+        io,
+        {},
+        { min: 1, max: 1, usage: "<id>" },
+      );
+      const p = await findPack(ctx, positionals[0] ?? "");
+      if (ctx.json) {
+        ctx.printJson(p);
+        return EXIT_OK;
+      }
+      printFields(io, [
+        ["id", p.id],
+        ["name", p.name],
+        ["version", p.version],
+        ["source", p.source],
+        ["state", `${p.state}${p.enabled ? " (enabled)" : ""}`],
+        ["error", p.error],
+        ["description", p.description],
+        ["notice", p.notice],
+        ["tools", p.tools.join(", ") || "none"],
+        ["providers", p.providers.join(", ") || null],
+        ["workflows", p.workflows.join(", ") || null],
+        ["skills", p.skills.join(", ") || null],
+        ["mounts", p.mounts.join(", ") || null],
+        [
+          "secrets",
+          p.secrets.map((s) => `${s.name}${s.present ? " (set)" : " (not set)"}`).join(", ") ||
+            null,
+        ],
+      ]);
+      for (const w of p.workflowErrors) io.out(`workflow ${w.name} did not load: ${w.error}`);
+      return EXIT_OK;
+    }
+    case "consent": {
+      const { positionals, ctx } = sub(
+        "pack consent",
+        argv,
+        io,
+        {},
+        { min: 1, max: 1, usage: "<id>" },
+      );
+      const c = await ctx
+        .api()
+        .get<{ consent: ConsentView }>(`/api/packs/${enc(positionals[0] ?? "")}/consent`);
+      if (ctx.json) ctx.printJson(c.consent);
+      else printConsent(io, c.consent);
+      return EXIT_OK;
+    }
+    case "enable": {
+      const { values, positionals, ctx } = sub(
+        "pack enable",
+        argv,
+        io,
+        { grant: { type: "string", multiple: true }, yes: { type: "boolean", short: "y" } },
+        { min: 1, max: 1, usage: "<id> [--grant SECRET ...] [--yes]" },
+      );
+      const id = positionals[0] ?? "";
+      const { consent } = await ctx
+        .api()
+        .get<{ consent: ConsentView }>(`/api/packs/${enc(id)}/consent`);
+      const grants = values.grant ?? [];
+      for (const g of grants) {
+        const s = consent.secrets.find((x) => x.name === g);
+        if (!s) throw new CliError(`${id} does not ask for a secret named ${g}`, EXIT_USAGE);
+        if (!s.grantable) throw new CliError(`${g} cannot be granted to ${id}`, EXIT_USAGE);
+      }
+      if (!ctx.json || !values.yes) printConsent(ctx.json ? { ...io, out: io.err } : io, consent);
+      if (grants.length) io.err(`\nGranting: ${grants.join(", ")}`);
+      await confirm(io, `\nEnable ${id}?`, values.yes === true);
+      const { pack } = await ctx
+        .api()
+        .post<{ pack: PackView | null }>(`/api/packs/${enc(id)}/enable`, {
+          grants,
+          manifestHash: consent.manifestHash,
+          entryHash: consent.entryHash,
+        });
+      if (ctx.json) ctx.printJson(pack);
+      else
+        io.out(
+          `Enabled ${id}: ${pack?.state ?? "unknown"}${pack?.error ? ` (${pack.error})` : ""}, ${
+            pack?.tools.length ?? 0
+          } tools.`,
+        );
+      return EXIT_OK;
+    }
+    case "disable":
+    case "reload": {
+      const { positionals, ctx } = sub(
+        `pack ${name}`,
+        argv,
+        io,
+        {},
+        { min: 1, max: 1, usage: "<id>" },
+      );
+      const id = positionals[0] ?? "";
+      const { pack } = await ctx
+        .api()
+        .post<{ pack: PackView | null }>(`/api/packs/${enc(id)}/${name}`);
+      if (ctx.json) ctx.printJson(pack);
+      else
+        io.out(
+          `${name === "disable" ? "Disabled" : "Reloaded"} ${id}: ${pack?.state ?? "unknown"}${
+            pack?.error ? ` (${pack.error})` : ""
+          }.`,
+        );
+      return EXIT_OK;
+    }
+    case "settings": {
+      const { values, positionals, ctx } = sub(
+        "pack settings",
+        argv,
+        io,
+        { unset: { type: "string", multiple: true } },
+        { min: 1, max: 1000, usage: "<id> [key=value | key:=json ...] [--unset key]" },
+      );
+      const [id = "", ...pairs] = positionals;
+      const path = `/api/packs/${enc(id)}/settings`;
+      let body: Record<string, unknown>;
+      if (pairs.length || values.unset?.length) {
+        const patch: Record<string, unknown> = parseAssignments(pairs);
+        for (const k of values.unset ?? []) patch[k] = null;
+        body = await ctx.api().put(path, { values: patch });
+      } else {
+        body = await ctx.api().get(path);
+      }
+      if (ctx.json) {
+        ctx.printJson(body);
+        return EXIT_OK;
+      }
+      printSettings(io, body);
+      return EXIT_OK;
+    }
+  }
+}
+
+function printSettings(io: CliIo, body: Record<string, unknown>): void {
+  const schema = body.schema as {
+    properties?: Record<string, { type?: string; title?: string; description?: string }>;
+  } | null;
+  const vals = (body.values ?? {}) as Record<string, unknown>;
+  const props = Object.entries(schema?.properties ?? {});
+  if (!props.length) {
+    io.out("This pack has no settings.");
+    return;
+  }
+  printTable(
+    io,
+    ["KEY", "VALUE", "TYPE", "ABOUT"],
+    props.map(([key, p]) => [
+      key,
+      vals[key] === undefined ? "" : JSON.stringify(vals[key]),
+      p.type,
+      p.title ?? p.description,
+    ]),
+  );
+}
+
+export async function runPack(argv: string[], io: CliIo): Promise<number> {
+  const legacy = async (name: "list" | "add" | "remove", args: string[]) => {
+    const { values, positionals } = parse(`pack ${name}`, args, { ...COMMON_OPTIONS }, true);
+    const env = homeEnv(io, values.home);
+    const want = name === "list" ? 0 : 1;
+    if (positionals.length < want) {
       throw new CliError(
-        `unknown pack command "${sub}"\nRun "plughive pack --help" for usage.`,
+        name === "add" ? "pack add needs a folder or a git URL" : "pack remove needs a pack id",
         EXIT_USAGE,
       );
-  }
+    }
+    if (positionals.length > want)
+      throw new CliError(`too many arguments for "pack ${name}"`, EXIT_USAGE);
+    if (name === "list") return list(env, io, values.json === true);
+    if (name === "add") return add(positionals[0] ?? "", env, io);
+    return remove(positionals[0] ?? "", env, io);
+  };
+  return runGroup("pack", PACK_HELP, argv, io, {
+    list: (a) => legacy("list", a),
+    add: (a) => legacy("add", a),
+    remove: (a) => legacy("remove", a),
+    show: (a) => packSub("show", a, io),
+    consent: (a) => packSub("consent", a, io),
+    enable: (a) => packSub("enable", a, io),
+    disable: (a) => packSub("disable", a, io),
+    reload: (a) => packSub("reload", a, io),
+    settings: (a) => packSub("settings", a, io),
+  });
 }

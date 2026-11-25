@@ -19,6 +19,7 @@ import { cursorDeeplink, cursorServerConfig } from "../../src/cli/cursor-link.js
 import { checkHome, checkNode, checkPort } from "../../src/cli/doctor.js";
 import { browserCommand } from "../../src/cli/open.js";
 import { isGitUrl } from "../../src/cli/pack.js";
+import { sseFrames } from "../../src/cli/raw.js";
 import { applyStartFlags } from "../../src/cli/start.js";
 import { loadOrCreateAdminToken } from "../../src/lib/admin-token.js";
 
@@ -76,6 +77,22 @@ describe("plughive CLI: commands and exit codes", () => {
       "cursor-link",
       "connect",
       "clients",
+      "tools",
+      "jobs",
+      "artifacts",
+      "usage",
+      "approvals",
+      "policy",
+      "secrets",
+      "capabilities",
+      "mounts",
+      "triggers",
+      "software",
+      "setup",
+      "profiles",
+      "prefs",
+      "watch",
+      "api",
     ]) {
       const io = capture();
       expect(await runCli([cmd, "--help"], io), cmd).toBe(0);
@@ -496,5 +513,178 @@ describe("plughive service on a fresh home", () => {
     expect(text).not.toContain("no admin token");
     expect(text).toMatch(/daemon:\s+not answering/);
     expect([0, 1]).toContain(code);
+  });
+});
+
+describe("dashboard commands against a daemon", () => {
+  let server: Server;
+  let port: number;
+  let seen: { method: string; url: string; csrf: string | undefined; body: string }[];
+
+  beforeEach(async () => {
+    seen = [];
+    const token = loadOrCreateAdminToken(home, {}).token;
+    server = createServer((req, res) => {
+      let body = "";
+      req.on("data", (c) => {
+        body += c;
+      });
+      req.on("end", () => {
+        const json = (status: number, b: unknown) => {
+          res.writeHead(status, { "content-type": "application/json" });
+          res.end(JSON.stringify(b));
+        };
+        if (req.headers.authorization !== `Bearer ${token}`) return json(401, { ok: false });
+        const csrf = req.headers["x-plughive-csrf"];
+        seen.push({
+          method: req.method ?? "",
+          url: req.url ?? "",
+          csrf: typeof csrf === "string" ? csrf : undefined,
+          body,
+        });
+        const url = req.url ?? "";
+        if (req.method === "GET" && url.startsWith("/api/jobs"))
+          return json(200, {
+            ok: true,
+            counts: { succeeded: 1 },
+            jobs: [
+              {
+                job_id: "job_1",
+                tool: "generate_image",
+                status: "succeeded",
+                created_at: new Date().toISOString(),
+              },
+            ],
+          });
+        if (req.method === "POST" && url === "/api/approvals/apr_1/approve")
+          return json(200, {
+            ok: true,
+            approval: {
+              id: "apr_1",
+              tool: "generate_video",
+              estimate_usd: 0.5,
+              status: "approved",
+            },
+          });
+        if (req.method === "POST" && url === "/api/tools/generate_video/call")
+          return json(403, {
+            ok: false,
+            error: {
+              code: "APPROVAL_REQUIRED",
+              message: "This call is over the daily cap.",
+              approval_id: "apr_01HZZZZZZZZZZZZZZZZZZZZZZZ",
+            },
+          });
+        if (req.method === "GET" && url === "/api/profiles")
+          return json(200, {
+            ok: true,
+            profiles: [
+              {
+                id: "images",
+                name: "Images",
+                mode: "list",
+                include: ["capability:image"],
+                exclude: [],
+                pinned: [],
+                autoThresholdTokens: 0,
+                autoThresholdTools: 0,
+              },
+            ],
+          });
+        if (req.method === "PUT" && url === "/api/preferences")
+          return json(200, { ok: true, preferences: JSON.parse(body) });
+        json(404, { ok: false, error: { code: "NOT_FOUND", message: "no such route" } });
+      });
+    });
+    await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+    port = (server.address() as AddressInfo).port;
+  });
+  afterEach(async () => {
+    await new Promise<void>((done) => server.close(() => done()));
+  });
+
+  const io = () => capture({ PLUGHIVE_HOME: home, PLUGHIVE_PORT: String(port) });
+
+  it("jobs list prints the jobs", async () => {
+    const c = io();
+    expect(await runCli(["jobs", "list"], c)).toBe(0);
+    expect(c.stdout.join("\n")).toContain("job_1");
+    expect(c.stdout.join("\n")).toContain("generate_image");
+  });
+
+  it("approvals approve posts with the csrf header", async () => {
+    const c = io();
+    expect(await runCli(["approvals", "approve", "apr_1"], c)).toBe(0);
+    const hit = seen.find((r) => r.url === "/api/approvals/apr_1/approve");
+    expect(hit?.method).toBe("POST");
+    expect(hit?.csrf).toBe("1");
+    expect(c.stdout.join("\n")).toContain("Approved apr_1");
+  });
+
+  it("tools call explains how to approve a capped call", async () => {
+    const c = io();
+    expect(await runCli(["tools", "call", "generate_video", "prompt=a cat"], c)).toBe(1);
+    const sent = seen.find((r) => r.url === "/api/tools/generate_video/call");
+    expect(JSON.parse(sent?.body ?? "{}")).toMatchObject({ arguments: { prompt: "a cat" } });
+    expect(c.stderr.join("\n")).toContain(
+      "plughive approvals approve apr_01HZZZZZZZZZZZZZZZZZZZZZZZ",
+    );
+  });
+
+  it("profiles list prints a table", async () => {
+    const c = io();
+    expect(await runCli(["profiles"], c)).toBe(0);
+    expect(c.stdout.join("\n")).toMatch(/images\s+Images\s+list\s+capability:image/);
+  });
+
+  it("prefs set sends the locale and clears it when empty", async () => {
+    expect(await runCli(["prefs", "set", "locale=fr"], io())).toBe(0);
+    expect(await runCli(["prefs", "set", "locale="], io())).toBe(0);
+    const puts = seen.filter((r) => r.url === "/api/preferences").map((r) => JSON.parse(r.body));
+    expect(puts).toEqual([{ locale: "fr" }, { locale: null }]);
+  });
+
+  it("api adds the /api prefix and exits 1 on a 404", async () => {
+    const ok = io();
+    expect(await runCli(["api", "GET", "jobs"], ok)).toBe(0);
+    expect(seen.at(-1)?.url).toBe("/api/jobs");
+    const missing = io();
+    expect(await runCli(["api", "GET", "/api/nope"], missing)).toBe(1);
+    expect(missing.stderr.join("\n")).toContain("NOT_FOUND");
+  });
+
+  it("api rejects an unknown method with exit code 2", async () => {
+    expect(await runCli(["api", "FETCH", "/api/jobs"], io())).toBe(2);
+  });
+
+  it("never prints the admin token", async () => {
+    const token = loadOrCreateAdminToken(home, {}).token;
+    const c = io();
+    await runCli(["api", "GET", "/api/nope", "--include"], c);
+    await runCli(["jobs", "list", "--json"], c);
+    expect([...c.stdout, ...c.stderr].join("\n")).not.toContain(token);
+  });
+});
+
+describe("sseFrames", () => {
+  it("splits events, joins data lines and skips comments and bad JSON", async () => {
+    const text =
+      ': keep-alive\n\nevent: hello\ndata: {"v":1}\n\nevent: job\r\ndata: {"job_id":\r\ndata: "j1"}\r\n\ndata: not json\n\nevent: pack\ndata: {"id":"media"}\n\n';
+    const bytes = new TextEncoder().encode(text);
+    const stream = new ReadableStream<Uint8Array>({
+      start(c) {
+        // Two chunks that cut a frame in half.
+        c.enqueue(bytes.slice(0, 40));
+        c.enqueue(bytes.slice(40));
+        c.close();
+      },
+    });
+    const frames = [];
+    for await (const f of sseFrames(stream)) frames.push(f);
+    expect(frames).toEqual([
+      { event: "hello", data: { v: 1 } },
+      { event: "job", data: { job_id: "j1" } },
+      { event: "pack", data: { id: "media" } },
+    ]);
   });
 });

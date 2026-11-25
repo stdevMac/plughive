@@ -16,6 +16,11 @@ export interface CliIo {
   /** True when stdout is a terminal. Secrets (the dashboard link) only go there. */
   isTTY: boolean;
   env: NodeJS.ProcessEnv;
+  /**
+   * Asks a question on the terminal and resolves the answer. With `hidden`,
+   * what is typed is not echoed (secrets). Absent when there is no terminal.
+   */
+  prompt?(question: string, opts?: { hidden?: boolean }): Promise<string>;
 }
 
 export function processIo(): CliIo {
@@ -24,7 +29,46 @@ export function processIo(): CliIo {
     err: (line) => process.stderr.write(`${line}\n`),
     isTTY: process.stdout.isTTY === true,
     env: process.env,
+    prompt: terminalPrompt,
   };
+}
+
+/** One line from the terminal, on stderr so stdout stays clean for pipes. */
+function terminalPrompt(question: string, opts: { hidden?: boolean } = {}): Promise<string> {
+  const stdin = process.stdin;
+  if (!stdin.isTTY) return Promise.reject(new CliError("no terminal to ask on"));
+  return new Promise((done, fail) => {
+    process.stderr.write(question);
+    let answer = "";
+    stdin.setRawMode(true);
+    stdin.resume();
+    stdin.setEncoding("utf8");
+    const finish = (err: Error | null) => {
+      stdin.setRawMode(false);
+      stdin.pause();
+      stdin.off("data", onData);
+      process.stderr.write("\n");
+      if (err) fail(err);
+      else done(answer);
+    };
+    const onData = (chunk: string) => {
+      for (const ch of chunk) {
+        if (ch === "\r" || ch === "\n") return finish(null);
+        if (ch === "\u0003") return finish(new CliError("cancelled"));
+        if (ch === "\u007f" || ch === "\b") {
+          if (answer.length) {
+            answer = answer.slice(0, -1);
+            if (!opts.hidden) process.stderr.write("\b \b");
+          }
+          continue;
+        }
+        if (ch < " ") continue;
+        answer += ch;
+        if (!opts.hidden) process.stderr.write(ch);
+      }
+    };
+    stdin.on("data", onData);
+  });
 }
 
 /** A failure written for the user. The message is printed as is, without a stack. */

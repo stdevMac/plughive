@@ -20,12 +20,30 @@ Commands:
   dashboard     open the dashboard, signed in (--print to print the link)
   doctor        check that this machine can run the daemon
   status        show whether the daemon runs, with pack and tool counts
-  pack          list, add or remove packs
+  pack          packs: list, show, consent, enable, disable, settings, add, remove
   cursor-link   print a link that adds the daemon to Cursor
   clients       list MCP clients on this computer and their state
   connect       add the daemon to a client (claude-code, cursor, codex, ...)
   service       start the daemon at login (install, uninstall, status)
   version       print the version
+
+What the dashboard shows and does (the daemon must run):
+  tools         list, show and call tools (the Playground)
+  jobs          list, follow, wait for and cancel background jobs
+  artifacts     list, download and delete generated files (the Library)
+  approvals     pending spend requests: approve or deny them
+  policy        spend caps and approval rules
+  usage         spend and calls by vendor, capability and tool
+  secrets       API keys: what is set, set or remove one (values never shown)
+  capabilities  which provider serves each capability, and your preference
+  mounts        other MCP servers: add, switch, sign in, smart mount
+  triggers      workflows on a schedule or a webhook
+  software      programs the tools use: install and remove them
+  setup         what a goal still needs on this machine, and how to get it
+  profiles      what each agent profile exposes (the Exposure page)
+  prefs         dashboard preferences (language)
+  watch         follow jobs, packs and approvals as they change
+  api           call any /api endpoint with the admin token
 
 Run "plughive <command> --help" for the options of a command.
 
@@ -97,6 +115,47 @@ export async function runCli(argv: string[], io: CliIo = processIo()): Promise<n
         return (await import("./cli/connect.js")).runConnect(command, args, io);
       case "service":
         return await (await import("./cli/service.js")).runService(args, io);
+      case "tools":
+      case "tool":
+        return await (await import("./cli/tools.js")).runTools(args, io);
+      case "jobs":
+      case "job":
+        return await (await import("./cli/jobs.js")).runJobs(args, io);
+      case "artifacts":
+      case "library":
+        return await (await import("./cli/jobs.js")).runArtifacts(args, io);
+      case "usage":
+        return await (await import("./cli/jobs.js")).runUsage(args, io);
+      case "approvals":
+        return await (await import("./cli/approvals.js")).runApprovals(args, io);
+      case "policy":
+        return await (await import("./cli/approvals.js")).runPolicy(args, io);
+      case "secrets":
+        return await (await import("./cli/secrets.js")).runSecrets(args, io);
+      case "capabilities":
+      case "caps":
+        return await (await import("./cli/capabilities.js")).runCapabilities(args, io);
+      case "mounts":
+      case "mount":
+        return await (await import("./cli/mounts.js")).runMounts(args, io);
+      case "triggers":
+      case "trigger":
+        return await (await import("./cli/triggers.js")).runTriggers(args, io);
+      case "software":
+        return await (await import("./cli/software.js")).runSoftware(args, io);
+      case "setup":
+        return await (await import("./cli/software.js")).runSetup(args, io);
+      case "profiles":
+      case "profile":
+        return await (await import("./cli/profiles.js")).runProfiles(args, io);
+      case "prefs":
+      case "preferences":
+        return await (await import("./cli/profiles.js")).runPrefs(args, io);
+      case "watch":
+      case "events":
+        return await (await import("./cli/raw.js")).runWatch(args, io);
+      case "api":
+        return await (await import("./cli/raw.js")).runApi(args, io);
       case "version":
         io.out(packageVersion());
         return EXIT_OK;

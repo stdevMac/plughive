@@ -1,6 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 // Playground: pick a tool, fill in its form, run it and see what comes back.
 import { useCancelJob } from "../components/CancelJob";
+import { Dialog } from "../components/Dialog";
 import { Icon } from "../components/Icon";
 import { JobProgress } from "../components/JobProgress";
 import { ResultView } from "../components/ResultView";
@@ -29,6 +30,7 @@ import { displayName, formatDuration } from "../lib/format";
 import { useDocumentTitle, useNow, useResource } from "../lib/hooks";
 import { isTerminal, jobErrorText, jobStatusLabel, jobTone, rememberJobInput } from "../lib/jobs";
 import { triedFlag } from "../lib/onboarding";
+import { toolNeedsConfirm } from "../lib/packs";
 import { Link, useRouter } from "../lib/router";
 import {
   type Draft,
@@ -124,10 +126,18 @@ function ToolPicker({
 function JobPanel({
   job,
   pack,
+  canUseKey,
   startedAt,
   onCancel,
   cancelling,
-}: { job: JobView; pack: string; startedAt: number; onCancel: () => void; cancelling: boolean }) {
+}: {
+  job: JobView;
+  pack: string;
+  canUseKey: boolean;
+  startedAt: number;
+  onCancel: () => void;
+  cancelling: boolean;
+}) {
   const done = isTerminal(job.status);
   const now = useNow(!done);
   const err = jobErrorText(job.error);
@@ -161,6 +171,7 @@ function JobPanel({
         <HumanErrorAlert
           error={job.error ?? { message: err || t("playground.job.failed") }}
           pack={pack}
+          canUseKey={canUseKey}
         />
       ) : null}
       {job.status === "submission_unknown" ? (
@@ -187,7 +198,9 @@ function CallError({ error, tool }: { error: unknown; tool: ToolInfo }) {
       </InlineAlert>
     );
   }
-  return <HumanErrorAlert error={error} pack={tool.pack} />;
+  return (
+    <HumanErrorAlert error={error} pack={tool.pack} canUseKey={tool.requires_secrets.length > 0} />
+  );
 }
 
 function ToolRunner({ tool }: { tool: ToolInfo }) {
@@ -201,12 +214,16 @@ function ToolRunner({ tool }: { tool: ToolInfo }) {
   const [rawError, setRawError] = useState<string | null>(null);
   const [errors, setErrors] = useState<FieldError[]>([]);
   const [run, setRun] = useState<Run>({ kind: "idle" });
+  const [confirmArgs, setConfirmArgs] = useState<Record<string, unknown> | null>(null);
   const jobId = run.kind === "job" ? run.job.job_id : null;
   const hasFields = (field.fields?.length ?? 0) > 0 || field.kind !== "object";
+  const destructive = toolNeedsConfirm(tool);
+  const canUseKey = tool.requires_secrets.length > 0;
 
   useEffect(() => {
     setDraft(initialDraft(field));
     setRun({ kind: "idle" });
+    setConfirmArgs(null);
     setErrors([]);
     setRaw(false);
     setRawError(null);
@@ -285,10 +302,8 @@ function ToolRunner({ tool }: { tool: ToolInfo }) {
     }
   };
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    const args = currentArgs();
-    if (!args.ok) return;
+  const executeCall = async (argsValue: Record<string, unknown>) => {
+    setConfirmArgs(null);
     const startedAt = Date.now();
     setRun({ kind: "running", startedAt });
     try {
@@ -296,11 +311,11 @@ function ToolRunner({ tool }: { tool: ToolInfo }) {
         `/api/tools/${encodeURIComponent(tool.name)}/call`,
         {
           method: "POST",
-          body: { arguments: args.value },
+          body: { arguments: argsValue },
         },
       );
       if (r.job_id) {
-        rememberJobInput(r.job_id, args.value);
+        rememberJobInput(r.job_id, argsValue);
         const now = new Date().toISOString();
         setRun({
           kind: "job",
@@ -330,6 +345,17 @@ function ToolRunner({ tool }: { tool: ToolInfo }) {
         setErrors(err.issues.map((i) => ({ path: i.path, message: i.message })));
       setRun({ kind: "error", error: err });
     }
+  };
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    const args = currentArgs();
+    if (!args.ok) return;
+    if (destructive) {
+      setConfirmArgs(args.value);
+      return;
+    }
+    await executeCall(args.value);
   };
 
   const stopper = useCancelJob((j) =>
@@ -395,6 +421,11 @@ function ToolRunner({ tool }: { tool: ToolInfo }) {
           ) : null}
           {tool.tags.includes("paid") || tool.capability ? (
             <span>{t("playground.runner.mayCost")}</span>
+          ) : null}
+          {destructive ? (
+            <span className="perm-risk">
+              <Icon name="alert" /> {t("playground.runner.destructive")}
+            </span>
           ) : null}
         </p>
         <form
@@ -482,6 +513,7 @@ function ToolRunner({ tool }: { tool: ToolInfo }) {
           <JobPanel
             job={run.job}
             pack={tool.pack}
+            canUseKey={canUseKey}
             startedAt={run.startedAt}
             onCancel={cancel}
             cancelling={cancelling}
@@ -490,6 +522,34 @@ function ToolRunner({ tool }: { tool: ToolInfo }) {
           <CallError error={run.error} tool={tool} />
         )}
       </section>
+      <Dialog
+        open={confirmArgs !== null}
+        onClose={() => setConfirmArgs(null)}
+        title={t("playground.confirm.title", { tool: tool.name })}
+        size="sm"
+        role="alertdialog"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConfirmArgs(null)} data-autofocus>
+              {t("playground.confirm.cancel")}
+            </Button>
+            <Button
+              variant="danger"
+              icon="play"
+              onClick={() => confirmArgs && void executeCall(confirmArgs)}
+            >
+              {t("playground.confirm.run")}
+            </Button>
+          </>
+        }
+      >
+        <div className="stack">
+          <p>{t("playground.confirm.body")}</p>
+          {confirmArgs && Object.keys(confirmArgs).length > 0 ? (
+            <pre className="approval-args mono small">{JSON.stringify(confirmArgs, null, 2)}</pre>
+          ) : null}
+        </div>
+      </Dialog>
       {stopper.dialog}
     </div>
   );

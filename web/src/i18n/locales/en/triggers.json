@@ -108,5 +108,17 @@
     "keep": "Keep it",
     "confirm": "Delete trigger",
     "body": "It stops running and its webhook address stops working. Jobs it already started are kept."
+  },
+  "runConfirm": {
+    "title": "Run {name} now?",
+    "cancel": "Cancel",
+    "confirm": "Run now",
+    "body": "Starts {workflow} right now as a background job. Tools it calls may change data or spend credit."
+  },
+  "rotateConfirm": {
+    "title": "Replace secret for {name}?",
+    "cancel": "Keep current secret",
+    "confirm": "Make new secret",
+    "body": "The current signing secret stops working right away for incoming webhooks and job callbacks."
   }
 }

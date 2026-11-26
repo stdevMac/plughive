@@ -1,6 +1,6 @@
 // Plain-language wording for pack state and permissions.
 import { t } from "../i18n";
-import type { PackStatus } from "./types";
+import type { PackConsent, PackStatus, ToolInfo } from "./types";
 
 /** The library permission value ("read", "read-all", ...) -> its message key. */
 const LIBRARY_KEY: Record<string, string> = {
@@ -94,3 +94,32 @@ export function packStateLabel(p: Pick<PackStatus, "enabled" | "state">): {
 }
 
 export const isBundled = (p: Pick<PackStatus, "source">) => p.source === "builtin";
+
+export type ConsentSecret = PackConsent["secrets"][number];
+
+/** Initial secret checkboxes in the consent dialog: never pre-select non-grantable secrets. */
+export function initialConsentGrants(secrets: readonly ConsentSecret[]): Set<string> {
+  return new Set(
+    secrets.filter((s) => s.grantable !== false && (s.granted || s.required)).map((s) => s.name),
+  );
+}
+
+/** Toggle a secret grant in the consent dialog, refusing non-grantable secrets. */
+export function toggleConsentGrant(
+  grants: ReadonlySet<string>,
+  secret: ConsentSecret,
+  checked: boolean,
+): Set<string> {
+  const next = new Set(grants);
+  if (secret.grantable === false || !checked) {
+    next.delete(secret.name);
+  } else {
+    next.add(secret.name);
+  }
+  return next;
+}
+
+/** Whether a tool in the Playground should ask for confirmation before running. */
+export function toolNeedsConfirm(tool: Pick<ToolInfo, "annotations" | "tags">): boolean {
+  return tool.annotations?.destructiveHint === true || tool.tags.includes("sends");
+}

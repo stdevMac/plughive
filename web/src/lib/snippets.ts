@@ -20,6 +20,17 @@ export interface Snippet {
   note?: string;
 }
 
+const BARE_KEY = /^[A-Za-z0-9_-]+$/;
+
+function shellQuote(value: string): string {
+  if (/^[A-Za-z0-9_./:@%+=,-]+$/.test(value)) return value;
+  return `'${value.replace(/'/g, "'\\''")}'`;
+}
+
+function quoteKey(key: string): string {
+  return BARE_KEY.test(key) ? key : JSON.stringify(key);
+}
+
 export function connectSnippets(url: string, withKey: boolean, name = "plughive"): Snippet[] {
   const auth = `Bearer ${KEY_PLACEHOLDER}`;
   const json = (v: unknown) => JSON.stringify(v, null, 2);
@@ -42,6 +53,9 @@ export function connectSnippets(url: string, withKey: boolean, name = "plughive"
     ...(url.startsWith("http:") && !loopback ? ["--allow-http"] : []),
     ...(withKey ? ["--header", "Authorization:${AUTH_HEADER}"] : []),
   ];
+  const shellName = shellQuote(name);
+  const shellUrl = shellQuote(url);
+  const configKey = quoteKey(name);
 
   return [
     {
@@ -50,8 +64,8 @@ export function connectSnippets(url: string, withKey: boolean, name = "plughive"
       where: t("connect.snippets.claudeCode.where"),
       language: "shell",
       code: withKey
-        ? `claude mcp add --transport http ${name} ${url} \\\n  --header "Authorization: ${auth}"`
-        : `claude mcp add --transport http ${name} ${url}`,
+        ? `claude mcp add --transport http ${shellName} ${shellUrl} \\\n  --header "Authorization: ${auth}"`
+        : `claude mcp add --transport http ${shellName} ${shellUrl}`,
     },
     {
       id: "claude-desktop",
@@ -87,9 +101,9 @@ export function connectSnippets(url: string, withKey: boolean, name = "plughive"
       where: "~/.codex/config.toml",
       language: "toml",
       code: [
-        `[mcp_servers.${name}]`,
-        `url = "${url}"`,
-        ...(withKey ? [`http_headers = { "Authorization" = "${auth}" }`] : []),
+        `[mcp_servers.${configKey}]`,
+        `url = ${JSON.stringify(url)}`,
+        ...(withKey ? [`http_headers = { "Authorization" = ${JSON.stringify(auth)} }`] : []),
       ].join("\n"),
     },
     {
@@ -99,9 +113,9 @@ export function connectSnippets(url: string, withKey: boolean, name = "plughive"
       language: "yaml",
       code: [
         "mcp_servers:",
-        `  ${name}:`,
-        `    url: "${url}"`,
-        ...(withKey ? ["    headers:", `      Authorization: "${auth}"`] : []),
+        `  ${configKey}:`,
+        `    url: ${JSON.stringify(url)}`,
+        ...(withKey ? ["    headers:", `      Authorization: ${JSON.stringify(auth)}`] : []),
       ].join("\n"),
     },
     {

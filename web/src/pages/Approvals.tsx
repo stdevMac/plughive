@@ -1,5 +1,6 @@
 // Approvals: paid or guarded calls waiting for a person, and what was decided.
 import { useEffect, useState } from "react";
+import { Dialog } from "../components/Dialog";
 import { useToast } from "../components/Toast";
 import {
   Badge,
@@ -18,6 +19,7 @@ import {
   type ApprovalStatus,
   type ApprovalView,
   type ApprovalsResponse,
+  approvalConfirmReasons,
   statusLabel,
   statusTone,
 } from "../lib/approvals";
@@ -43,14 +45,18 @@ function ApprovalCard({
 }: { a: ApprovalView; highlight: boolean; onDecided: (a: ApprovalView) => void }) {
   const toast = useToast();
   const [busy, setBusy] = useState<"approve" | "deny" | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const now = useNow(a.status === "pending", 30_000);
   const pending = a.status === "pending";
+  const reasons = approvalConfirmReasons(a);
+  const needsConfirm = reasons.unknownCost || reasons.truncatedArgs;
   const decide = async (verb: "approve" | "deny") => {
     setBusy(verb);
     try {
       const r = await api.post<{ approval: ApprovalView }>(
         `/api/approvals/${encodeURIComponent(a.id)}/${verb}`,
       );
+      setConfirming(false);
       onDecided(r.approval);
       toast.ok(
         verb === "approve"
@@ -115,7 +121,7 @@ function ApprovalCard({
             icon="check"
             busy={busy === "approve"}
             disabled={busy !== null}
-            onClick={() => decide("approve")}
+            onClick={() => (needsConfirm ? setConfirming(true) : void decide("approve"))}
           >
             {t("approvals.card.approve")}
           </Button>
@@ -131,6 +137,39 @@ function ApprovalCard({
           </Button>
         </div>
       ) : null}
+      <Dialog
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        title={t("approvals.confirm.title", { tool: a.tool })}
+        size="sm"
+        role="alertdialog"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConfirming(false)} data-autofocus>
+              {t("approvals.confirm.cancel")}
+            </Button>
+            <Button
+              variant="danger"
+              busy={busy === "approve"}
+              disabled={busy !== null}
+              onClick={() => void decide("approve")}
+            >
+              {t("approvals.confirm.approve")}
+            </Button>
+          </>
+        }
+      >
+        <div className="stack">
+          {reasons.unknownCost ? (
+            <InlineAlert tone="warn">{t("approvals.confirm.unknownCost")}</InlineAlert>
+          ) : null}
+          {reasons.truncatedArgs ? (
+            <InlineAlert tone="warn">{t("approvals.confirm.truncatedArgs")}</InlineAlert>
+          ) : null}
+          <p className="small">{a.reason}</p>
+          {a.args_summary ? <pre className="approval-args mono small">{a.args_summary}</pre> : null}
+        </div>
+      </Dialog>
     </li>
   );
 }

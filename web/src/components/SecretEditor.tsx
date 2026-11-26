@@ -128,6 +128,7 @@ export function SecretEditor({
             placeholder={
               row.present ? t("packs.secret.placeholderNew") : t("packs.secret.placeholderFirst")
             }
+            autoComplete="new-password"
             autoFocus={!autoOpen || focusOnOpen}
             invalid={!!error}
             describedBy={error ? `${id}-error` : undefined}

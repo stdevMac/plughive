@@ -217,3 +217,22 @@ export function withCaps(policy: Policy, caps: Cap[]): Policy {
 export function pendingAfter(prev: number, e: Partial<ApprovalEvent>): number {
   return typeof e.pending === "number" && e.pending >= 0 ? e.pending : prev;
 }
+
+/** The daemon cuts a long summary and ends it with "…" (summarizeArgs). */
+export function isArgsSummaryTruncated(summary: string): boolean {
+  return summary.endsWith("…");
+}
+
+/**
+ * Approvals whose cost is unknown or whose argument summary was cut short
+ * ask for a second confirmation before executing.
+ */
+export function approvalConfirmReasons(a: Pick<ApprovalView, "estimate_usd" | "args_summary">): {
+  unknownCost: boolean;
+  truncatedArgs: boolean;
+} {
+  return {
+    unknownCost: a.estimate_usd === null,
+    truncatedArgs: isArgsSummaryTruncated(a.args_summary),
+  };
+}

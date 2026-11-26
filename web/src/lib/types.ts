@@ -28,6 +28,14 @@ export type JsonSchema = {
   [key: string]: unknown;
 };
 
+export interface ToolAnnotations {
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+  openWorldHint?: boolean;
+  title?: string;
+}
+
 export interface ToolInfo {
   name: string;
   pack: string;
@@ -37,6 +45,7 @@ export interface ToolInfo {
   capability: string | null;
   requires_secrets: string[];
   long_running: boolean;
+  annotations?: ToolAnnotations | null;
   input_schema: JsonSchema;
 }
 
@@ -122,7 +131,17 @@ export interface PackConsent {
   highRisk: boolean;
   /** The pack ships code, which runs with the user's full rights (older daemons omit it). */
   runsCode?: boolean;
-  secrets: Array<{ name: string; label?: string; required: boolean; granted: boolean }>;
+  secrets: Array<{
+    name: string;
+    label?: string;
+    required: boolean;
+    granted: boolean;
+    grantable?: boolean;
+    stored?: boolean;
+    declaredBy?: string[];
+    wellKnown?: boolean;
+    warnings?: string[];
+  }>;
   manifestHash: string;
   entryHash: string;
   review: unknown;

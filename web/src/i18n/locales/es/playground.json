@@ -36,6 +36,7 @@
     "longRunning": "Se ejecuta como trabajo en segundo plano",
     "needsSecrets": "Necesita {secrets}",
     "mayCost": "Puede costar dinero con el proveedor",
+    "destructive": "Puede modificar datos o enviar al exterior",
     "argsLabel": "Argumentos (JSON)",
     "jsonPlaceholder": "Valor JSON",
     "argsNotObject": "Los argumentos deben ser un objeto JSON.",
@@ -49,6 +50,12 @@
     "idleHint": "Ejecuta la herramienta para ver aquí su resultado. Los archivos que genere se guardan en la Biblioteca.",
     "running": "En marcha",
     "copyToolName": "nombre de la herramienta"
+  },
+  "confirm": {
+    "title": "¿Ejecutar {tool}?",
+    "cancel": "Cancelar",
+    "run": "Ejecutar igualmente",
+    "body": "Esta herramienta está marcada como destructiva o envía mensajes fuera de plughive. Revisa los argumentos antes de ejecutarla."
   },
   "empty": {
     "noToolsTitle": "Todavía no hay herramientas",

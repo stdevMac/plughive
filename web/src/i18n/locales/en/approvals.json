@@ -69,5 +69,12 @@
     "limitError": "Cap {n}: the limit must be an amount in dollars, like 5 or 0.50.",
     "scopeError": "Cap {n}: name the {scope} (letters, digits, and . _ : -).",
     "duplicateError": "Cap {n} repeats an earlier cap with the same scope and period."
+  },
+  "confirm": {
+    "title": "Approve {tool}?",
+    "cancel": "Cancel",
+    "approve": "Approve once",
+    "unknownCost": "The cost of this call is unknown before it runs.",
+    "truncatedArgs": "The arguments summary is cut short, so some values could not be shown here."
   }
 }

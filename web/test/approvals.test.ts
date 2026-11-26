@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   type CapStatus,
   type Policy,
+  approvalConfirmReasons,
   capLabel,
   capProgress,
   capsFromDrafts,
+  isArgsSummaryTruncated,
   parseUsd,
   pendingAfter,
   statusTone,
@@ -134,5 +136,22 @@ describe("labels and badge", () => {
     expect(pendingAfter(3, { pending: 0 })).toBe(0);
     expect(pendingAfter(3, {})).toBe(3);
     expect(pendingAfter(3, { pending: -1 })).toBe(3);
+  });
+
+  it("flags unknown-cost and truncated-args approvals for confirmation (D-M14)", () => {
+    expect(isArgsSummaryTruncated('{"prompt":"hello"}')).toBe(false);
+    expect(isArgsSummaryTruncated('{"prompt":"very long…')).toBe(true);
+    expect(approvalConfirmReasons({ estimate_usd: 0.25, args_summary: '{"a":1}' })).toEqual({
+      unknownCost: false,
+      truncatedArgs: false,
+    });
+    expect(approvalConfirmReasons({ estimate_usd: null, args_summary: '{"a":1}' })).toEqual({
+      unknownCost: true,
+      truncatedArgs: false,
+    });
+    expect(approvalConfirmReasons({ estimate_usd: 0.25, args_summary: '{"a":"cut…' })).toEqual({
+      unknownCost: false,
+      truncatedArgs: true,
+    });
   });
 });

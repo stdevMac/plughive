@@ -52,7 +52,10 @@
     "mayNothing": "Nothing beyond working on what you pass it.",
     "keysTitle": "Keys it may read",
     "keysHint": "The pack only sees the keys you allow here.",
-    "requiredSuffix": " (needed for its tools)"
+    "requiredSuffix": " (needed for its tools)",
+    "notGrantable": "Cannot be granted to this pack (well-known credential of another tool).",
+    "declaredBy": "Also used by: {packs}. Granting lets this pack read that key.",
+    "stored": "A value is already stored; granting hands that existing value to this pack."
   },
   "settings": {
     "title": "Settings",

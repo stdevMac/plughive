@@ -45,3 +45,29 @@ describe("claude-desktop snippet matches the CLI entry (H-10)", () => {
     expect(entry("https://example.com/mcp", false).args).not.toContain("--allow-http");
   });
 });
+
+describe("connectSnippets quoting (D-M14)", () => {
+  it("quotes IPv6 bracketed URLs and special characters for shell, TOML, and YAML", () => {
+    const ipv6 = connectSnippets("http://[::1]:7870/mcp", true);
+    const claude = ipv6.find((s) => s.id === "claude-code")?.code ?? "";
+    expect(claude).toContain("'http://[::1]:7870/mcp'");
+
+    const nastyUrl = 'http://127.0.0.1:7870/mcp?a="1"&b=$(id)#\'x\ninjected: true';
+    const nastyName = "plug'hive\"$(id)\n[evil]";
+    const snippets = connectSnippets(nastyUrl, true, nastyName);
+
+    const shell = snippets.find((s) => s.id === "claude-code")?.code ?? "";
+    expect(shell).toContain(`'plug'\\''hive"$(id)\n[evil]'`);
+    expect(shell).toContain(`'http://127.0.0.1:7870/mcp?a="1"&b=$(id)#\'\\''x\ninjected: true'`);
+
+    const toml = snippets.find((s) => s.id === "codex")?.code ?? "";
+    expect(toml).toContain(`[mcp_servers.${JSON.stringify(nastyName)}]`);
+    expect(toml).toContain(`url = ${JSON.stringify(nastyUrl)}`);
+    expect(toml).not.toContain("\ninjected: true");
+
+    const yaml = snippets.find((s) => s.id === "hermes")?.code ?? "";
+    expect(yaml).toContain(`  ${JSON.stringify(nastyName)}:`);
+    expect(yaml).toContain(`    url: ${JSON.stringify(nastyUrl)}`);
+    expect(yaml).not.toContain("\ninjected: true");
+  });
+});

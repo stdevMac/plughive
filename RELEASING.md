@@ -8,7 +8,7 @@ A release is a tag. Pushing `vX.Y.Z` runs
 2. publishes `plughive@X.Y.Z` to npm with provenance (`latest` tag, or `next`
    for a pre-release such as `1.2.0-rc.1`);
 3. builds the Docker image on native amd64 and arm64 runners and pushes
-   `ghcr.io/stdevmac/plughive:X.Y.Z` and `marcosmaceo97/plughive:X.Y.Z` on
+   `ghcr.io/stdevmac/plughive:X.Y.Z` and `stdevmac/plughive:X.Y.Z` on
    Docker Hub, plus `:X.Y` and `:latest` for a stable release (Docker Hub only
    when the `DOCKERHUB_TOKEN` secret is set);
 4. creates the GitHub Release with the `## X.Y.Z` section of `CHANGELOG.md` as
@@ -48,7 +48,7 @@ give its `developers` team write access to the package if others publish too.
   `release`. Delete the `NPM_TOKEN` secret and, under Publishing access,
   choose "Require two-factor authentication and disallow tokens".
 
-**Docker Hub.** The public repository `marcosmaceo97/plughive` exists. Create
+**Docker Hub.** Images go to `stdevmac/plughive` (the first push creates it; check it is public). Create
 a personal access token at https://app.docker.com/settings/personal-access-tokens
 (Read & Write) and save it as the secret `DOCKERHUB_TOKEN` in the `release`
 environment, not as a repository secret, so only the publishing jobs can read

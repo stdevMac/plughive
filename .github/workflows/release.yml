@@ -3,7 +3,7 @@ name: Release
 # Pushing a tag vX.Y.Z (matching package.json "version") publishes:
 #   - the npm package plughive@X.Y.Z (with provenance)
 #   - the Docker image ghcr.io/stdevmac/plughive:X.Y.Z and
-#     docker.io/marcosmaceo97/plughive:X.Y.Z for linux/amd64 and linux/arm64
+#     docker.io/stdevmac/plughive:X.Y.Z for linux/amd64 and linux/arm64
 #     (plus :X.Y and :latest for a stable release)
 #   - a GitHub Release whose notes are the CHANGELOG.md section "## X.Y.Z"
 # A version with a pre-release part (1.2.0-rc.1) goes to the npm "next" tag
@@ -22,8 +22,8 @@ concurrency:
 
 env:
   IMAGE: ghcr.io/stdevmac/plughive
-  DOCKERHUB_IMAGE: docker.io/marcosmaceo97/plughive
-  DOCKERHUB_USERNAME: marcosmaceo97
+  DOCKERHUB_IMAGE: docker.io/stdevmac/plughive
+  DOCKERHUB_USERNAME: stdevmac
 
 jobs:
   verify:

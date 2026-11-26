@@ -29,6 +29,10 @@ import type { Trigger, TriggerRun, TriggerStore } from "./store.js";
 export const MISSED_AFTER_MS = 2 * 60_000;
 export const DEFAULT_TICK_MS = 15_000;
 export const CALLBACK_TIMEOUT_MS = 15_000;
+/** Jobs one trigger may have queued or running at once; a further fire is refused. */
+export const MAX_ACTIVE_RUNS_PER_TRIGGER = 5;
+/** Callbacks sent at once, so one slow receiver does not hold back the others. */
+export const MAX_CALLBACKS_AT_ONCE = 4;
 /** Most bytes of a job result put into a webhook callback body. */
 export const MAX_CALLBACK_RESULT_BYTES = 64 * 1024;
 export const TELEGRAM_TOOL = "send_telegram";
@@ -57,7 +61,7 @@ export type FireSource = TriggerRun["source"];
 
 export class TriggerFireError extends Error {
   constructor(
-    readonly code: "UNKNOWN_WORKFLOW" | "INVALID_INPUT" | "START_FAILED",
+    readonly code: "UNKNOWN_WORKFLOW" | "INVALID_INPUT" | "START_FAILED" | "BUSY",
     message: string,
   ) {
     super(message);
@@ -90,6 +94,8 @@ export class TriggerService {
   private callbacking = false;
   private readonly now: () => number;
   private readonly sending = new Set<Promise<void>>();
+  /** Jobs each trigger started that may not have finished yet. */
+  private readonly active = new Map<string, Set<string>>();
 
   constructor(private readonly deps: TriggerServiceDeps) {
     this.now = deps.now ?? Date.now;
@@ -223,11 +229,28 @@ export class TriggerService {
   }
 
   private startJob(t: Trigger, extraArgs?: Record<string, unknown>): string {
+    // Counted here, not from the stored runs: those are pruned, and refused
+    // fires are recorded too.
+    const started = this.active.get(t.id) ?? new Set<string>();
+    for (const id of started) {
+      const job = this.deps.tasks.get(id);
+      if (!job || isTerminal(job.status)) started.delete(id);
+    }
+    if (started.size >= MAX_ACTIVE_RUNS_PER_TRIGGER) {
+      throw new TriggerFireError(
+        "BUSY",
+        `this trigger already has ${started.size} runs that have not finished; wait for them or cancel them`,
+      );
+    }
     const tool = this.deps.registry.get(t.workflow);
     if (!tool || !isWorkflowTool(t.workflow)) {
       throw new TriggerFireError("UNKNOWN_WORKFLOW", `workflow ${t.workflow} is not loaded`);
     }
-    const parsed = tool.input.safeParse({ ...t.args, ...(extraArgs ?? {}) });
+    // The saved args are what the owner pinned: a request body only fills in
+    // the rest, and never asks for a dry run (which would answer 202 and run
+    // nothing).
+    const { dry_run: _dryRun, ...fromBody } = extraArgs ?? {};
+    const parsed = tool.input.safeParse({ ...fromBody, ...t.args });
     if (!parsed.success) {
       const first = parsed.error.issues[0];
       throw new TriggerFireError(
@@ -235,13 +258,17 @@ export class TriggerService {
         `the workflow input is not valid${first ? `: ${first.path.join(".") || "(root)"} ${first.message}` : ""}`,
       );
     }
-    return this.deps.tasks.start(t.workflow, parsed.data as Record<string, unknown>, {
+    const jobId = this.deps.tasks.start(t.workflow, parsed.data as Record<string, unknown>, {
       ...(t.profile ? { profile: t.profile } : {}),
     });
+    started.add(jobId);
+    this.active.set(t.id, started);
+    return jobId;
   }
 
   /** Send the callbacks of runs whose job has finished. */
   async sendCallbacks(): Promise<void> {
+    const inFlight = new Set<Promise<void>>();
     for (const run of this.deps.store.pendingCallbacks()) {
       const job = run.jobId ? this.deps.tasks.get(run.jobId) : null;
       if (job && !isTerminal(job.status)) continue;
@@ -256,9 +283,14 @@ export class TriggerService {
         },
       );
       this.sending.add(p);
-      void p.finally(() => this.sending.delete(p));
-      await p;
+      inFlight.add(p);
+      void p.finally(() => {
+        this.sending.delete(p);
+        inFlight.delete(p);
+      });
+      if (inFlight.size >= MAX_CALLBACKS_AT_ONCE) await Promise.race(inFlight);
     }
+    await Promise.all(inFlight);
   }
 
   private async deliver(run: TriggerRun, t: Trigger | null, job: TaskJob | null): Promise<void> {

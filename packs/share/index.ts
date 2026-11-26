@@ -202,6 +202,8 @@ const shareArtifact = defineTool({
   description:
     "Publish a library artifact as a public link that expires: uploads it to the configured R2/S3 bucket and returns a presigned download URL. Anyone with the link can download it until it expires (capped by the maxExpirySeconds setting, at most 7 days). share_unshare removes it.",
   secrets: ["SHARE_S3_ACCESS_KEY_ID", "SHARE_S3_SECRET_ACCESS_KEY"],
+  // A public link reaches whoever gets it, so ask_before_sending applies.
+  tags: ["sends"],
   annotations: {
     title: "Share artifact link",
     destructiveHint: true,
@@ -264,6 +266,8 @@ const unshare = defineTool({
   description:
     "Delete an artifact's shared copy from the R2/S3 bucket, so its links stop working at once.",
   secrets: ["SHARE_S3_ACCESS_KEY_ID", "SHARE_S3_SECRET_ACCESS_KEY"],
+  // Like deleting a post: it changes what other people see.
+  tags: ["sends"],
   annotations: {
     title: "Remove shared link",
     destructiveHint: true,

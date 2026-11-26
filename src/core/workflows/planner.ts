@@ -229,7 +229,13 @@ export class Planner {
     let paid = 0;
     let costMax: number | null = 0;
 
-    const planStep = async (s: CompiledStep, parentRuns: PlanStep["runs"]): Promise<PlanStep> => {
+    // `outerCalls`: how often the step itself may be called (a fallback runs
+    // once per item of its step's forEach).
+    const planStep = async (
+      s: CompiledStep,
+      parentRuns: PlanStep["runs"],
+      outerCalls = 1,
+    ): Promise<PlanStep> => {
       let runs: PlanStep["runs"] = parentRuns;
       if (s.when && runs !== "no") {
         if (s.whenRefs.steps.size === 0) {
@@ -255,7 +261,7 @@ export class Planner {
           }
         }
       }
-      const calls = s.kind === "group" ? 0 : (knownItems ?? maxItems);
+      const calls = s.kind === "group" ? 0 : (knownItems ?? maxItems) * outerCalls;
       const needs: Need[] =
         s.kind === "tool" && s.target
           ? await this.toolNeeds(s.target, s.pack)
@@ -288,7 +294,7 @@ export class Planner {
         out.ready = out.steps.every((c) => c.ready || c.runs === "no");
       }
       if (typeof s.onError === "object") {
-        out.fallback = await planStep(s.onError.fallback, runs === "no" ? "no" : "maybe");
+        out.fallback = await planStep(s.onError.fallback, runs === "no" ? "no" : "maybe", calls);
         if (stepPaid && isPaid(s.onError.fallback, this.deps)) {
           out.fallback_after_unknown_outcome = s.onError.afterUnknownOutcome ? "explicit" : "never";
         }

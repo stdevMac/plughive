@@ -24,6 +24,7 @@ Set it up on the dashboard (**Usage > Spend caps**) or write
     "always_ask_providers": [],
     "ask_before_destructive": false,
     "ask_before_sending": true,
+    "max_sends_per_hour": null,
     "approve_in_chat": false
   },
   "profiles": {
@@ -75,17 +76,26 @@ ledger cannot be read, every cap counts as used up.
   default), so with this on, unhinted mounted tools ask.
 - `ask_before_sending` (on by default): ask before tools that reach other
   people: sending an email or SMS, placing a call, posting or deleting a
-  social post, creating or cancelling a booking. These tools are tagged
+  social post, creating or cancelling a booking, publishing or removing a
+  public share link. These tools are tagged
   `sends`. They ask even inside an approved workflow run (that approval
   covers the run's cost, not its messages), so a scheduled workflow that
   sends needs this off for its profile. Turn it off only for a profile you
   trust to send on its own.
+- `max_sends_per_hour` (off by default): at most this many calls to `sends`
+  tools per profile in any hour, asked or not. Later calls fail with
+  `SPEND_BLOCKED` until older ones leave the hour. Useful with
+  `ask_before_sending` off, so a runaway agent cannot send without end. The
+  count is kept in memory and starts again when the daemon restarts.
 
 - `approve_in_chat` (off by default): a client that supports MCP form
   elicitation shows an approve/deny form in the chat instead of the
   dashboard link, and the call runs as soon as you approve. The answer then
   comes from the MCP client, not from the dashboard, so turn this on only for
   clients you trust to show the form to you rather than answer it themselves.
+  Only an answer to a form plughive actually showed counts: an answer sent
+  along with the first call approves nothing. plughive still cannot tell
+  whether you or the client filled the form in.
   Closing the form leaves the request open on the Approvals page.
 
 `profiles` overrides any of these rules for one profile. A field left out

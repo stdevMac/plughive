@@ -157,8 +157,9 @@ export interface AppDeps {
 function chatApprovalsFor(gate: PolicyGate) {
   return {
     allowed: (profile: string) => gate.chatApprovalsAllowed(profile),
-    decide: (id: string, approve: boolean, profile: string) =>
-      gate.decideInChat(id, approve, profile),
+    formShown: (id: string) => gate.chatFormShown(id),
+    decide: (id: string, approve: boolean, profile: string, token: unknown) =>
+      gate.decideInChat(id, approve, profile, token),
   };
 }
 

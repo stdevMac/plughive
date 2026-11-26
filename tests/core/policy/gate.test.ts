@@ -20,7 +20,11 @@ import {
   readPolicy,
   writePolicy,
 } from "../../../src/core/policy/policy.js";
-import { runInPolicyJob, runPreApproved } from "../../../src/core/policy/run-context.js";
+import {
+  currentPolicyRun,
+  runInPolicyJob,
+  runPreApproved,
+} from "../../../src/core/policy/run-context.js";
 import { type RegisteredTool, ToolRegistry } from "../../../src/core/tools/registry.js";
 import { UsageLedger } from "../../../src/lib/usage.js";
 import { expectMode } from "../../support/platform.js";
@@ -272,6 +276,26 @@ describe("spend policy gate", () => {
       expect(
         await gate.runWorkflow({ name: "wf_c", args: {}, maxUsd: 0.6 }, undefined, async () => "y"),
       ).toBe("y");
+    });
+
+    it("D-H1: a workflow nested in an approved run is checked on its own", async () => {
+      policy({ rules: { auto_approve_under_usd: 0.5 } });
+      const child = () =>
+        gate.runWorkflow({ name: "wf_child", args: {}, maxUsd: 5 }, undefined, async () => "ran");
+      // Inside an approved parent run the child still needs its own approval.
+      const err = await rejection(runPreApproved(child));
+      expect(err.code).toBe("APPROVAL_REQUIRED");
+      expect(err.message).toMatch(/up to \$5\.00/);
+      // A nested child that fits under the rules runs, and its body is not pre-approved.
+      let inner: boolean | undefined;
+      const small = await runPreApproved(() =>
+        gate.runWorkflow({ name: "wf_small", args: {}, maxUsd: 0.1 }, undefined, async () => {
+          inner = currentPolicyRun().preApproved;
+          return "ok";
+        }),
+      );
+      expect(small).toBe("ok");
+      expect(inner).toBe(false);
     });
   });
 
@@ -670,28 +694,90 @@ describe("spend policy gate", () => {
       expect(asBot.ok).toBe(true);
     });
 
+    it("H-7: max_sends_per_hour caps sending calls per profile, asked or not", async () => {
+      const code = (out: Awaited<ReturnType<typeof registry.call>>) =>
+        out.ok ? "ok" : out.error.code;
+      policy({ rules: { ask_before_sending: false, max_sends_per_hour: 2 } });
+      expect(code(await registry.call("send_email", {}))).toBe("ok");
+      expect(code(await registry.call("send_email", {}))).toBe("ok");
+      const third = await registry.call("send_email", {});
+      expect(code(third)).toBe("SPEND_BLOCKED");
+      expect(third.ok ? "" : third.error.message).toMatch(/max_sends_per_hour/);
+      // Tools that do not send are not counted or limited.
+      expect(code(await registry.call("read", {}))).toBe("ok");
+      // Each profile has its own count.
+      const asBot = await requestScope.run({ profileId: "bot" }, () =>
+        registry.call("send_email", {}),
+      );
+      expect(code(asBot)).toBe("ok");
+      // A refused call opens no approval request, and an approved run does not lift it.
+      policy({ rules: { max_sends_per_hour: 2 } });
+      expect(code(await runPreApproved(() => registry.call("send_email", {})))).toBe(
+        "SPEND_BLOCKED",
+      );
+      expect(approvals.list({ status: "pending" })).toHaveLength(0);
+      // The window slides.
+      now += 60 * 60_000;
+      policy({ rules: { ask_before_sending: false, max_sends_per_hour: 2 } });
+      expect(code(await registry.call("send_email", {}))).toBe("ok");
+    });
+
+    it("H-7: a profile can set its own max_sends_per_hour", async () => {
+      policy({
+        rules: { ask_before_sending: false },
+        profiles: { bot: { max_sends_per_hour: 1 } },
+      });
+      const asBot = () =>
+        requestScope.run({ profileId: "bot" }, () => registry.call("send_email", {}));
+      expect((await asBot()).ok).toBe(true);
+      expect((await asBot()).ok).toBe(false);
+      expect((await registry.call("send_email", {})).ok).toBe(true);
+    });
+
+    it("H-7: with no max_sends_per_hour (the default) sending calls are not counted", async () => {
+      policy({ rules: { ask_before_sending: false } });
+      for (let i = 0; i < 50; i++) expect((await registry.call("send_email", {})).ok).toBe(true);
+    });
+
     it("decideInChat: only when approve_in_chat is on, only for the caller's own profile", async () => {
       const opened = await registry.call("send_email", {});
       const id = opened.ok ? "" : (opened.error.approval?.id ?? "");
       expect(id).toMatch(/^apr_/);
+      const token = gate.chatFormShown(id);
       // Off by default.
       expect(gate.chatApprovalsAllowed("default")).toBe(false);
-      expect(gate.decideInChat(id, true, "default")).toBe(false);
+      expect(gate.decideInChat(id, true, "default", token)).toBe(false);
       policy({ rules: { approve_in_chat: true } });
       // Another profile cannot decide this profile's request.
-      expect(gate.decideInChat(id, true, "bot")).toBe(false);
+      expect(gate.decideInChat(id, true, "bot", token)).toBe(false);
       // A profile can opt out on its own.
       policy({
         rules: { approve_in_chat: true },
         profiles: { default: { approve_in_chat: false } },
       });
-      expect(gate.decideInChat(id, true, "default")).toBe(false);
+      expect(gate.decideInChat(id, true, "default", token)).toBe(false);
       policy({ rules: { approve_in_chat: true } });
-      expect(gate.decideInChat(id, true, "default")).toBe(true);
+      expect(gate.decideInChat(id, true, "default", token)).toBe(true);
       expect(approvals.get(id)).toMatchObject({ status: "approved", decided_by: "mcp-chat" });
       // Decided once.
-      expect(gate.decideInChat(id, false, "default")).toBe(false);
+      expect(gate.decideInChat(id, false, "default", token)).toBe(false);
       expect((await registry.call("send_email", {})).ok).toBe(true);
+    });
+
+    it("R2-M2: decideInChat needs the token of a form that was shown", async () => {
+      policy({ rules: { approve_in_chat: true } });
+      const opened = await registry.call("send_email", {});
+      const id = opened.ok ? "" : (opened.error.approval?.id ?? "");
+      // No form shown yet: nothing to answer.
+      expect(gate.decideInChat(id, true, "default", undefined)).toBe(false);
+      expect(gate.decideInChat(id, true, "default", "made-up")).toBe(false);
+      const token = gate.chatFormShown(id);
+      expect(gate.decideInChat(id, true, "default", `${token.slice(0, -1)}x`)).toBe(false);
+      // A form shown for another request does not answer this one.
+      const other = gate.chatFormShown("apr_other");
+      expect(gate.decideInChat(id, true, "default", other)).toBe(false);
+      expect(approvals.get(id)?.status).toBe("pending");
+      expect(gate.decideInChat(id, true, "default", token)).toBe(true);
     });
 
     it("always-ask tools ask", async () => {

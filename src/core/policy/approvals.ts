@@ -113,21 +113,67 @@ export function stripMaxCost(args: unknown): unknown {
   return rest;
 }
 
-/** A short summary of arguments a person can read: masked, cut, never the full values. */
+/**
+ * Text a person reads in an approval (dashboard, CLI, Telegram) must look like
+ * what it is: control characters, line breaks and bidirectional overrides
+ * (which can make `evil.com/moc.elgoog` read as something else) become spaces.
+ */
+const UNSAFE_TEXT =
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: these are the characters being removed
+  /[\u0000-\u001f\u007f-\u009f\u061c\u200b-\u200f\u2028-\u202e\u2060-\u2069\ufeff]/g;
+
+export function cleanText(text: string): string {
+  return text.replace(UNSAFE_TEXT, " ");
+}
+
+/** Room each value gets at least, however many keys there are. */
+const MIN_VALUE_CHARS = 12;
+/** Longest key name shown. */
+const MAX_KEY_CHARS = 40;
+
+function cut(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, Math.max(1, max - 1))}…` : text;
+}
+
+/**
+ * A short summary of arguments a person can read: masked, cut, never the full
+ * values. For an object every key is shown and each value gets its share of
+ * the space, so one long value cannot push the others out of sight.
+ */
 export function summarizeArgs(
   args: unknown,
   redact?: (text: string) => string,
   kind?: ApprovalKind,
 ): string {
-  let text: string;
+  const mask = (text: string) => cleanText(redact ? redact(text) : text);
   try {
-    const shown = kind === "provider" ? stripMaxCost(args) : args;
-    text = JSON.stringify(redactArgs(shown)) ?? "";
+    const shown = redactArgs(kind === "provider" ? stripMaxCost(args) : args);
+    if (!shown || typeof shown !== "object" || Array.isArray(shown)) {
+      return cut(mask(JSON.stringify(shown) ?? ""), MAX_ARGS_SUMMARY);
+    }
+    const entries = Object.entries(shown as Record<string, unknown>).map(
+      ([k, v]) =>
+        [cut(mask(JSON.stringify(k)), MAX_KEY_CHARS), mask(JSON.stringify(v) ?? "null")] as const,
+    );
+    if (entries.length === 0) return "{}";
+    const keysLength = entries.reduce((n, [k]) => n + k.length + 2, 2);
+    const share = Math.max(
+      MIN_VALUE_CHARS,
+      Math.floor((MAX_ARGS_SUMMARY - keysLength) / entries.length),
+    );
+    // Values shorter than their share leave room for the others.
+    let spare = 0;
+    for (const [, v] of entries) spare += Math.max(0, share - v.length);
+    const parts = entries.map(([k, v]) => {
+      if (v.length <= share) return `${k}:${v}`;
+      const extra = Math.min(spare, v.length - share);
+      spare -= extra;
+      return `${k}:${cut(v, share + extra)}`;
+    });
+    return `{${parts.join(",")}}`;
   } catch {
-    text = "(arguments not shown)";
+    return "(arguments not shown)";
   }
-  if (redact) text = redact(text);
-  return text.length > MAX_ARGS_SUMMARY ? `${text.slice(0, MAX_ARGS_SUMMARY - 1)}…` : text;
 }
 
 interface Row {
@@ -308,12 +354,12 @@ export class ApprovalStore {
         .run(
           id,
           req.kind,
-          req.tool.slice(0, 200),
+          cleanText(req.tool.slice(0, 200)),
           req.provider ?? null,
           summarizeArgs(req.args, this.redact, req.kind),
           req.estimateUsd,
           req.estimateBasis ?? null,
-          req.reason.slice(0, 500),
+          cleanText(req.reason.slice(0, 500)),
           req.profile,
           req.jobId ?? null,
           req.fingerprint,

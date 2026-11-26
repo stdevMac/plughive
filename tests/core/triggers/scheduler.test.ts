@@ -6,7 +6,12 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import type { TaskEngine, TaskJob } from "../../../src/core/mcp/tasks.js";
 import { ToolRegistry } from "../../../src/core/tools/registry.js";
-import { TriggerService, nextSlot, sign } from "../../../src/core/triggers/service.js";
+import {
+  MAX_ACTIVE_RUNS_PER_TRIGGER,
+  TriggerService,
+  nextSlot,
+  sign,
+} from "../../../src/core/triggers/service.js";
 import { TriggerStore } from "../../../src/core/triggers/store.js";
 import { mockTool } from "../../http/harness.js";
 
@@ -204,6 +209,42 @@ describe("cron scheduler", () => {
     release();
     await hanging;
     expect(s.service.store.runs(t.id).some((r) => r.callbackState === "sent")).toBe(true);
+  });
+
+  it("D-M5: refuses a run while the trigger has five that have not finished", () => {
+    const s = setup();
+    const t = s.cron("* * * * *");
+    const minute = (m: number) => {
+      s.clock.now = Date.parse(`2026-03-10T10:${String(m).padStart(2, "0")}:05Z`);
+      return s.service.runDue();
+    };
+    for (let m = 1; m <= MAX_ACTIVE_RUNS_PER_TRIGGER; m++) expect(minute(m)).toEqual([t.id]);
+    expect(minute(6)).toEqual([]);
+    expect(s.started).toHaveLength(MAX_ACTIVE_RUNS_PER_TRIGGER);
+    expect(s.service.store.get(t.id)?.lastError).toMatch(/runs that have not finished/);
+    (s.jobs.get("job_1") as TaskJob).status = "succeeded";
+    expect(minute(7)).toEqual([t.id]);
+    expect(s.started).toHaveLength(MAX_ACTIVE_RUNS_PER_TRIGGER + 1);
+  });
+
+  it("D-M5: sends several callbacks at once, so one slow receiver does not hold back the rest", async () => {
+    const s = setup();
+    for (let i = 0; i < 6; i++) {
+      s.cron("* * * * *", { callback: { type: "webhook", url: `https://hooks.example.com/${i}` } });
+    }
+    s.clock.now = Date.parse("2026-03-10T10:01:05Z");
+    expect(s.service.runDue()).toHaveLength(6);
+    for (const job of s.jobs.values()) job.status = "succeeded";
+    let release = () => {};
+    s.net.gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const pass = s.service.sendCallbacks();
+    await Promise.resolve();
+    expect(s.sent).toHaveLength(4);
+    release();
+    await pass;
+    expect(s.sent).toHaveLength(6);
   });
 
   it("marks a callback interrupted by a restart as failed instead of resending it", async () => {

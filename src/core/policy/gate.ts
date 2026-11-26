@@ -18,6 +18,7 @@
 // FAIL CLOSED: while policy.json is invalid, every call that may cost money
 // (a non-zero or unknown estimate, a "paid" tool) and every destructive tool
 // is refused. Free calls go on.
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import type { CapabilityName } from "../capabilities/schemas.js";
 import { DEFAULT_PROFILE_ID, currentScope } from "../mcp/scope.js";
 import {
@@ -31,6 +32,7 @@ import { type Cap, PolicyCache, type PolicyState, rulesFor } from "./policy.js";
 import {
   type SpendReservation,
   currentPolicyRun,
+  runNotPreApproved,
   runPreApproved,
   runWithReservation,
 } from "./run-context.js";
@@ -87,6 +89,10 @@ export const APPROVAL_TAG = "approval";
 /** Tools tagged with this reach other people (email, SMS, calls, posts, bookings); they ask unless rules.ask_before_sending is off. */
 export const SENDS_TAG = "sends";
 const ESTIMATE_TIMEOUT_MS = 5000;
+/** Approve/deny forms remembered at once; the oldest is forgotten first. */
+const MAX_CHAT_FORMS = 1000;
+/** The window of the max_sends_per_hour ceiling. */
+const SEND_WINDOW_MS = 60 * 60_000;
 
 function money(usd: number | null): string {
   if (usd === null) return "an unknown amount";
@@ -142,6 +148,10 @@ export class PolicyGate {
   readonly cache: PolicyCache;
   private readonly now: () => number;
   private readonly reservations = new Set<Reservation>();
+  /** Approval id -> token of the in-chat form shown for it. */
+  private readonly chatForms = new Map<string, string>();
+  /** Profile -> start times of its recent sending calls (max_sends_per_hour). */
+  private readonly sendTimes = new Map<string, number[]>();
 
   constructor(private readonly opts: PolicyGateOptions) {
     this.cache = new PolicyCache(opts.home);
@@ -175,14 +185,37 @@ export class PolicyGate {
   }
 
   /**
-   * Decide a pending approval from the caller's own chat form. Only when the
-   * caller's profile allows it, and only for a request that profile opened.
+   * Remember that the approve/deny form for request `id` was shown, and return
+   * the token the answer must carry back. An answer without it was not given
+   * to that form (a client can send an answer with its very first call).
    */
-  decideInChat(id: string, approve: boolean, profile: string): boolean {
+  chatFormShown(id: string): string {
+    const token = randomBytes(24).toString("base64url");
+    this.chatForms.delete(id);
+    this.chatForms.set(id, token);
+    while (this.chatForms.size > MAX_CHAT_FORMS) {
+      const oldest = this.chatForms.keys().next().value as string;
+      this.chatForms.delete(oldest);
+    }
+    return token;
+  }
+
+  /**
+   * Decide a pending approval from the caller's own chat form. Only when the
+   * caller's profile allows it, only for a request that profile opened, and
+   * only as the answer to a form this gate showed (`token` from chatFormShown).
+   */
+  decideInChat(id: string, approve: boolean, profile: string, token: unknown): boolean {
     if (!this.chatApprovalsAllowed(profile)) return false;
+    const shown = this.chatForms.get(id);
+    if (shown === undefined || typeof token !== "string") return false;
+    const a = Buffer.from(shown);
+    const b = Buffer.from(token);
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return false;
     const store = this.opts.approvals;
     const open = store.get(id);
     if (!open || open.status !== "pending" || open.profile !== profile) return false;
+    this.chatForms.delete(id);
     const decided = store.decide(
       id,
       approve ? "approved" : "denied",
@@ -431,12 +464,28 @@ export class PolicyGate {
   // Tool calls (registry)
 
   /** Run a tool through the policy: maybe refuse, maybe ask first. */
+  /** Refuse a sending call over the profile's max_sends_per_hour; `count` records this one. */
+  private checkSendCeiling(tool: string, profile: string, limit: number, count: boolean): void {
+    const now = this.now();
+    const recent = (this.sendTimes.get(profile) ?? []).filter((t) => now - t < SEND_WINDOW_MS);
+    if (recent.length >= limit) {
+      this.sendTimes.set(profile, recent);
+      throw new PolicyError(
+        `${tool} not run: this profile already made ${recent.length} sending calls in the last hour (max_sends_per_hour is ${limit})`,
+        "SPEND_BLOCKED",
+      );
+    }
+    if (count) recent.push(now);
+    this.sendTimes.set(profile, recent);
+  }
+
   async runTool<T>(
     tool: GatedTool,
     args: unknown,
     signal: AbortSignal | undefined,
-    run: () => Promise<T>,
+    body: () => Promise<T>,
   ): Promise<T> {
+    let run = body;
     const paid = tool.tags?.includes(PAID_TAG) === true;
     const sends = tool.tags?.includes(SENDS_TAG) === true;
     const destructive = sends || tool.annotations?.destructiveHint === true;
@@ -451,6 +500,16 @@ export class PolicyGate {
         `${tool.name} not run: policy.json is invalid, so paid and destructive tools are refused until it is fixed or deleted`,
         "SPEND_BLOCKED",
       );
+    }
+    if (sends && rules.max_sends_per_hour !== null) {
+      // Checked before asking (no request for a call that cannot run) and
+      // again, with the call counted, right before it runs.
+      const limit = rules.max_sends_per_hour;
+      this.checkSendCeiling(tool.name, profile, limit, false);
+      run = () => {
+        this.checkSendCeiling(tool.name, profile, limit, true);
+        return body();
+      };
     }
     const runCtx = currentPolicyRun();
     const preApproved = runCtx.preApproved === true;
@@ -522,6 +581,12 @@ export class PolicyGate {
     signal: AbortSignal | undefined,
     run: () => Promise<T>,
   ): Promise<T> {
+    // A workflow called from inside an approved run is checked on its own:
+    // that approval covered the outer run's plan, which counts a nested
+    // workflow as free, so it never covers the nested run's cost.
+    if (currentPolicyRun().preApproved === true) {
+      return runNotPreApproved(() => this.runWorkflow(workflow, signal, run));
+    }
     if (workflow.maxUsd === 0) return run();
     const state = this.policy();
     if (!state.ok) {

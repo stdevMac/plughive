@@ -52,6 +52,29 @@ const FLOWS = [
     { output: "${steps.img}" },
   ),
   recipe("free", [{ id: "a", set: 1 }], { output: "${steps.a}" }),
+  recipe(
+    "fallback_each",
+    [
+      {
+        id: "img",
+        title: "One image each, with a dearer fallback",
+        tool: "generate_image",
+        forEach: "${input.items}",
+        as: "it",
+        maxItems: 5,
+        args: { prompt: "${it}", max_cost_usd: 0.1 },
+        onError: {
+          fallback: {
+            id: "img_again",
+            tool: "generate_image",
+            args: { prompt: "${it}", max_cost_usd: 0.2 },
+          },
+          afterUnknownOutcome: true,
+        },
+      },
+    ],
+    { input: items, output: "${steps.img}" },
+  ),
 ];
 
 let h: LoaderHarness;
@@ -124,6 +147,14 @@ describe("dry_run cost estimate", () => {
     const plan = await runOk(h, "wf_open_ended", { dry_run: true });
     expect(plan.estimated_cost_usd).toMatchObject({ min: 0, max: null });
     expect((plan.steps as Obj[])[0]).toMatchObject({ max_cost_usd_per_call: null });
+  });
+
+  it("D-H2: counts a forEach step's fallback once per item", async () => {
+    const plan = await runOk(h, "wf_fallback_each", { items: ["a", "b", "c"], dry_run: true });
+    // 3 items x $0.10, and the fallback may run for each of them: 3 x $0.20.
+    expect(plan.paid_calls_max).toBe(6);
+    expect(plan.estimated_cost_usd).toMatchObject({ max: 0.9 });
+    expect((plan.steps as Obj[])[0]).toMatchObject({ calls: 3, fallback: { calls: 3 } });
   });
 
   it("is zero without paid steps", async () => {

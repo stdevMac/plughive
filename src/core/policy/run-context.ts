@@ -46,6 +46,11 @@ export function runPreApproved<T>(fn: () => T): T {
   return storage.run({ ...currentPolicyRun(), preApproved: true }, fn);
 }
 
+/** Run `fn` as if nothing above it was approved: its own cost rules apply again. */
+export function runNotPreApproved<T>(fn: () => T): T {
+  return storage.run({ ...currentPolicyRun(), preApproved: false }, fn);
+}
+
 /** Run `fn` with an active spend reservation so nested calls carve from it instead of double-counting. */
 export function runWithReservation<T>(reservation: SpendReservation, fn: () => T): T {
   return storage.run({ ...currentPolicyRun(), reservation }, fn);

@@ -20,7 +20,7 @@ import { ZodError } from "zod";
 import { CapabilityError, type PackContext, PackPermissionError } from "../pack-api.js";
 import { MissingSecretError } from "../secrets/errors.js";
 import type { CompiledRecipe, CompiledStep } from "./compile.js";
-import { type EvalScope, evaluate, isPlainObject, truthy } from "./expr.js";
+import { type EvalScope, evaluate, isPlainObject, jsonLength, truthy } from "./expr.js";
 import { WORKFLOW_LIMITS } from "./schema.js";
 import { resolveValue } from "./template.js";
 
@@ -118,10 +118,14 @@ export function collectArtifacts(
   v: unknown,
   out: Map<string, { id: string; mime?: string; url?: string }> = new Map(),
   depth = 0,
+  // Objects already looked at: a value that holds one object in many places
+  // is walked once.
+  seen: Set<object> = new Set(),
 ): Map<string, { id: string; mime?: string; url?: string }> {
-  if (depth > 12 || v === null || typeof v !== "object") return out;
+  if (depth > 12 || v === null || typeof v !== "object" || seen.has(v)) return out;
+  seen.add(v);
   if (Array.isArray(v)) {
-    for (const x of v) collectArtifacts(x, out, depth + 1);
+    for (const x of v) collectArtifacts(x, out, depth + 1, seen);
     return out;
   }
   if (!isPlainObject(v)) return out;
@@ -140,12 +144,15 @@ export function collectArtifacts(
       ARTIFACT_ID.test(x)
     ) {
       if (!out.has(x)) out.set(x, { id: x });
-    } else if (x !== null && typeof x === "object") collectArtifacts(x, out, depth + 1);
+    } else if (x !== null && typeof x === "object") collectArtifacts(x, out, depth + 1, seen);
   }
   return out;
 }
 
-function jsonSize(v: unknown): number {
+/** JSON size of `v`, or a number over `max` (found without writing it all) when it is larger. */
+function jsonSize(v: unknown, max: number): number {
+  const atLeast = jsonLength(v, max);
+  if (atLeast > max) return atLeast;
   try {
     return JSON.stringify(v)?.length ?? 0;
   } catch {
@@ -155,12 +162,13 @@ function jsonSize(v: unknown): number {
 
 /** Keep a step output under the cap; a larger one keeps its artifacts and the start of its text. */
 export function capOutput(v: unknown, max = WORKFLOW_LIMITS.maxStepOutputBytes): unknown {
-  const size = jsonSize(v);
+  const size = jsonSize(v, max);
   if (size <= max) return v;
   const text =
     isPlainObject(v) && typeof v.text === "string" ? v.text.slice(0, 16 * 1024) : undefined;
   return {
     truncated: true,
+    // Counting stopped early for a much larger value: the size is a lower bound.
     bytes: Number.isFinite(size) ? size : null,
     artifacts: [...collectArtifacts(v).values()],
     ...(text !== undefined ? { text } : {}),
@@ -253,6 +261,12 @@ export async function runRecipe(
       case "save": {
         const save = step.save as NonNullable<CompiledStep["save"]>;
         const content = resolveValue(save.content, scope, limits);
+        if (
+          typeof content !== "string" &&
+          jsonLength(content, WORKFLOW_LIMITS.maxArgsBytes * 4) > WORKFLOW_LIMITS.maxArgsBytes * 4
+        ) {
+          throw new Error("the content to save is too large");
+        }
         const text =
           typeof content === "string" ? content : JSON.stringify(content ?? null, null, 2);
         if (text.length > WORKFLOW_LIMITS.maxArgsBytes * 4) {
@@ -273,7 +287,7 @@ export async function runRecipe(
       case "tool":
       case "capability": {
         const args = resolveValue(step.args as never, scope, limits);
-        if (jsonSize(args) > WORKFLOW_LIMITS.maxArgsBytes) {
+        if (jsonSize(args, WORKFLOW_LIMITS.maxArgsBytes) > WORKFLOW_LIMITS.maxArgsBytes) {
           throw new Error(`the arguments are larger than ${WORKFLOW_LIMITS.maxArgsBytes} bytes`);
         }
         const target = step.target as string;
@@ -445,7 +459,10 @@ export async function runRecipe(
       await runStep(step, `step ${i + 1} of ${total}: ${step.title}`);
     }
     checkAlive();
-    const output = resolveValue(recipe.output, scopeFor(), limits);
+    const output = capOutput(
+      resolveValue(recipe.output, scopeFor(), limits),
+      WORKFLOW_LIMITS.maxOutputBytes,
+    );
     ctx.progress(1, "done");
     return {
       workflow: recipe.toolName,

@@ -29,7 +29,18 @@
 // refuse symlinks at the remote leaf (the remote side is a shell, so the pack
 // cannot canonicalise a remote directory tree; the remote account's own
 // permissions are the boundary there).
-import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  constants,
+  closeSync,
+  fchmodSync,
+  fstatSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { type PackContext, SpawnError } from "plughive/pack";
 import { type AccessPolicy, assertTargetAllowed, hostAllowed, identityAllowed } from "../policy.js";
@@ -73,21 +84,62 @@ export function hostKeyFilePath(dataDir: string, machine: string): string {
  * Make sure the pinned-key file exists and holds exactly the registered line.
  * Called before every connection of a pinned machine, so a deleted or edited
  * file is restored (and a hand-edited state line is what gets written).
+ * The file is opened with O_NOFOLLOW and rewritten through unlink + O_EXCL:
+ * a symlink planted at the pin path is removed itself, never read or written
+ * through.
  */
 function ensureHostKeyFile(dataDir: string, m: MachineRecord): void {
   const line = m.ssh.hostKey;
   if (line === null || line === undefined) return;
   const dir = join(dataDir, "host_keys");
-  const file = hostKeyFilePath(dataDir, m.name);
   mkdirSync(dir, { recursive: true, mode: 0o700 });
+  // A symlinked host_keys directory would redirect the pin file: refuse it.
+  // (lstat of a symlink is not a directory.)
+  if (!lstatSync(dir).isDirectory()) {
+    throw new Error(`${dir} is not a real directory (a symlink?); remove it`);
+  }
+  const file = hostKeyFilePath(dataDir, m.name);
   let current: string | null = null;
   try {
-    current = readFileSync(file, "utf8");
-  } catch {
-    /* missing: written below */
+    const fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW);
+    try {
+      const st = fstatSync(fd);
+      if (!st.isFile()) throw new Error(`${file} is not a regular file; remove it`);
+      if (st.size > 8192) throw new Error(`${file} is unexpectedly large; remove it`);
+      if ((st.mode & 0o077) !== 0) fchmodSync(fd, 0o600);
+      current = readFileSync(fd, "utf8");
+    } finally {
+      closeSync(fd);
+    }
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") current = null;
+    else if (code === "ELOOP") {
+      // A symlink at the pin path: drop the link itself, never write through it.
+      unlinkSync(file);
+      current = null;
+    } else throw e;
   }
-  if (current !== `${line}\n`) writeFileSync(file, `${line}\n`, { mode: 0o600 });
-  chmodSync(file, 0o600);
+  if (current !== `${line}\n`) {
+    // Unlink first so the create below is O_EXCL: whatever is at the path
+    // (including a freshly planted symlink) is replaced, not followed.
+    try {
+      unlinkSync(file);
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+    }
+    const fd = openSync(
+      file,
+      constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW,
+      0o600,
+    );
+    try {
+      writeFileSync(fd, `${line}\n`);
+      fchmodSync(fd, 0o600);
+    } finally {
+      closeSync(fd);
+    }
+  }
 }
 
 /** The full ssh argv for one remote command. Exported for tests. */
@@ -300,11 +352,17 @@ export class SshProvider implements MachineProvider {
     // a remote directory tree (remote_path may be any absolute path the
     // remote account can reach; there is no remote allow-list to contain it
     // in), so uploads refuse symlinks at the leaf: the named path must be the
-    // file itself, never a link to somewhere else.
+    // file itself, never a link to somewhere else. The write itself goes to a
+    // fresh mktemp name in the same folder and is then renamed over the
+    // target: rename(2) replaces a symlink at the destination instead of
+    // writing through it, so a link swapped in after the checks above cannot
+    // redirect the upload.
     const script = [
       `if [ -L ${p} ]; then echo "refusing to upload through a remote symlink" >&2; exit 6; fi`,
       `if [ -e ${p} ] && [ ! -f ${p} ]; then echo "remote path exists and is not a regular file" >&2; exit 7; fi`,
-      `cat > ${p} || exit 1`,
+      `t=$(mktemp ${p}.XXXXXX) || exit 1`,
+      `if ! cat > "$t"; then rm -f "$t"; exit 1; fi`,
+      `if ! mv -f "$t" ${p}; then rm -f "$t"; exit 1; fi`,
       ...(opts.mode ? [`chmod ${opts.mode} ${p}`] : []),
     ].join("\n");
     const r = await this.run(id, script, {

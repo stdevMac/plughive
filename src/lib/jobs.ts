@@ -101,6 +101,11 @@ export interface JobQueueOpts {
   maxFinished?: number;
   /** How long a queued job waits for its handler to be registered (default 60 s). */
   handlerGraceMs?: number;
+  /**
+   * Masks known secret values in what is stored for a finished job (result
+   * and error text): the secret store's redactor.
+   */
+  redactor?: { redact(text: string): string; redactDeep<T>(value: T): T };
 }
 
 export interface RegisterOptions {
@@ -158,6 +163,7 @@ export class JobQueue {
   private readonly maxResultBytes: number;
   private readonly maxFinished: number;
   private readonly handlerGraceMs: number;
+  private readonly redactor: JobQueueOpts["redactor"];
   private readonly openedAt = Date.now();
   private lastPrune = 0;
   /** Finished jobs are kept this long; also the `ttlMs` of a task. */
@@ -172,6 +178,7 @@ export class JobQueue {
     this.retentionMs = opts.retentionMs ?? JOB_RETENTION_MS;
     this.maxFinished = opts.maxFinished ?? MAX_FINISHED_JOBS;
     this.handlerGraceMs = opts.handlerGraceMs ?? DEFAULT_HANDLER_GRACE_MS;
+    this.redactor = opts.redactor;
     this.db
       .prepare(
         `CREATE TABLE IF NOT EXISTS jobs (
@@ -574,10 +581,10 @@ export class JobQueue {
       if (abort.signal.aborted) return void markCancelled();
       this.db
         .prepare("UPDATE jobs SET status='succeeded', result_json=?, updated_at=? WHERE id=?")
-        .run(storedResultJson(result, this.maxResultBytes), now(), job.id);
+        .run(storedResultJson(this.redactDeep(result), this.maxResultBytes), now(), job.id);
     } catch (e) {
       if (abort.signal.aborted) return void markCancelled();
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = this.redactText(e instanceof Error ? e.message : String(e));
       try {
         this.db
           .prepare("UPDATE jobs SET status=?, error=?, updated_at=? WHERE id=?")
@@ -651,6 +658,14 @@ export class JobQueue {
     }
   }
 
+  private redactText(text: string): string {
+    return this.redactor ? this.redactor.redact(text) : text;
+  }
+
+  private redactDeep<T>(value: T): T {
+    return this.redactor ? this.redactor.redactDeep(value) : value;
+  }
+
   private requireJob(id: string): Job {
     const job = this.get(id);
     if (!job) throw new Error(`job not found: ${id}`);
@@ -682,7 +697,13 @@ export class JobQueue {
            SET status = ?, error = ?, checkpoint_json = ?, updated_at = ?
            WHERE id = ? AND status = 'submission_unknown'`,
         )
-        .run(next.status, next.error, JSON.stringify(next.checkpoint), at, id);
+        .run(
+          next.status,
+          next.error === null ? null : this.redactText(next.error),
+          JSON.stringify(next.checkpoint),
+          at,
+          id,
+        );
       if (result.changes === 0) {
         throw new Error(`job ${id} must have status submission_unknown to reconcile`);
       }
@@ -709,14 +730,42 @@ function storedResultJson(result: unknown, maxBytes: number): string {
 }
 
 /**
+ * A string with URL userinfo and credential-looking query values masked
+ * (`https://user:pw@host`, `?api_key=...`, `&sig=...`).
+ */
+function maskUrlSecrets(text: string): string {
+  return text
+    .replace(/\b([a-z][a-z0-9+.-]*:\/\/)[^\s/?#@]*@/gi, `$1${SECRET_ARG_PLACEHOLDER}@`)
+    .replace(/([?&;]([^=&;#\s]{1,64})=)([^&;#\s]*)/g, (whole, head: string, name: string) => {
+      let key = name;
+      try {
+        key = decodeURIComponent(name);
+      } catch {
+        // keep the raw name
+      }
+      return SECRET_ARG_KEY.test(key) ? `${head}${SECRET_ARG_PLACEHOLDER}` : whole;
+    });
+}
+
+/**
  * A copy of `input` in which every string (or nested value) under a key that
- * looks secret is replaced by a placeholder. Numbers, booleans and null stay
- * (max_tokens is not a secret).
+ * looks secret is replaced by a placeholder, and URLs lose their userinfo and
+ * credential query values. Numbers, booleans and null stay (max_tokens is not
+ * a secret). Anything nested deeper than it walks is not stored at all.
  */
 export function scrubSecretArgs(input: unknown): { value: unknown; changed: boolean } {
   let changed = false;
   const walk = (value: unknown, depth: number): unknown => {
-    if (depth > 32 || value === null || typeof value !== "object") return value;
+    if (typeof value === "string") {
+      const masked = maskUrlSecrets(value);
+      if (masked !== value) changed = true;
+      return masked;
+    }
+    if (value === null || typeof value !== "object") return value;
+    if (depth > 32) {
+      changed = true;
+      return SECRET_ARG_PLACEHOLDER;
+    }
     if (Array.isArray(value)) return value.map((item) => walk(item, depth + 1));
     const out: Record<string, unknown> = {};
     for (const [key, item] of Object.entries(value as Record<string, unknown>)) {

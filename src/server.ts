@@ -81,7 +81,7 @@ export async function startDaemon(opts: StartDaemonOptions = {}): Promise<Runnin
   if (cfg.accessKey) store.redactor.register(cfg.accessKey);
   assertNoMultiKeyConfig(process.env);
   assertSafeBind(cfg.bindHost, cfg.accessKey);
-  assertEncryptedSecretsOnNetwork(cfg.bindHost, process.env);
+  assertEncryptedSecretsOnNetwork(cfg.bindHost, process.env, store.storage());
   // The credential of /api. Distinct from the access key: what an agent holds
   // must not administer the daemon. Registered with the redactor; it is never
   // passed to the logger.
@@ -126,6 +126,7 @@ export async function startDaemon(opts: StartDaemonOptions = {}): Promise<Runnin
     db: jobsDb,
     concurrency: cfg.jobConcurrency,
     maxQueued: cfg.jobMaxQueued,
+    redactor: store.redactor,
   });
   // Spend is recorded under the profile the call ran for (profile caps).
   const usage = new UsageLedger({ root: cfg.root, profileOf: () => currentScope()?.profileId });

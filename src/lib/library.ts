@@ -6,6 +6,7 @@ import {
   lstatSync,
   mkdirSync,
   realpathSync,
+  rmSync,
   statSync,
   unlinkSync,
   writeFileSync,
@@ -126,6 +127,16 @@ function ownerOnly(path: string, mode: number): void {
   }
 }
 
+/** Runs `fn`; if it throws, the file it was creating is removed (no orphan without a row). */
+function removeOnError<T>(path: string, fn: () => T): T {
+  try {
+    return fn();
+  } catch (err) {
+    rmSync(path, { force: true });
+    throw err;
+  }
+}
+
 export class Library {
   private db: Database.Database;
   private root: string;
@@ -166,16 +177,20 @@ export class Library {
 
   save(input: SaveInput): ArtifactRef {
     const target = this.allocate(input.kind, input.mime);
-    writeFileSync(target.path, input.bytes, { mode: 0o600 });
-    return this.insert({ ...target, ...input, bytes: input.bytes.length });
+    return removeOnError(target.path, () => {
+      writeFileSync(target.path, input.bytes, { mode: 0o600 });
+      return this.insert({ ...target, ...input, bytes: input.bytes.length });
+    });
   }
 
   importFile(input: ImportInput): ArtifactRef {
     const target = this.allocate(input.kind, input.mime);
-    copyFileSync(input.sourcePath, target.path);
-    // The copy takes the mode of its source.
-    chmodSync(target.path, 0o600);
-    return this.insert({ ...target, ...input, bytes: statSync(target.path).size });
+    return removeOnError(target.path, () => {
+      copyFileSync(input.sourcePath, target.path);
+      // The copy takes the mode of its source.
+      chmodSync(target.path, 0o600);
+      return this.insert({ ...target, ...input, bytes: statSync(target.path).size });
+    });
   }
 
   /**
@@ -218,7 +233,7 @@ export class Library {
       await rm(target.path, { force: true }).catch(() => undefined);
       throw err;
     }
-    return this.insert({ ...target, ...input, bytes: total });
+    return removeOnError(target.path, () => this.insert({ ...target, ...input, bytes: total }));
   }
 
   get(id: string): Artifact | null {

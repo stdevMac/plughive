@@ -4,6 +4,7 @@ import { join } from "node:path";
 import Database from "better-sqlite3";
 // tests/lib/jobs.test.ts
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { Redactor } from "../../src/core/secrets/redactor.js";
 import {
   DEFAULT_HANDLER_GRACE_MS,
   DEFAULT_MAX_QUEUED_JOBS,
@@ -339,6 +340,45 @@ describe("jobs", () => {
     for (const [name, value] of Object.entries(scrubbed.value as Record<string, unknown>)) {
       expect(value, name).toBe(SECRET_ARG_PLACEHOLDER);
     }
+  });
+
+  it("D-M7: a secret nested past the walk depth is never stored", () => {
+    let deep: Record<string, unknown> = { api_key: "sk-live-DO-NOT-STORE-deep" };
+    for (let i = 0; i < 40; i++) deep = { n: deep };
+    const scrubbed = scrubSecretArgs(deep);
+    expect(scrubbed.changed).toBe(true);
+    expect(JSON.stringify(scrubbed.value)).not.toContain("DO-NOT-STORE");
+  });
+
+  it("D-M7: URL userinfo and credential query values are not stored", () => {
+    const scrubbed = scrubSecretArgs({
+      image: "https://bob:hunter2-DO-NOT-STORE@example.com/a.png",
+      list: ["https://cdn.example.com/x.mp4?X-Amz-Signature=DO-NOT-STORE-sig&w=640"],
+      plain: "https://example.com/a.png?w=640",
+    });
+    expect(scrubbed.changed).toBe(true);
+    expect(JSON.stringify(scrubbed.value)).not.toContain("DO-NOT-STORE");
+    expect((scrubbed.value as { plain: string }).plain).toBe("https://example.com/a.png?w=640");
+    expect((scrubbed.value as { list: string[] }).list[0]).toContain("w=640");
+    expect(scrubSecretArgs({ url: "https://example.com/?page=2" }).changed).toBe(false);
+  });
+
+  it("D-M7: known secrets are masked in the stored result and error", async () => {
+    const redactor = new Redactor();
+    redactor.register("sk-live-RESULT-SECRET-1");
+    const q = new JobQueue({ db, concurrency: 1, redactor });
+    q.register("ok", async () => ({ echoed: "key sk-live-RESULT-SECRET-1" }));
+    q.register("bad", async () => {
+      throw new Error("upstream said sk-live-RESULT-SECRET-1 is invalid");
+    });
+    const ok = q.enqueue("ok", {});
+    const bad = q.enqueue("bad", {});
+    q.startWorker({ intervalMs: 5 });
+    await waitFor(() => q.get(ok)?.status === "succeeded" && q.get(bad)?.status === "failed", 1000);
+    q.stopWorker();
+    const everything = JSON.stringify(db.prepare("SELECT * FROM jobs").all());
+    expect(everything).not.toContain("RESULT-SECRET");
+    expect(q.get(bad)?.error).toContain("[redacted]");
   });
 
   it("L3: two checkpoint merges keep each other's keys", () => {

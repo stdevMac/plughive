@@ -8,7 +8,7 @@
 // downloads are off, and the whole call has one deadline. Local addresses
 // follow the pack's allowLocalUrls setting, exactly as for screenshots.
 //
-// Output: html is the rendered document as is (page.content()). No
+// Output: html is the rendered document as is (as page.content() serializes it). No
 // HTML-to-markdown converter is a dependency, so text and markdown requests
 // both return the page's visible text (document.body.innerText), and a
 // markdown request says so by answering with format "text".
@@ -30,6 +30,8 @@ export const BROWSER_SETUP_HINT =
 /** Longest a whole fetch may take. */
 export const BROWSER_FETCH_DEADLINE_MS = 60_000;
 const DEFAULT_MAX_CHARS = 100_000;
+/** The schema's max_chars ceiling, kept here too so the page read is always bounded. */
+const MAX_CHARS = 1_000_000;
 
 // biome-ignore lint/suspicious/noExplicitAny: Playwright module shape, loaded lazily
 type PlaywrightModule = any;
@@ -166,18 +168,38 @@ export async function browserFetch(
     await page.waitForLoadState?.("networkidle", { timeout: 5_000 }).catch(() => {});
 
     const format = input.format === "html" ? "html" : "text";
-    const raw: unknown =
-      format === "html"
-        ? await page.content()
-        : await page.evaluate(() => {
-            const doc = (globalThis as { document?: { body?: { innerText?: string } | null } })
-              .document;
-            return doc?.body?.innerText ?? "";
-          });
+    const max = Math.min(input.max_chars ?? DEFAULT_MAX_CHARS, MAX_CHARS);
+    // Cut inside the page: only max + 1 characters (a few MB at most, under the
+    // pack's 8 MiB response cap) cross from Chromium, however large the page.
+    // The html is built the way page.content() builds it.
+    const raw: unknown = await page.evaluate(
+      ({ html, keep }: { html: boolean; keep: number }) => {
+        const doc = (
+          globalThis as {
+            document?: {
+              doctype?: unknown;
+              documentElement?: { outerHTML?: string } | null;
+              body?: { innerText?: string } | null;
+            };
+          }
+        ).document;
+        let out = "";
+        if (html) {
+          const Serializer = (
+            globalThis as { XMLSerializer?: new () => { serializeToString(n: unknown): string } }
+          ).XMLSerializer;
+          if (doc?.doctype && Serializer) out = new Serializer().serializeToString(doc.doctype);
+          out += doc?.documentElement?.outerHTML ?? "";
+        } else {
+          out = doc?.body?.innerText ?? "";
+        }
+        return out.slice(0, keep);
+      },
+      { html: format === "html", keep: max + 1 },
+    );
     const content = typeof raw === "string" ? raw : "";
     const title: unknown = await page.title().catch(() => "");
     const finalUrl: unknown = page.url();
-    const max = input.max_chars ?? DEFAULT_MAX_CHARS;
     const truncated = content.length > max;
     ctx.logger.info("browser fetched", {
       url: input.url,

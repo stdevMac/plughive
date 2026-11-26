@@ -186,7 +186,13 @@ describe("share pack", () => {
         fetch,
         settings: SETTINGS,
       });
-      h.t.library!.seed({ id: "p1", kind: "file", mime, bytes: "<script>1</script>" });
+      h.t.library!.seed({
+        id: "p1",
+        kind: "other",
+        mime,
+        bytes: "<script>1</script>",
+        tool: "other/tool",
+      });
       const out = (await h.call({ artifact_id: "p1" })) as { mime: string };
       expect(out.mime, mime).toBe("application/octet-stream");
       expect(fetch.calls[0]!.headers["content-type"], mime).toBe("application/octet-stream");
@@ -199,7 +205,13 @@ describe("share pack", () => {
       fetch,
       settings: SETTINGS,
     });
-    h.t.library!.seed({ id: "t1", kind: "file", mime: "text/plain; charset=UTF-8", bytes: "hi" });
+    h.t.library!.seed({
+      id: "t1",
+      kind: "document",
+      mime: "text/plain; charset=UTF-8",
+      bytes: "hi",
+      tool: "other/tool",
+    });
     expect(((await h.call({ artifact_id: "t1" })) as { mime: string }).mime).toBe(
       "text/plain; charset=utf-8",
     );

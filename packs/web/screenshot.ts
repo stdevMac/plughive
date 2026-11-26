@@ -81,6 +81,13 @@ export interface Gate {
    * target, which carries no scheme.
    */
   localOrigins: Set<string>;
+  /**
+   * Every local "host:port" the route handler or the WebSocket guard let
+   * through. The proxy connects to a local address only for these: a redirect
+   * is followed without the route handler seeing it, so a public resource that
+   * redirects to a LAN host never reaches it.
+   */
+  localTargets: Set<string>;
   blocked: BlockedRequest[];
 }
 
@@ -90,6 +97,7 @@ export function makeGate(policy: UrlPolicy, typedIsLocal: boolean): Gate {
     localTop: policy.allowLocal && typedIsLocal,
     publicFrame: false,
     localOrigins: new Set(),
+    localTargets: new Set(),
     blocked: [],
   };
 }
@@ -189,6 +197,8 @@ async function gateRequest(gate: Gate, req: PwRequest): Promise<Verdict> {
   if (open.local) {
     if (!gate.policy.allowLocal) return checkUrl(req.url(), gate.policy);
     if (!(await issuerIsLocal(gate, req))) return { ok: false, reason: NOT_FROM_PUBLIC };
+    const target = hostKey(req.url());
+    if (target !== null) gate.localTargets.add(target);
   }
   if (navigation && open.local) {
     const key = hostKey(req.url());
@@ -211,12 +221,21 @@ export async function gateConnection(gate: Gate, url: string): Promise<PinDecisi
   }
   const address = verdict.addresses[0];
   if (address === undefined) return { ok: false, reason: "the URL has no network address" };
+  const key = hostKey(url);
+  if (
+    verdict.local &&
+    (key === null || !(gate.localTargets.has(key) || gate.localOrigins.has(key)))
+  ) {
+    const reason = "a local address the page did not request directly (a redirect) is blocked";
+    gate.blocked.push({ url, reason });
+    return { ok: false, reason };
+  }
   // A host let through as local that now connects to a public address (a
   // rebinding answer) ends the local allowance for the rest of the capture.
   if (!verdict.local) {
-    const key = hostKey(url);
     if (key !== null && gate.localOrigins.has(key)) {
       gate.localOrigins.clear();
+      gate.localTargets.clear();
       gate.publicFrame = true;
       gate.localTop = false;
     }
@@ -269,6 +288,8 @@ export async function installGuards(context: PwContext, gate: Gate): Promise<Blo
       await ws.close({ code: 1008, reason: "blocked" });
       return;
     }
+    const target = hostKey(asHttp);
+    if (verdict.local && target !== null) gate.localTargets.add(target);
     ws.connectToServer();
   });
   return blocked;

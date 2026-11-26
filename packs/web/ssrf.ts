@@ -49,8 +49,6 @@ function parseV4(text: string): [number, number, number, number] | null {
 /** IPv6 literal (no brackets) to 8 groups of 16 bits, or null. */
 function parseV6(input: string): number[] | null {
   let text = input;
-  const zone = text.indexOf("%");
-  if (zone !== -1) text = text.slice(0, zone);
   if (isIP(text) !== 6) return null;
   let tail: number[] = [];
   if (text.includes(".")) {
@@ -103,16 +101,15 @@ export function classifyV6(g: number[]): AddressClass {
   const high = g0 === 0 && g1 === 0 && g2 === 0 && g3 === 0 && g4 === 0;
   if (high && g5 === 0 && g6 === 0 && g7 === 0) return local("unspecified address (::)");
   if (high && g5 === 0 && g6 === 0 && g7 === 1) return local("loopback (::1)");
-  // IPv4-mapped (::ffff:a.b.c.d) and deprecated IPv4-compatible (::a.b.c.d).
-  if ((high && g5 === 0xffff) || (high && g5 === 0)) {
-    return classifyV4(g6 >> 8, g6 & 255, g7 >> 8, g7 & 255);
-  }
+  // IPv4-mapped (::ffff:a.b.c.d) is that IPv4 address as far as the kernel cares.
+  if (high && g5 === 0xffff) return classifyV4(g6 >> 8, g6 & 255, g7 >> 8, g7 & 255);
+  if (high && g5 === 0) return never("deprecated IPv4-compatible address (::/96)");
   // NAT64 well-known prefix 64:ff9b::/96 carries an IPv4 address.
   if (g0 === 0x64 && g1 === 0xff9b && g2 === 0 && g3 === 0 && g4 === 0 && g5 === 0) {
     return classifyV4(g6 >> 8, g6 & 255, g7 >> 8, g7 & 255);
   }
-  // 6to4 (2002::/16) embeds an IPv4 address in groups 1 and 2.
-  if (g0 === 0x2002) return classifyV4(g1 >> 8, g1 & 255, g2 >> 8, g2 & 255);
+  // 6to4 (2002::/16) reaches an arbitrary IPv4 address through a relay.
+  if (g0 === 0x2002) return never("6to4 (2002::/16)");
   // Local-use NAT64 (64:ff9b:1::/48) translates to whatever the site chose.
   if (g0 === 0x64 && g1 === 0xff9b && g2 === 1) return never("local-use NAT64 (64:ff9b:1::/48)");
   if (g0 === 0x100 && g1 === 0 && g2 === 0 && g3 === 0)
@@ -126,14 +123,18 @@ export function classifyV6(g: number[]): AddressClass {
   if (g0 === 0xfd00 && g1 === 0x0ec2) return never("cloud metadata endpoint (fd00:ec2::)");
   if ((g0 & 0xfe00) === 0xfc00) return local("unique local address (fc00::/7)");
   if ((g0 & 0xffc0) === 0xfe80) return never("link-local (fe80::/10)");
-  if ((g0 & 0xffc0) === 0xfec0) return local("site-local (fec0::/10)");
+  if ((g0 & 0xffc0) === 0xfec0) return never("deprecated site-local (fec0::/10)");
   if ((g0 & 0xff00) === 0xff00) return never("multicast (ff00::/8)");
+  // Only global unicast (2000::/3) is public; the rest is reserved.
+  if ((g0 & 0xe000) !== 0x2000) return never("reserved IPv6 range (outside 2000::/3)");
   return PUBLIC;
 }
 
 /** Classify an IP literal. Anything that is not a valid literal is treated as "never". */
 export function classifyAddress(address: string): AddressClass {
   const bare = address.startsWith("[") && address.endsWith("]") ? address.slice(1, -1) : address;
+  // A zone index ("%en0") names an interface, not a destination.
+  if (bare.includes("%")) return never("an IPv6 address with a zone index");
   const v4 = parseV4(bare);
   if (v4) return classifyV4(...v4);
   const v6 = parseV6(bare);

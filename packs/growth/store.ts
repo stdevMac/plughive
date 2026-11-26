@@ -346,6 +346,41 @@ export class LeadsStore {
       .run(status, Date.now(), artifactId ?? null, personId);
   }
 
+  /**
+   * Record a new draft without undoing progress: a person already marked sent,
+   * replied, won, lost or skipped keeps that status.
+   */
+  markDrafted(personId: string, artifactId: string): void {
+    this.db
+      .prepare(
+        `UPDATE people
+         SET contact_status = 'drafted',
+             last_contacted_at = ?,
+             last_contact_artifact_id = ?
+         WHERE id = ? AND (contact_status IS NULL OR contact_status IN ('new', 'drafted'))`,
+      )
+      .run(Date.now(), artifactId, personId);
+  }
+
+  /**
+   * The opt-out status (skipped or lost) of this person or of any other lead
+   * row with the same email, compared trimmed and case-insensitively. The same
+   * person found through two providers is two rows; marking one counts for both.
+   */
+  suppressedStatus(personId: string): ContactStatus | null {
+    const r = this.db
+      .prepare(
+        `SELECT o.contact_status AS s FROM people p JOIN people o
+           ON o.id = p.id
+           OR (p.email IS NOT NULL AND TRIM(p.email) != ''
+               AND LOWER(TRIM(o.email)) = LOWER(TRIM(p.email)))
+         WHERE p.id = ? AND o.contact_status IN ('skipped', 'lost')
+         LIMIT 1`,
+      )
+      .get(personId) as { s: ContactStatus } | undefined;
+    return r?.s ?? null;
+  }
+
   query(filter: LeadFilter = {}): QueryResult {
     const clauses: string[] = [];
     const params: SqlValue[] = [];

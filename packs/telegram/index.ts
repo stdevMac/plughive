@@ -50,7 +50,12 @@ const sendTelegram = defineTool({
       .regex(CHAT_ID, "chat_id must be a numeric chat id or an @username")
       .optional(),
     artifact_id: z.string().min(1).max(128).optional(),
-    parse_mode: z.enum(["Markdown", "HTML"]).optional(),
+    parse_mode: z
+      .enum(["Markdown", "HTML"])
+      .optional()
+      .describe(
+        "Render text as Telegram Markdown or HTML. Links then show their label, not their target: check every link before sending text you did not write.",
+      ),
   }),
   async run(input, ctx) {
     const fallback = ctx.settings.defaultChatId;

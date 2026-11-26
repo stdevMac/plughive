@@ -695,6 +695,14 @@ const quote = defineTool({
   async run(input, ctx) {
     const limits = limitsFrom(ctx.settings);
     checkRequest(input, limits);
+    // A quote runs without asking anyone. Without headers it is a plain public
+    // GET, like fetch_web; caller headers (an API key, say) only go to hosts
+    // the user listed.
+    if (Object.keys(input.headers ?? {}).length > 0 && limits.allowedHosts.length === 0) {
+      throw new Error(
+        "x402_quote sends extra headers only to the pack's allowed hosts; set allowedHosts in the x402 pack settings, or quote without headers",
+      );
+    }
     const res = await send(ctx, input, limits);
     if (res.status !== 402) {
       await res.body?.cancel().catch(() => undefined);

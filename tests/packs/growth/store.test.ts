@@ -1,4 +1,13 @@
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  lstatSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -24,6 +33,53 @@ describe("SenderStore", () => {
       store.set({ name: "B", email: "b@example.test", pitch: "p" });
       expectMode(path, 0o600);
       expect(store.get()?.name).toBe("B");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("SenderStore hardening (D-M12)", () => {
+  it("reads a corrupt or tampered sender.json as no profile", () => {
+    const dir = mkdtempSync(join(tmpdir(), "growth-sender-"));
+    try {
+      const path = join(dir, "sender.json");
+      const store = new SenderStore({ root: dir });
+      writeFileSync(path, JSON.stringify({ name: "A" }));
+      expect(store.get()).toBeNull();
+      writeFileSync(
+        path,
+        JSON.stringify({
+          name: "A",
+          email: "a@example.test",
+          pitch: "p",
+          cta_url: "javascript:alert(1)",
+          updated_at: 1,
+        }),
+      );
+      expect(store.get()).toBeNull();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not read or write through a symlink at sender.json, and leaves no temp file", () => {
+    const dir = mkdtempSync(join(tmpdir(), "growth-sender-"));
+    try {
+      const outside = join(dir, "outside.json");
+      writeFileSync(
+        outside,
+        JSON.stringify({ name: "X", email: "x@example.test", pitch: "p", updated_at: 1 }),
+      );
+      const path = join(dir, "sender.json");
+      symlinkSync(outside, path);
+      const store = new SenderStore({ root: dir });
+      expect(store.get()).toBeNull();
+      store.set({ name: "B", email: "b@example.test", pitch: "p" });
+      expect(JSON.parse(readFileSync(outside, "utf8")).name).toBe("X");
+      expect(lstatSync(path).isSymbolicLink()).toBe(false);
+      expect(store.get()?.name).toBe("B");
+      expect(readdirSync(dir).sort()).toEqual(["outside.json", "sender.json"]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -11,7 +11,7 @@
 // the access key ID (not the secret) in X-Amz-Credential, as all S3 links do.
 import { openAsBlob } from "node:fs";
 import { type PackContext, type PackFetchInit, definePack, defineTool, z } from "plughive/pack";
-import { noControl, readCapped, scrub, send } from "./http.js";
+import { readCapped, scrub, send } from "./http.js";
 import { MAX_PRESIGN_SECONDS, encodeKeyPath, presignUrl } from "./sigv4.js";
 
 /** Lifetime of the signed upload and delete requests themselves. */
@@ -64,7 +64,10 @@ async function target(ctx: PackContext): Promise<Target> {
     throw new Error("the bucket setting is not a valid bucket name");
   }
   const prefix = setting(ctx, "keyPrefix") ?? DEFAULT_PREFIX;
-  if (!/^[A-Za-z0-9!_.*'()/-]{0,200}$/.test(prefix) || prefix.split("/").includes("..")) {
+  if (
+    !/^[A-Za-z0-9!_.*'()/-]{0,200}$/.test(prefix) ||
+    prefix.split("/").some((seg) => seg === "." || seg === "..")
+  ) {
     throw new Error("the keyPrefix setting may hold only letters, digits, / and -_.!*'()");
   }
   const region =
@@ -103,6 +106,20 @@ const EXT: Record<string, string> = {
   "text/plain": "txt",
   "text/csv": "csv",
 };
+
+/**
+ * The Content-Type an artifact is uploaded with. Only the passive types above
+ * keep theirs; anything else (HTML, SVG, XML, JavaScript...) is stored as
+ * application/octet-stream, so the bucket's origin downloads it instead of
+ * rendering it, and a shared page cannot run script there.
+ */
+function uploadMime(mime: string): string {
+  const [base = "", ...params] = mime.split(";");
+  const type = base.trim().toLowerCase();
+  if (!EXT[type]) return "application/octet-stream";
+  const utf8 = params.some((p) => /^\s*charset\s*=\s*"?utf-8"?\s*$/i.test(p));
+  return utf8 ? `${type}; charset=utf-8` : type;
+}
 
 /** Object key of an artifact: the prefix, its id and an extension from its mime. */
 function objectKey(t: Target, id: string, mime: string): string {
@@ -148,8 +165,15 @@ async function s3Call(
   } catch (err) {
     // A transport error may quote the URL, and a presigned URL is a live
     // credential until it expires: report the failure without it.
-    if ((err as Error).message?.startsWith("S3: request failed")) {
+    const e = err as Error;
+    if (e.message?.startsWith("S3: request failed")) {
       throw new Error("S3: request failed (network error)");
+    }
+    // Permission, abort and timeout errors pass through for the router, but
+    // never with the signed query string in them.
+    if (typeof e?.message === "string" && /X-Amz-/i.test(`${e.message} ${e.stack}`)) {
+      e.message = e.message.replace(/\?\S*/g, "");
+      e.stack = `${e.name}: ${e.message}`;
     }
     throw err;
   }
@@ -198,7 +222,7 @@ const shareArtifact = defineTool({
     const art = await ctx.library.get(input.artifact_id);
     if (!art) throw new Error(`artifact ${input.artifact_id} not found`);
     if (art.bytes > MAX_UPLOAD_BYTES) throw new Error("the artifact is over the 5 GB upload limit");
-    const mime = noControl(art.mime) ? art.mime : "application/octet-stream";
+    const mime = uploadMime(art.mime);
     const key = objectKey(t, art.id, mime);
     const url = objectUrl(t, key);
     const secrets = [t.secretAccessKey];

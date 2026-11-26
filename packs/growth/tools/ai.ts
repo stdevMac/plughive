@@ -215,6 +215,8 @@ export const researchProspect = defineTool<typeof ResearchInput, GrowthServices>
     "company is not stored). Reads the homepage through a scrape tool when one is available. Saves the " +
     "brief as an artifact and caches it on the company. Uses an LLM.",
   annotations: { openWorldHint: true },
+  // Enriching an unknown company is a billed lead-provider call.
+  tags: ["paid"],
   input: ResearchInput,
   run: (input, ctx) => runResearchProspect(input, ctx as GrowthCtx),
 });

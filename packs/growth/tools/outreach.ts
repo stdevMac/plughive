@@ -169,6 +169,14 @@ function resolveSender(
 function leadContext(ctx: GrowthCtx, personId: string) {
   const person = ctx.leads.getPerson(personId);
   if (!person) throw new Error(`person ${personId} not found`);
+  // A lead marked skipped or lost (on this row or another row with the same
+  // email) has opted out or been ruled out: never draft to it again.
+  const suppressed = ctx.leads.suppressedStatus(personId);
+  if (suppressed) {
+    throw new Error(
+      `person ${personId} is marked ${suppressed} (or another lead with the same email is); no draft was written. To contact them again, call mark_contacted with status "new" on every such lead first.`,
+    );
+  }
   const company = person.company_id ? ctx.leads.getCompany(person.company_id) : null;
   return {
     person,
@@ -244,7 +252,7 @@ export async function runDraftColdEmail(input: z.infer<typeof DraftInput>, ctx: 
       costUsd: resp.costUsd,
     },
   );
-  ctx.leads.markContacted(lead.person.id, "drafted", artifact.id);
+  ctx.leads.markDrafted(lead.person.id, artifact.id);
   ctx.logger.info("draft created", { person_id: lead.person.id, artifact: artifact.id });
   return {
     subject: draft.subject,
@@ -341,7 +349,7 @@ export async function runPersonalizeOutreach(
       costUsd: resp.costUsd,
     },
   );
-  ctx.leads.markContacted(lead.person.id, "drafted", artifact.id);
+  ctx.leads.markDrafted(lead.person.id, artifact.id);
   ctx.logger.info("personalized draft created", {
     person_id: lead.person.id,
     pages_scraped: pagesScraped.length,

@@ -45,7 +45,10 @@ const ALPHA = `export default (api) => {
     providers: [chat("one", 10), chat("two", 5)],
     tools: [
       tool("alpha_echo", (input, ctx) => ({ echo: input, region: ctx.settings.region ?? null })),
-      tool("alpha_strict", (input) => input, { input: api.z.object({ q: api.z.string() }).strict() }),
+      tool("alpha_strict", (input) => input, {
+        input: api.z.object({ q: api.z.string() }).strict(),
+        annotations: { destructiveHint: true, readOnlyHint: false },
+      }),
       tool("alpha_keyed", async (_input, ctx) => "key=" + (await ctx.secrets.get("ALPHA_KEY")), {
         secrets: ["ALPHA_KEY"],
       }),
@@ -331,6 +334,11 @@ describe("management API", () => {
       pack: "alpha",
       requires_secrets: ["ALPHA_KEY"],
       long_running: false,
+      annotations: null,
+    });
+    expect(listed.tools.find((t: any) => t.name === "alpha_strict")).toMatchObject({
+      pack: "alpha",
+      annotations: { destructiveHint: true, readOnlyHint: false },
     });
 
     const ok = await callTool("alpha_echo", { arguments: { a: 1 } });

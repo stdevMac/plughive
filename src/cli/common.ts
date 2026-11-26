@@ -22,6 +22,8 @@ import {
   parse,
 } from "./args.js";
 
+export { clean } from "./args.js";
+
 /** The flags every management sub-command accepts. */
 export const COMMON_OPTIONS = {
   home: { type: "string" },

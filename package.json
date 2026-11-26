@@ -18,13 +18,12 @@
   "files": [
     "dist/src",
     "dist/packs",
+    "dist/types",
     "dist/web/dist",
+    "!dist/**/*.map",
     "!dist/**/*.test.js",
-    "!dist/**/*.test.js.map",
     "!dist/**/*.tsbuildinfo",
     "!dist/**/.env*",
-    "src",
-    "!src/**/*.test.ts",
     "README.md",
     "LICENSE",
     "NOTICE",
@@ -38,7 +37,7 @@
   "scripts": {
     "dev": "tsx --conditions=plughive-source src/server.ts",
     "dev:watch": "tsx watch --conditions=plughive-source src/server.ts",
-    "build": "tsc -p tsconfig.json && pnpm build:web && node scripts/copy-skills.mjs",
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.types.json && pnpm build:web && node scripts/copy-skills.mjs",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "prepack": "pnpm clean && pnpm build && pnpm check:pack",
     "check:pack": "node scripts/check-pack.mjs",
@@ -94,12 +93,12 @@
   "packageManager": "pnpm@9.0.0",
   "exports": {
     "./pack": {
-      "types": "./src/core/pack-api.ts",
+      "types": "./dist/types/src/core/pack-api.d.ts",
       "plughive-source": "./src/core/pack-api.ts",
       "default": "./dist/src/core/pack-api.js"
     },
     "./pack/testing": {
-      "types": "./src/core/packs/testing.ts",
+      "types": "./dist/types/src/core/packs/testing.d.ts",
       "plughive-source": "./src/core/packs/testing.ts",
       "default": "./dist/src/core/packs/testing.js"
     }
@@ -111,5 +110,8 @@
       "qs@6": ">=6.16.1 <7",
       "fast-copy": ">=4.1.0 <5"
     }
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

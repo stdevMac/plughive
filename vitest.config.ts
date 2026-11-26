@@ -20,7 +20,9 @@ export default defineConfig({
     environment: "node",
     globals: false,
     include: ["tests/**/*.test.ts"],
-    // Pack-loader tests import whole packs; under a full parallel run that can exceed 5 s.
+    // Pack-loader tests import whole packs, often in beforeEach; under a full
+    // parallel run that can exceed the 5 s test and 10 s hook defaults.
     testTimeout: 20_000,
+    hookTimeout: 30_000,
   },
 });

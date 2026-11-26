@@ -65,6 +65,8 @@ describe("UserMountSchema", () => {
     ["an uppercase id", http({ id: "Notes" })],
     ["a bad prefix", http({ prefix: "9x" })],
     ["a bad header name", http({ headers: { "X Bad": "v" } })],
+    ["a CR/LF in a header value", http({ headers: { "X-Key": "v\r\nX-Injected: 1" } })],
+    ["a LF in a header value", http({ headers: { "X-Key": "v\nw" } })],
     ["a bad env name", stdio({ env: { "1A": "v" } })],
     ["a NUL in an argument", stdio({ args: ["a\0b"] })],
     ["a transport it does not know", http({ transport: "sse" })],

@@ -464,7 +464,13 @@ export const MountDeclSchema = z
       .regex(BINARY_PATTERN, "mount command must be a bare binary name")
       .optional(),
     args: z.array(z.string()).optional(),
-    headers: z.record(z.string(), z.string()).optional(),
+    // No CR, LF or NUL: a header must stay one header.
+    headers: z
+      .record(
+        z.string().regex(/^[^\r\n\0]+$/, "mount header names must not contain CR, LF or NUL"),
+        z.string().regex(/^[^\r\n\0]*$/, "mount header values must not contain CR, LF or NUL"),
+      )
+      .optional(),
     env: z.record(z.string(), z.string()).optional(),
     prefix: z
       .string()

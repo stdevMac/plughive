@@ -97,7 +97,12 @@ export const UserMountSchema = z
     transport: z.enum(["http", "stdio"], { error: 'mount transport must be "http" or "stdio"' }),
     prefix: z.string().regex(PREFIX_PATTERN, "mount prefix must match ^[a-z][a-z0-9_-]{0,31}$"),
     url: mountUrl.optional(),
-    headers: z.record(z.string().regex(HEADER_NAME, "invalid header name"), text(8192)).optional(),
+    headers: z
+      .record(
+        z.string().regex(HEADER_NAME, "invalid header name"),
+        text(8192).refine((s) => !/[\r\n]/.test(s), "must not contain a line break"),
+      )
+      .optional(),
     command: z
       .string()
       .regex(COMMAND_PATTERN, "mount command must be a program name or an absolute path")

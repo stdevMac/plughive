@@ -60,6 +60,17 @@ describe("mount declarations (manifest)", () => {
     expect(ok.mounts[0]?.headers).toEqual({ Authorization: "Bearer ${secret:OWN_KEY}" });
   });
 
+  it("refuses CR, LF or NUL in a mount header", () => {
+    for (const headers of [
+      { "X-Key": "a\r\nX-Injected: 1" },
+      { "X-Key": "a\nb" },
+      { "X-Key": "a\0b" },
+      { "X-Key\r\nX-Injected": "1" },
+    ]) {
+      expect(issuesOf({ ...base, mounts: [{ ...mount, headers }] }).join("\n")).toMatch(/headers/);
+    }
+  });
+
   it("refuses an OAuth-only mount that is on by default", () => {
     const issues = issuesOf({
       ...base,
@@ -344,6 +355,18 @@ describe("pack mount transport helpers", () => {
     expect(hinted?.hints).toEqual({ readOnlyHint: true, openWorldHint: false });
     const many = Array.from({ length: MOUNT_MAX_TOOLS + 10 }, (_, i) => ({ name: `t${i}` }));
     expect(sanitizeUpstreamTools(mount, many)).toHaveLength(MOUNT_MAX_TOOLS);
+  });
+
+  // D-M2: an upstream description cannot hide or reorder text with control or bidi characters.
+  it("sanitizeUpstreamTools strips control and bidi characters from descriptions", () => {
+    const [t] = sanitizeUpstreamTools({ id: "mounts/x", prefix: "x" }, [
+      {
+        name: "s",
+        description:
+          "Read\u202e a file\u202c.\u2066x\u2069\u200b\u0007\u001b[2J\u0085\ufeff\nLine two\tok",
+      },
+    ]);
+    expect(t?.description).toBe("Read a file.x[2J\nLine two\tok");
   });
 
   it("combineMountSources keeps the first of duplicate names and routes calls to the owner", async () => {

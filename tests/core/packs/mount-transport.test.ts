@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
+  MOUNT_MAX_ERROR_CHARS,
   MOUNT_MAX_RESPONSE_BYTES,
   MountPolicyError,
   PackMounts,
@@ -93,12 +94,24 @@ describe("mountFetchPolicy", () => {
         "http://[::1]:7777/mcp",
         "http://169.254.169.254/latest/meta-data",
         "http://metadata.google.internal/mcp",
+        // IPv6 forms that carry 169.254.169.254: NAT64, 6to4, Teredo.
+        "http://[64:ff9b::a9fe:a9fe]/latest/meta-data",
+        "http://[2002:a9fe:a9fe::]/mcp",
+        "http://[2001:0:4136:e378:8000:63bf:5601:5601]/mcp",
       ]) {
         expect(() => mountFetchPolicy({ pack, url }, { daemonPorts: [7777] }), url).toThrow(
           MountPolicyError,
         );
       }
     }
+  });
+
+  it("refuses a name that resolves to an IPv6 form of the metadata address", async () => {
+    const policy = mountFetchPolicy(
+      { pack: "user", url: "http://mcp.example.test/mcp" },
+      { lookup: async () => [{ address: "64:ff9b::a9fe:a9fe", family: 6 }] },
+    );
+    await expect(policy.lookup?.("mcp.example.test")).rejects.toThrow(MountPolicyError);
   });
 });
 
@@ -115,6 +128,18 @@ describe("PackMounts http transport", () => {
     const state = await connect(httpMount("evil", `http://127.0.0.1:${port}/mcp`));
     expect(state.connected).toBe(false);
     expect(state.error).toMatch(/cannot point at this machine/);
+    expect(hits).toEqual([]);
+  });
+
+  it("a mount header that is not a valid HTTP header is refused by name, never echoing the value", async () => {
+    const mount = {
+      ...httpMount("user", `http://127.0.0.1:${port}/mcp`),
+      headers: { Authorization: "Bearer s3cr3t-value\r\nX-Injected: 1" },
+    };
+    const state = await connect(mount);
+    expect(state.connected).toBe(false);
+    expect(state.error).toMatch(/mount header "Authorization" is not a valid HTTP header/);
+    expect(state.error).not.toContain("s3cr3t-value");
     expect(hits).toEqual([]);
   });
 
@@ -192,7 +217,14 @@ createInterface({ input: process.stdin }).on("line", (line) => {
     return send({ id: msg.id, result: { tools: [{ name: "blob", description: "big", inputSchema: { type: "object", properties: { bytes: { type: "number" } } } }] } });
   }
   if (msg.method === "tools/call") {
-    return send({ id: msg.id, result: { content: [{ type: "text", text: "x".repeat(msg.params.arguments.bytes) }] } });
+    const a = msg.params.arguments;
+    if (a.fail) return send({ id: msg.id, error: { code: -32000, message: "e".repeat(a.fail) } });
+    if (a.depth) {
+      let v = "leaf";
+      for (let i = 0; i < a.depth; i++) v = { v };
+      return send({ id: msg.id, result: { content: [{ type: "text", text: "ok" }], structuredContent: { v } } });
+    }
+    return send({ id: msg.id, result: { content: [{ type: "text", text: "x".repeat(a.bytes) }] } });
   }
   send({ id: msg.id, result: {} });
 });
@@ -222,6 +254,13 @@ describe("PackMounts result size", () => {
       await expect(
         mounts.call("user/big", "blob", { bytes: MOUNT_MAX_RESPONSE_BYTES + 1024 }),
       ).rejects.toThrow(/too large/);
+      // D-M2: a result nested too deep is refused like a too large one.
+      await expect(mounts.call("user/big", "blob", { depth: 10 })).resolves.toBeTruthy();
+      await expect(mounts.call("user/big", "blob", { depth: 5000 })).rejects.toThrow(/too large/);
+      // D-M2: a huge upstream error message is cut.
+      const err = await mounts.call("user/big", "blob", { fail: 100_000 }).catch((e) => e);
+      expect(err).toBeInstanceOf(Error);
+      expect((err as Error).message.length).toBeLessThanOrEqual(MOUNT_MAX_ERROR_CHARS);
     } finally {
       await mounts?.stop();
       mounts = null;

@@ -6,7 +6,7 @@
 // The escape hatch (anything the dashboard can do, through the same /api it
 // uses) and the live feed the dashboard listens to.
 import type { HttpMethod } from "./api.js";
-import { CliError, type CliIo, EXIT_FAIL, EXIT_OK, EXIT_USAGE } from "./args.js";
+import { CliError, type CliIo, EXIT_FAIL, EXIT_OK, EXIT_USAGE, jsonText } from "./args.js";
 import { COMMON_HELP, readJsonInput, sub } from "./common.js";
 
 export const API_HELP = `Usage: plughive api <METHOD> <path> [options]
@@ -46,12 +46,13 @@ export async function runApi(argv: string[], io: CliIo): Promise<number> {
   if (!path.startsWith("/")) path = `/${path}`;
   if (!path.startsWith("/api/") && path !== "/api") path = `/api${path}`;
   const body = values.data !== undefined ? readJsonInput(values.data, "--data") : undefined;
-  if (body !== undefined && method === "GET") throw new CliError("a GET has no body", EXIT_USAGE);
+  if (body !== undefined && (method === "GET" || method === "DELETE"))
+    throw new CliError(`a ${method} has no body`, EXIT_USAGE);
   const res = await ctx.api().raw(method as HttpMethod, path, body, { timeoutMs: 0 });
   if (values.include) io.err(`HTTP ${res.status}`);
   if (res.body !== undefined && res.body !== null) {
     (res.status >= 400 ? io.err : io.out)(
-      typeof res.body === "string" ? res.body : JSON.stringify(res.body, null, 2),
+      typeof res.body === "string" ? res.body : jsonText(res.body, 2),
     );
   }
   return res.status >= 400 ? EXIT_FAIL : EXIT_OK;
@@ -74,8 +75,14 @@ interface Frame {
   data: unknown;
 }
 
+/** The most of one event the CLI holds while waiting for its end. */
+export const MAX_FRAME_BYTES = 1024 * 1024;
+
 /** Splits an SSE byte stream into frames; comments and malformed data are skipped. */
-export async function* sseFrames(body: ReadableStream<Uint8Array>): AsyncGenerator<Frame> {
+export async function* sseFrames(
+  body: ReadableStream<Uint8Array>,
+  maxFrame = MAX_FRAME_BYTES,
+): AsyncGenerator<Frame> {
   const decoder = new TextDecoder();
   let buf = "";
   const reader = body.getReader();
@@ -83,7 +90,8 @@ export async function* sseFrames(body: ReadableStream<Uint8Array>): AsyncGenerat
     for (;;) {
       const { done, value } = await reader.read();
       if (done) return;
-      buf += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+      // Normalised on the whole buffer: a "\r\n" can be split across two chunks.
+      buf = (buf + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
       let end = buf.indexOf("\n\n");
       while (end !== -1) {
         const chunk = buf.slice(0, end);
@@ -102,6 +110,7 @@ export async function* sseFrames(body: ReadableStream<Uint8Array>): AsyncGenerat
           // Not JSON: skipped.
         }
       }
+      if (buf.length > maxFrame) throw new CliError("the daemon sent an event that is too large");
     }
   } finally {
     reader.releaseLock();
@@ -155,7 +164,7 @@ export async function runWatch(argv: string[], io: CliIo): Promise<number> {
     for await (const f of sseFrames(res.body)) {
       if (f.event === "hello") continue;
       if (only && !only.has(f.event)) continue;
-      if (ctx.json) io.out(JSON.stringify(f));
+      if (ctx.json) io.out(jsonText(f));
       else {
         const line = describe(f);
         if (line) io.out(line);

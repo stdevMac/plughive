@@ -6,7 +6,7 @@
 // input, and a way to run one exactly as the dashboard does (as the default
 // profile, through the spend policy, queued when it runs long).
 import { ApiError } from "./api.js";
-import { CliError, type CliIo, EXIT_FAIL, EXIT_OK, EXIT_USAGE } from "./args.js";
+import { CliError, type CliIo, EXIT_FAIL, EXIT_OK, EXIT_USAGE, jsonText } from "./args.js";
 import {
   COMMON_HELP,
   type Ctx,
@@ -145,7 +145,7 @@ async function call(ctx: Ctx, name: string, pairs: string[], values: Record<stri
     if (values.wait === true) {
       const job: JobView = await waitForJob(ctx, res.job_id, { quiet: ctx.json });
       if (ctx.json) ctx.printJson(job);
-      else if (job.status === "succeeded") io.out(JSON.stringify(job.result, null, 2));
+      else if (job.status === "succeeded") io.out(jsonText(job.result, 2));
       else
         io.err(
           `Job ${job.job_id} ${job.status}${

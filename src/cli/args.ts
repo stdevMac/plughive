@@ -24,12 +24,73 @@ export interface CliIo {
 }
 
 export function processIo(): CliIo {
-  return {
+  return safeIo({
     out: (line) => process.stdout.write(`${line}\n`),
     err: (line) => process.stderr.write(`${line}\n`),
     isTTY: process.stdout.isTTY === true,
     env: process.env,
     prompt: terminalPrompt,
+  });
+}
+
+// ---- terminal safety ---------------------------------------------------------
+//
+// Much of what the CLI prints comes from the daemon, and through it from packs,
+// mounted MCP servers and tool results: names, descriptions, errors, progress
+// messages. A terminal acts on control characters, so such text could move the
+// cursor, rewrite lines, set the clipboard (OSC 52) or reverse what is shown
+// (bidi overrides). Every line therefore goes through clean() on its way out.
+
+/** True for a character a terminal may act on: C0 (but newline and tab), DEL, C1, bidi controls. */
+function isControl(code: number): boolean {
+  return (
+    (code < 0x20 && code !== 0x0a && code !== 0x09) ||
+    (code >= 0x7f && code <= 0x9f) ||
+    code === 0x061c ||
+    code === 0x200e ||
+    code === 0x200f ||
+    (code >= 0x202a && code <= 0x202e) ||
+    (code >= 0x2066 && code <= 0x2069)
+  );
+}
+
+/** The text without terminal control characters; newlines and tabs stay. */
+export function clean(text: string): string {
+  let out = "";
+  for (const ch of text) {
+    if (!isControl(ch.codePointAt(0) ?? 0)) out += ch;
+  }
+  return out;
+}
+
+/** clean() for one line (a table cell, a field value): newlines and tabs become spaces. */
+export function cleanLine(text: string): string {
+  return clean(text).replace(/[\n\t]/g, " ");
+}
+
+/**
+ * JSON text in which the characters clean() would drop are \u escapes, so
+ * --json output is the daemon's answer exactly, and safe to print. They can
+ * only occur inside strings, so the result is valid JSON with the same value.
+ */
+export function jsonText(value: unknown, indent?: number): string {
+  const text = JSON.stringify(value, null, indent) ?? "null";
+  let out = "";
+  for (const ch of text) {
+    const code = ch.codePointAt(0) ?? 0;
+    out += isControl(code) ? `\\u${code.toString(16).padStart(4, "0")}` : ch;
+  }
+  return out;
+}
+
+/** The same sinks with every line and prompt cleaned. */
+export function safeIo(io: CliIo): CliIo {
+  const prompt = io.prompt;
+  return {
+    ...io,
+    out: (line) => io.out(clean(String(line))),
+    err: (line) => io.err(clean(String(line))),
+    ...(prompt ? { prompt: (question, opts) => prompt.call(io, clean(question), opts) } : {}),
   };
 }
 
@@ -47,6 +108,8 @@ function terminalPrompt(question: string, opts: { hidden?: boolean } = {}): Prom
       stdin.setRawMode(false);
       stdin.pause();
       stdin.off("data", onData);
+      stdin.off("end", onEnd);
+      stdin.off("error", onEnd);
       process.stderr.write("\n");
       if (err) fail(err);
       else done(answer);
@@ -67,7 +130,11 @@ function terminalPrompt(question: string, opts: { hidden?: boolean } = {}): Prom
         if (!opts.hidden) process.stderr.write(ch);
       }
     };
+    // The terminal went away: stop asking rather than wait forever in raw mode.
+    const onEnd = () => finish(new CliError("no answer: the terminal closed"));
     stdin.on("data", onData);
+    stdin.once("end", onEnd);
+    stdin.once("error", onEnd);
   });
 }
 

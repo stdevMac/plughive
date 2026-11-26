@@ -5,10 +5,13 @@
 // give the base URL, and the admin token authenticates /api. The token is
 // sent in a header only; it is never printed or put in an error.
 import { existsSync } from "node:fs";
+import { isIP } from "node:net";
+import { networkInterfaces } from "node:os";
 import { join } from "node:path";
+import { isLoopbackHost } from "../lib/access-key.js";
 import { ADMIN_TOKEN_ENV, ADMIN_TOKEN_FILE, loadOrCreateAdminToken } from "../lib/admin-token.js";
 import { type AppConfig, daemonOrigin, loadConfig } from "../lib/config.js";
-import { CliError } from "./args.js";
+import { CliError, EXIT_USAGE } from "./args.js";
 
 export interface DaemonTarget {
   config: AppConfig;
@@ -100,8 +103,86 @@ export class ApiError extends CliError {
   }
 }
 
+/** The most the CLI reads of one answer of the daemon. */
+export const MAX_RESPONSE_BYTES = 64 * 1024 * 1024;
+
+/**
+ * True when `host` is this computer: loopback, or an address of one of its
+ * own network interfaces (a daemon bound to the machine's LAN address).
+ * Traffic to such an address never leaves the machine.
+ */
+export function isThisMachine(host: string): boolean {
+  const h = host.replace(/^\[|\]$/g, "").toLowerCase();
+  if (isLoopbackHost(h)) return true;
+  if (!isIP(h)) return false;
+  for (const list of Object.values(networkInterfaces())) {
+    for (const a of list ?? []) {
+      if (a.address.toLowerCase() === h) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * The admin token gives full control of the daemon. Over plain HTTP anyone on
+ * the network path could read it, so it is only sent over https or to this
+ * computer.
+ */
+export function assertTokenTransport(baseUrl: string): void {
+  const url = new URL(baseUrl);
+  if (url.protocol === "https:" || isThisMachine(url.hostname)) return;
+  throw new CliError(
+    `refusing to send the admin token over plain HTTP to ${url.host}: anyone on the network could read it. Run the command on the daemon's computer, or reach the daemon through an SSH tunnel to 127.0.0.1.`,
+  );
+}
+
+/**
+ * The full URL of an /api path. The path is resolved first, so "/api/../mcp"
+ * or an encoded "%2e%2e" cannot carry the admin token to another endpoint.
+ */
+export function apiUrl(baseUrl: string, path: string): string {
+  const base = new URL(baseUrl);
+  const fail = () =>
+    new CliError(`"${path}" is not a path under /api (no "..", "\\" or host)`, EXIT_USAGE);
+  if (!path.startsWith("/") || path.startsWith("//") || path.includes("\\")) throw fail();
+  let url: URL;
+  try {
+    url = new URL(path, base);
+  } catch {
+    throw fail();
+  }
+  if (url.origin !== base.origin) throw fail();
+  if (url.pathname !== "/api" && !url.pathname.startsWith("/api/")) throw fail();
+  return url.toString();
+}
+
+/** The body of an answer as text, refused when it is larger than MAX_RESPONSE_BYTES. */
+export async function readBody(res: Response, max = MAX_RESPONSE_BYTES): Promise<string> {
+  if (!res.body) return "";
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let total = 0;
+  let text = "";
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > max) {
+        await reader.cancel().catch(() => {});
+        throw new CliError(`the daemon's answer is larger than ${max / 1024 / 1024} MiB`);
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return text + decoder.decode();
+}
+
 /** A client for /api/*. Writes carry the CSRF header the daemon requires. */
 export function apiClient(baseUrl: string, token: string, timeoutMs = 10_000): ApiClient {
+  assertTokenTransport(baseUrl);
   const unreachable = () =>
     new CliError(`no plughive daemon answers on ${baseUrl}; start one with "plughive start"`);
   const send = async (
@@ -115,11 +196,14 @@ export function apiClient(baseUrl: string, token: string, timeoutMs = 10_000): A
     if (method !== "GET") headers["x-plughive-csrf"] = "1";
     if (hasBody) headers["content-type"] = "application/json";
     const timeout = opts.timeoutMs ?? timeoutMs;
+    const url = apiUrl(baseUrl, path);
     let res: Response;
     try {
-      res = await fetch(`${baseUrl}${path}`, {
+      res = await fetch(url, {
         method,
         headers,
+        // A redirect would send the admin token on to wherever it points.
+        redirect: "error",
         ...(hasBody ? { body: JSON.stringify(body ?? {}) } : {}),
         ...(timeout > 0 ? { signal: AbortSignal.timeout(timeout) } : {}),
       });
@@ -130,8 +214,9 @@ export function apiClient(baseUrl: string, token: string, timeoutMs = 10_000): A
       throw unreachable();
     }
     let parsed: unknown = null;
+    const text = await readBody(res);
     try {
-      parsed = await res.json();
+      parsed = JSON.parse(text);
     } catch {
       // Not JSON: reported with the status.
     }
@@ -170,10 +255,12 @@ export function apiClient(baseUrl: string, token: string, timeoutMs = 10_000): A
     delete: (path, opts) => call("DELETE", path, undefined, opts),
     raw: (method, path, body, opts) => send(method, path, body, opts),
     stream: async (path, signal) => {
+      const url = apiUrl(baseUrl, path);
       let res: Response;
       try {
-        res = await fetch(`${baseUrl}${path}`, {
+        res = await fetch(url, {
           headers: { authorization: `Bearer ${token}`, accept: "text/event-stream" },
+          redirect: "error",
           ...(signal ? { signal } : {}),
         });
       } catch (e) {
@@ -186,7 +273,7 @@ export function apiClient(baseUrl: string, token: string, timeoutMs = 10_000): A
       if (!res.ok || !res.body) {
         let message = `HTTP ${res.status}`;
         try {
-          const b = (await res.json()) as { error?: { message?: string } };
+          const b = JSON.parse(await readBody(res)) as { error?: { message?: string } };
           if (b.error?.message) message = b.error.message;
         } catch {
           // Keep the status.

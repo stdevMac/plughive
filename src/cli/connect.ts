@@ -154,8 +154,13 @@ export function runConnect(
     };
     if (values["dry-run"]) {
       const plan = planConnect(id, opts);
+      // Shown with a placeholder key: the file may escape the real key (a quote
+      // or backslash), and then masking the raw key alone would miss it.
+      const shown = accessKey
+        ? planConnect(id, { ...opts, accessKey: "********" }).after
+        : plan.after;
       io.out(`${plan.path} ${plan.changed ? "would become:" : "is already up to date:"}`);
-      io.out(mask(plan.after, accessKey ?? undefined));
+      io.out(mask(shown, accessKey ?? undefined));
       if (plan.note) io.out(plan.note);
       return EXIT_OK;
     }

@@ -8,7 +8,7 @@ import "./lib/network.js";
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { CliError, type CliIo, EXIT_OK, EXIT_USAGE, processIo } from "./cli/args.js";
+import { CliError, type CliIo, EXIT_OK, EXIT_USAGE, processIo, safeIo } from "./cli/args.js";
 import { enablePrivateCompileCache } from "./lib/compile-cache.js";
 
 export const MAIN_HELP = `Usage: plughive [command] [options]
@@ -76,7 +76,10 @@ export function packageVersion(): string {
  * Runs one command. Resolves the exit code, or null when the command keeps
  * the process alive (start). Errors are printed here, never thrown.
  */
-export async function runCli(argv: string[], io: CliIo = processIo()): Promise<number | null> {
+export async function runCli(argv: string[], ioIn: CliIo = processIo()): Promise<number | null> {
+  // Every line a command prints goes through clean(): text from the daemon,
+  // packs and mounted servers must not reach the terminal as control codes.
+  const io = safeIo(ioIn);
   const [first, ...rest] = argv;
   const command = first === undefined || first.startsWith("-") ? "start" : first;
   const args = first === undefined || first.startsWith("-") ? argv : rest;

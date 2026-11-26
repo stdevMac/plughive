@@ -37,6 +37,7 @@ import type {
 } from "@modelcontextprotocol/client";
 import type { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { loadMcpClient, loadMcpStdio, loadedMcpClient } from "../../lib/lazy-mcp-client.js";
+import { packageVersion } from "../../lib/version.js";
 import { OAuthSignInRequiredError } from "../mounts/oauth.js";
 import { parseIPv4, parseIPv6 } from "../net/ip.js";
 import {
@@ -643,7 +644,7 @@ export class PackMounts implements MountedToolSource {
   private async connect(mount: ConnectableMount): Promise<void> {
     const { Client, StreamableHTTPClientTransport } = await loadMcpClient();
     const client = new Client(
-      { name: "plughive", version: "0.1.0" },
+      { name: "plughive", version: packageVersion() },
       {
         versionNegotiation: { mode: "auto" },
         // Skipped by the SDK when the server does not announce list changes.

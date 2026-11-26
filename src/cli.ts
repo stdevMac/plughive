@@ -5,11 +5,11 @@
 // sets the global fetch dispatcher before anything else can call fetch().
 import "./lib/network.js";
 
-import { existsSync, readFileSync, realpathSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { CliError, type CliIo, EXIT_OK, EXIT_USAGE, processIo, safeIo } from "./cli/args.js";
 import { enablePrivateCompileCache } from "./lib/compile-cache.js";
+import { packageVersion } from "./lib/version.js";
 
 export const MAIN_HELP = `Usage: plughive [command] [options]
 
@@ -51,26 +51,7 @@ Settings come from environment variables (PLUGHIVE_PORT, PLUGHIVE_HOME,
 PLUGHIVE_ACCESS_KEY, ...). The CLI does not read a .env file; use
 "node --env-file=.env" or export the variables. See docs/configuration.md.`;
 
-/** The version in the package.json next to this file (src/ or dist/src/). */
-export function packageVersion(): string {
-  let dir = dirname(fileURLToPath(import.meta.url));
-  for (let i = 0; i < 4; i++) {
-    const candidate = join(dir, "package.json");
-    if (existsSync(candidate)) {
-      try {
-        const pkg = JSON.parse(readFileSync(candidate, "utf8")) as {
-          name?: string;
-          version?: string;
-        };
-        if (pkg.name === "plughive" && pkg.version) return pkg.version;
-      } catch {
-        // Keep looking.
-      }
-    }
-    dir = dirname(dir);
-  }
-  return "unknown";
-}
+export { packageVersion };
 
 /**
  * Runs one command. Resolves the exit code, or null when the command keeps

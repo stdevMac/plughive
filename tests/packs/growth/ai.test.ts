@@ -358,6 +358,55 @@ describe("personalize_outreach", () => {
   });
 });
 
+describe("draft suppression (D-M12)", () => {
+  it("refuses to draft for a lead marked skipped or lost, also through another row with the same email", async () => {
+    env = makeEnv({ llm: [DRAFT_JSON, DRAFT_JSON] });
+    const { personId } = seedPerson(env);
+    env.ctx.leads.markContacted(personId, "skipped");
+    await expect(
+      env.call("draft_cold_email", { person_id: personId, sender: SENDER }),
+    ).rejects.toThrow(/marked skipped/);
+    // The same person found through another provider, email differing in case and spaces.
+    const twin = env.ctx.leads.upsertPerson({
+      ...(env.ctx.leads.getPerson(personId) as any),
+      provider: "other",
+      id: "p2",
+      email: "  ADA@acme.test ",
+      emailStatus: null,
+      firstName: "Ada",
+      lastName: null,
+      title: null,
+      seniority: null,
+      departments: null,
+      linkedinUrl: null,
+      city: null,
+      state: null,
+      country: null,
+      organization: null,
+      organizationId: null,
+      raw: {},
+    }).id;
+    await expect(
+      env.call("personalize_outreach", { person_id: twin, sender: SENDER }),
+    ).rejects.toThrow(/marked skipped/);
+    expect(env.llm).not.toHaveBeenCalled();
+    // Marking the lead new again lifts it.
+    env.ctx.leads.markContacted(personId, "new");
+    await env.call("draft_cold_email", { person_id: twin, sender: SENDER });
+    expect(env.ctx.leads.getPerson(twin)!.contact_status).toBe("drafted");
+  });
+
+  it("a new draft does not reset a lead already sent, replied or won", async () => {
+    env = makeEnv({ llm: [DRAFT_JSON] });
+    const { personId } = seedPerson(env);
+    env.ctx.leads.markContacted(personId, "replied", "art_old");
+    await env.call("draft_cold_email", { person_id: personId, sender: SENDER });
+    const row = env.ctx.leads.getPerson(personId)!;
+    expect(row.contact_status).toBe("replied");
+    expect(row.last_contact_artifact_id).toBe("art_old");
+  });
+});
+
 describe("list_drafts and mark_contacted", () => {
   it("lists drafts from both tools joined to leads, newest first, with score filter", async () => {
     env = makeEnv({ llm: [DRAFT_JSON, DRAFT_JSON] });

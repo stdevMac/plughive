@@ -41,6 +41,7 @@ const MUST_BE_PAID = [
   "enrich_people",
   "enrich_company",
   "pipeline_run",
+  "research_prospect",
   "apollo_search_people",
   "apollo_search_companies",
   "apollo_enrich_person",

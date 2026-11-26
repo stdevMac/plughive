@@ -61,7 +61,7 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 }
 
 /** Width of an element in CSS pixels, so SVG text keeps its real size. */
-function useWidth<T extends HTMLElement>(fallback: number): [RefObject<T>, number] {
+function useWidth<T extends HTMLElement>(fallback: number): [RefObject<T | null>, number] {
   const ref = useRef<T>(null);
   const [width, setWidth] = useState(fallback);
   useEffect(() => {

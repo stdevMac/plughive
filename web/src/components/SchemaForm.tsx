@@ -1,5 +1,5 @@
 // Renders a form model from lib/schemaForm. The parent owns the draft.
-import { useId } from "react";
+import { type JSX, useId } from "react";
 import { t } from "../i18n";
 import {
   type Draft,

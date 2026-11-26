@@ -625,7 +625,7 @@ export function CopyButton({
 }) {
   const toast = useToast();
   const [done, setDone] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
   return (
     <Button

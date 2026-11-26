@@ -19,14 +19,16 @@ npx plughive
 ```
 
 **Docker image** (linux/amd64 and linux/arm64). On a network bind the daemon
-needs an access key and a secrets passphrase; see `docker-compose.yml` for a
-hardened setup that reads them from files:
+needs an access key and a secrets passphrase. This keeps them in a private
+`plughive.env` file, so they stay off the command line and the passphrase
+survives a new container (without it the stored keys cannot be read). See
+`docker-compose.yml` for a hardened setup that reads them from files:
 
 ```sh
+[ -e plughive.env ] || (umask 077; printf 'PLUGHIVE_ACCESS_KEY=%s\nPLUGHIVE_SECRETS_PASSPHRASE=%s\n' \
+  "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" > plughive.env)
 docker run -d --name plughive -p 127.0.0.1:7777:7777 -v plughive-data:/data \
-  -e PLUGHIVE_ACCESS_KEY="$(openssl rand -hex 32)" \
-  -e PLUGHIVE_SECRETS_PASSPHRASE="$(openssl rand -hex 32)" \
-  ghcr.io/stdevmac/plughive:latest
+  --env-file plughive.env ghcr.io/stdevmac/plughive:latest
 docker exec plughive plughive dashboard --print
 ```
 

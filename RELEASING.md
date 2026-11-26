@@ -50,13 +50,19 @@ give its `developers` team write access to the package if others publish too.
 
 **Docker Hub.** The public repository `marcosmaceo97/plughive` exists. Create
 a personal access token at https://app.docker.com/settings/personal-access-tokens
-(Read & Write) and save it as the GitHub repository secret `DOCKERHUB_TOKEN`.
+(Read & Write) and save it as the secret `DOCKERHUB_TOKEN` in the `release`
+environment, not as a repository secret, so only the publishing jobs can read
+it.
 
 **GitHub.**
 
 - Settings → Environments → `release` (created by the first run if missing):
   add yourself as a required reviewer if every publish should wait for your
-  approval, and limit deployment to tags matching `v*`.
+  approval, and limit deployment to tags matching `v*`. Every job that
+  publishes (npm, both Docker builds, the Docker manifest and the GitHub
+  Release) runs in this environment, so with a reviewer set a release asks
+  for approval three times: npm and the builds together, then the manifest,
+  then the release.
 - After the first image push: the `plughive` package (your profile →
   Packages) → Package settings → Change visibility → Public, so
   `docker pull` works without signing in.

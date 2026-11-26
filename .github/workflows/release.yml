@@ -93,9 +93,18 @@ jobs:
           registry-url: https://registry.npmjs.org
 
       # Trusted publishing (OIDC) needs npm 11.5.1 or later; Node 22 ships npm 10.
-      - run: npm install -g npm@11
+      # An exact version, installed without running its scripts.
+      - run: npm install -g --ignore-scripts npm@11.6.2
 
       - run: pnpm install --frozen-lockfile
+
+      # prepack cleans, builds and checks the package contents. It runs here,
+      # in a step that holds no npm token, and the publish step below runs no
+      # scripts: it uploads this tarball as it is.
+      - name: Pack
+        run: |
+          npm pack
+          ls plughive-"$VERSION".tgz
 
       - name: Publish
         env:
@@ -107,8 +116,8 @@ jobs:
             echo "plughive@$VERSION is already on npm; skipping."
             exit 0
           fi
-          # prepack cleans, builds and checks the package contents.
-          npm publish --access public --provenance --tag "$DIST_TAG"
+          npm publish "./plughive-$VERSION.tgz" --ignore-scripts \
+            --access public --provenance --tag "$DIST_TAG"
 
   docker:
     needs: verify
@@ -122,6 +131,7 @@ jobs:
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
+    environment: release
     permissions:
       contents: read
       packages: write
@@ -139,13 +149,14 @@ jobs:
 
       - name: Build and push linux/${{ matrix.arch }}
         # Native runner per architecture: no emulation for the native modules.
+        # No build cache: a release image is built from the tagged source
+        # alone, never from layers a shared cache could have been fed.
         run: |
           docker buildx create --use --driver docker-container
           docker buildx build . \
             --platform "linux/${{ matrix.arch }}" \
             --build-arg "VERSION=$VERSION" \
-            --cache-from "type=registry,ref=$IMAGE:buildcache-${{ matrix.arch }}" \
-            --cache-to "type=registry,ref=$IMAGE:buildcache-${{ matrix.arch }},mode=max" \
+            --no-cache \
             --sbom=true \
             --provenance=mode=max \
             --tag "$IMAGE:$VERSION-${{ matrix.arch }}" \
@@ -173,6 +184,7 @@ jobs:
     needs: [verify, docker]
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    environment: release
     permissions:
       contents: read
       packages: write
@@ -218,6 +230,7 @@ jobs:
     needs: [verify, npm, docker-manifest]
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    environment: release
     permissions:
       contents: write
     env:

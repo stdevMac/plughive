@@ -8,6 +8,7 @@ web/e2e-screenshots/
 .env.*
 !.env.example
 admin-token
+plughive.env
 secrets.json
 .secrets.json.lock
 .secrets.*.tmp

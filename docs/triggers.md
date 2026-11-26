@@ -125,15 +125,17 @@ In this order:
 
 | Check | Refusal |
 | --- | --- |
-| At most 30 requests per minute per hook (`PLUGHIVE_HOOK_RATE_LIMIT`), and 10 times that for all hooks together; requests for ids that are not webhook triggers share a separate budget of the same size | `429` with `Retry-After: 60` |
+| At most 300 requests per minute per hook id before the signature is checked; requests for ids that are not webhook triggers share a separate budget of the same size | `429` with `Retry-After: 60` |
 | The body is at most 256 KB | `413` |
 | The hook exists and is a webhook trigger | `404` |
 | The timestamp is a whole number of seconds | `401 BAD_TIMESTAMP` |
 | The timestamp is within 5 minutes of the daemon's clock | `401 STALE_TIMESTAMP` |
 | The signature matches (compared in constant time) | `401 BAD_SIGNATURE` |
 | The trigger is on | `409 DISABLED` |
+| At most 30 signed requests per minute per hook (`PLUGHIVE_HOOK_RATE_LIMIT`, the 300 above is 10 times this), and 10 times that for all hooks together | `429` with `Retry-After: 60` |
 | The same signature has not been accepted in the last 24 hours | `409 REPLAYED` |
 | With `use_body`, a non-empty body is a JSON object | `400 INVALID_REQUEST` |
+| The trigger has fewer than 5 runs that have not finished | `429 BUSY` |
 | The input fits the workflow | `400 INVALID_INPUT` |
 | The workflow is loaded | `409 UNKNOWN_WORKFLOW` |
 
@@ -148,9 +150,10 @@ means the first one was accepted.
 ### The body as input
 
 With `use_body` on (the dashboard turns it on for new webhook triggers; the
-API default is off), the request's JSON object is merged over the saved
-`args`: keys in the body win. With it off, the body is only signed and
-checked, and the workflow gets the saved `args`.
+API default is off), the request's JSON object fills in the workflow input
+the saved `args` leave open: a key in the saved `args` always wins, and a
+`dry_run` key in the body is ignored. With it off, the body is only signed
+and checked, and the workflow gets the saved `args`.
 
 ## Job-done callbacks
 

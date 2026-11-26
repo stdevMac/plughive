@@ -22,7 +22,15 @@ beforeAll(async () => {
             runs.push(i);
             return { done: i.topic };
           },
-          { input: z.object({ topic: z.string(), n: z.number().default(1) }), longRunning: true },
+          {
+            // dry_run as every recipe's input has it
+            input: z.object({
+              topic: z.string(),
+              n: z.number().default(1),
+              dry_run: z.boolean().optional(),
+            }),
+            longRunning: true,
+          },
         ),
       ],
       demo: [mockTool("not_a_workflow", async () => 1)],
@@ -172,7 +180,7 @@ describe("/api/triggers", () => {
 });
 
 describe("/hooks/<id>", () => {
-  it("starts the workflow for a signed request, with the body merged over the args", async () => {
+  it("starts the workflow for a signed request, with the body filling in the args", async () => {
     const { trigger, secret } = await createHook({
       use_body: true,
       args: { n: 2 },
@@ -202,6 +210,20 @@ describe("/hooks/<id>", () => {
       status: "succeeded",
       result: { done: "from-hook" },
     });
+  });
+
+  it("D-H4: the body never overrides the saved args and never asks for a dry run", async () => {
+    const { trigger, secret } = await createHook({ use_body: true, args: { topic: "pinned" } });
+    const body = JSON.stringify({ topic: "from-body", n: 5, dry_run: true });
+    const res = await fetch(trigger.webhook_url, {
+      method: "POST",
+      headers: signed(secret, body),
+      body,
+    });
+    expect(res.status).toBe(202);
+    const { job_id } = (await res.json()) as { job_id: string };
+    await until(() => (h.jobs.get(job_id)?.status === "succeeded" ? true : undefined));
+    expect(runs.at(-1)).toEqual({ topic: "pinned", n: 5 });
   });
 
   it("refuses a bad signature, a stale timestamp, a replay and an unknown hook", async () => {
@@ -256,6 +278,8 @@ describe("/hooks/<id>", () => {
       body,
     });
     expect(off.status).toBe(409);
+    // A disabled hook is refused before the budget is counted.
+    await api(`/${trigger.id}`, { method: "PATCH", body: JSON.stringify({ enabled: true }) });
     const statuses: number[] = [];
     for (let i = 0; i < 10; i++) {
       const b = JSON.stringify({ i });
@@ -288,6 +312,26 @@ describe("/hooks/<id>", () => {
       ).status,
     ).toBe(202);
   });
+  it("D-M5: unsigned requests do not use up the budget signed requests start runs with", async () => {
+    const { trigger, secret } = await createHook({ args: { topic: "t" } });
+    for (let i = 0; i < 10; i++) {
+      const b = JSON.stringify({ i });
+      const res = await fetch(trigger.webhook_url, {
+        method: "POST",
+        headers: signed("whsec_wrong", b),
+        body: b,
+      });
+      expect(res.status).toBe(401);
+    }
+    const body = JSON.stringify({ ok: 1 });
+    const res = await fetch(trigger.webhook_url, {
+      method: "POST",
+      headers: signed(secret, body),
+      body,
+    });
+    expect(res.status).toBe(202);
+  });
+
   // Last in the file: it spends the shared webhook budget of this server.
   it("requests for unknown hook ids do not use up the real hooks' budget", async () => {
     const { trigger, secret } = await createHook({ args: { topic: "t" } });

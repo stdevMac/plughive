@@ -37,6 +37,9 @@ export const DEFAULT_HOOK_RATE_PER_MIN = 30;
 const GLOBAL_HOOK_RATE_FACTOR = 10;
 const HOOK_ID = /^trg_[A-Za-z0-9_-]{6,40}$/;
 
+/** Keys one RateLimiter tracks at once; a new key past this is refused. */
+const MAX_WINDOWS = 10_000;
+
 /** Fixed one-minute windows per key. */
 export class RateLimiter {
   private windows = new Map<string, { start: number; count: number }>();
@@ -48,7 +51,14 @@ export class RateLimiter {
     const now = this.now();
     let w = this.windows.get(key);
     if (!w || now - w.start >= 60_000) {
-      if (this.windows.size > 10_000) this.windows.clear();
+      if (!w && this.windows.size >= MAX_WINDOWS) {
+        // Make room from ended windows only: clearing live ones would hand
+        // every key a fresh budget.
+        for (const [k, old] of this.windows) {
+          if (now - old.start >= 60_000) this.windows.delete(k);
+        }
+        if (this.windows.size >= MAX_WINDOWS) return false;
+      }
       w = { start: now, count: 0 };
       this.windows.set(key, w);
     }
@@ -108,11 +118,19 @@ export interface TriggerHttpDeps {
 export function mountHooks(app: Express, deps: TriggerHttpDeps): void {
   const now = deps.now ?? Date.now;
   const per = deps.hookRatePerMinute ?? DEFAULT_HOOK_RATE_PER_MIN;
+  // Signed requests that start a run: each hook, and all hooks together.
   const perHook = new RateLimiter(per, now);
   const global = new RateLimiter(per * GLOBAL_HOOK_RATE_FACTOR, now);
-  // Requests for ids that are not webhook triggers get a budget of their own,
-  // so guessing ids cannot use up the budget the real hooks share.
+  // Before the signature is checked, requests only use budgets of their own,
+  // so unsigned floods cannot use up the budget signed requests start runs
+  // with: one per hook id, and one shared by ids that are not webhook triggers
+  // (guessing ids cannot use up the budget of the real hooks either).
+  const tries = new RateLimiter(per * GLOBAL_HOOK_RATE_FACTOR, now);
   const unknown = new RateLimiter(per * GLOBAL_HOOK_RATE_FACTOR, now);
+  const limited = (res: Response) => {
+    res.setHeader("retry-after", "60");
+    fail(res, 429, "RATE_LIMITED", "too many requests for this hook");
+  };
   const store = deps.service.store;
   const notFound = (res: Response) => fail(res, 404, "NOT_FOUND", "no such hook");
   const lookup = (id: string) => (HOOK_ID.test(id) ? store.get(id) : null);
@@ -120,12 +138,7 @@ export function mountHooks(app: Express, deps: TriggerHttpDeps): void {
   const limit = (req: Request, res: Response, next: () => void) => {
     const id = String(req.params.id ?? "");
     const known = lookup(id)?.kind === "webhook";
-    const ok = known ? global.take("*") && perHook.take(id) : unknown.take("*");
-    if (!ok) {
-      res.setHeader("retry-after", "60");
-      fail(res, 429, "RATE_LIMITED", "too many requests for this hook");
-      return;
-    }
+    if (!(known ? tries.take(id) : unknown.take("*"))) return limited(res);
     next();
   };
   const raw = express.raw({ type: () => true, limit: MAX_HOOK_BODY_BYTES });
@@ -145,6 +158,8 @@ export function mountHooks(app: Express, deps: TriggerHttpDeps): void {
     );
     if (!check.ok) return fail(res, check.status, check.code, check.message);
     if (!t.enabled) return fail(res, 409, "DISABLED", "this hook is disabled");
+    // Before the replay check, so a sender that was told to wait can resend.
+    if (!(perHook.take(t.id) && global.take("*"))) return limited(res);
     // Same signature twice: a replay (the timestamp is part of what is signed).
     if (!store.remember(t.id, String(req.header(SIGNATURE_HEADER)), now())) {
       return fail(res, 409, "REPLAYED", "this request was already received");
@@ -168,7 +183,13 @@ export function mountHooks(app: Express, deps: TriggerHttpDeps): void {
     } catch (e) {
       const err = e as TriggerFireError;
       const status =
-        err.code === "INVALID_INPUT" ? 400 : err.code === "UNKNOWN_WORKFLOW" ? 409 : 503;
+        err.code === "INVALID_INPUT"
+          ? 400
+          : err.code === "UNKNOWN_WORKFLOW"
+            ? 409
+            : err.code === "BUSY"
+              ? 429
+              : 503;
       fail(res, status, err.code ?? "START_FAILED", err.message);
     }
   });

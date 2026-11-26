@@ -19,6 +19,10 @@ use crate::i18n::{tr, trf};
 pub const POLL_EVERY: Duration = Duration::from_secs(5);
 /// Most approvals one poll reads (the count comes from the reply's `pending`).
 const LIMIT: u32 = 20;
+/// More new approvals than this in one poll get one summary notification.
+const MAX_NOTIFICATIONS: usize = 3;
+/// Most ids remembered while more approvals wait than one poll reads.
+const MAX_SEEN: usize = 1000;
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct Pending {
@@ -82,24 +86,59 @@ pub struct Tracker {
 }
 
 impl Tracker {
-    /// The approvals in `list` not announced before. Ids no longer pending are
-    /// forgotten, so the set stays as small as the pending list.
-    pub fn new_ones(&mut self, list: &[Pending]) -> Vec<Pending> {
+    /// The approvals in `list` not announced before. When `list` holds every
+    /// pending one (`count`), ids no longer pending are forgotten, so the set
+    /// stays as small as the pending list. When more wait than one poll reads,
+    /// ids are kept, so one pushed out of the list and back is not announced
+    /// twice.
+    pub fn new_ones(&mut self, list: &[Pending], count: usize) -> Vec<Pending> {
         let fresh: Vec<Pending> = list.iter().filter(|p| !self.seen.contains(&p.id)).cloned().collect();
-        self.seen = list.iter().map(|p| p.id.clone()).collect();
+        if count <= list.len() || self.seen.len() + fresh.len() > MAX_SEEN {
+            self.seen.clear();
+        }
+        self.seen.extend(list.iter().map(|p| p.id.clone()));
         fresh
     }
 }
 
+/// The notifications (title, body) for the approvals new in one poll: one
+/// each, or a single summary when there are many.
+pub fn notifications(fresh: &[Pending]) -> Vec<(String, String)> {
+    if fresh.len() > MAX_NOTIFICATIONS {
+        let body = trf("approvals.many", &[("count", &fresh.len().to_string())]) + &tr("approvals.notifyOpen");
+        return vec![(tr("approvals.notifyTitle"), body)];
+    }
+    fresh.iter().map(notification_text).collect()
+}
+
+/// `s` as one plain line of at most `max` characters: control, bidi and
+/// zero-width characters (which can reorder or hide text) are dropped and
+/// runs of whitespace become one space.
+fn plain(s: &str, max: usize) -> String {
+    let hidden = |c: char| {
+        c.is_control() || matches!(c, '\u{061C}' | '\u{200B}'..='\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2060}'..='\u{2069}' | '\u{FEFF}')
+    };
+    let words: Vec<&str> = s.split(|c: char| c.is_whitespace() || hidden(c)).filter(|w| !w.is_empty()).collect();
+    let line = words.join(" ");
+    if line.chars().count() <= max {
+        return line;
+    }
+    let mut out: String = line.chars().take(max - 1).collect();
+    out.push('…');
+    out
+}
+
 /// Notification title and body for one approval.
 pub fn notification_text(p: &Pending) -> (String, String) {
-    let reason = p.reason.trim().trim_end_matches('.');
+    let tool = plain(&p.tool, 80);
+    let reason = plain(&p.reason, 200);
+    let reason = reason.trim_end_matches('.');
     let mut body = if reason.is_empty() {
-        trf("approvals.waiting", &[("tool", &p.tool)])
-    } else if reason.starts_with(p.tool.as_str()) {
+        trf("approvals.waiting", &[("tool", &tool)])
+    } else if reason.starts_with(tool.as_str()) {
         reason.to_string()
     } else {
-        format!("{}: {reason}", p.tool)
+        format!("{tool}: {reason}")
     };
     if let Some(usd) = p.estimate_usd {
         body.push_str(&trf("approvals.estimate", &[("usd", &format!("{usd:.2}"))]));
@@ -149,12 +188,48 @@ mod tests {
     fn announces_each_approval_once() {
         let p = |id: &str| Pending { id: id.into(), tool: "t".into(), reason: String::new(), estimate_usd: None, profile: "default".into() };
         let mut t = Tracker::default();
-        assert_eq!(t.new_ones(&[p("a"), p("b")]).len(), 2);
-        assert!(t.new_ones(&[p("a"), p("b")]).is_empty());
-        let fresh = t.new_ones(&[p("b"), p("c")]);
+        assert_eq!(t.new_ones(&[p("a"), p("b")], 2).len(), 2);
+        assert!(t.new_ones(&[p("a"), p("b")], 2).is_empty());
+        let fresh = t.new_ones(&[p("b"), p("c")], 2);
         assert_eq!(fresh, vec![p("c")]);
         // "a" was decided and dropped from the set; it does not come back as new.
         assert_eq!(t.seen.len(), 2);
+    }
+
+    #[test]
+    fn an_approval_pushed_out_of_a_full_list_is_not_announced_again() {
+        let p = |id: &str| Pending { id: id.into(), tool: "t".into(), reason: String::new(), estimate_usd: None, profile: "default".into() };
+        let mut t = Tracker::default();
+        // 3 waiting, the poll reads the newest 2.
+        assert_eq!(t.new_ones(&[p("b"), p("a")], 2).len(), 2);
+        assert_eq!(t.new_ones(&[p("c"), p("b")], 3), vec![p("c")]);
+        // "c" is decided: "a" is back in the list, but was announced already.
+        assert!(t.new_ones(&[p("b"), p("a")], 2).is_empty());
+    }
+
+    #[test]
+    fn many_new_approvals_make_one_notification() {
+        let p = |id: &str| Pending { id: id.into(), tool: "t".into(), reason: String::new(), estimate_usd: None, profile: "default".into() };
+        assert_eq!(notifications(&[p("a"), p("b")]).len(), 2);
+        let many: Vec<Pending> = (0..20).map(|i| p(&i.to_string())).collect();
+        let n = notifications(&many);
+        assert_eq!(n.len(), 1);
+        assert_eq!(n[0].1, "20 new approvals are waiting. Open PlugHive to approve or deny.");
+    }
+
+    #[test]
+    fn notification_text_is_one_plain_bounded_line() {
+        let p = Pending {
+            id: "a".into(),
+            tool: "send\u{202E}liame\n\tx".into(),
+            reason: format!("Safe\u{2066} call\r\nApproved by admin {}", "z".repeat(500)),
+            estimate_usd: None,
+            profile: "default".into(),
+        };
+        let (_, body) = notification_text(&p);
+        assert!(body.starts_with("send liame x: Safe call Approved by admin zzz"), "{body}");
+        assert!(!body.chars().any(|c| c.is_control() || ('\u{2066}'..='\u{2069}').contains(&c) || c == '\u{202E}'));
+        assert!(body.chars().count() < 300, "{} chars", body.chars().count());
     }
 
     #[test]

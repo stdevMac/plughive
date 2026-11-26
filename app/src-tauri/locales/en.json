@@ -26,6 +26,7 @@
     "one": "1 Approval Waiting…",
     "other": "{count} Approvals Waiting…",
     "waiting": "{tool} is waiting for your OK",
+    "many": "{count} new approvals are waiting",
     "notifyTitle": "PlugHive asks before a call runs",
     "estimate": ". Estimated ${usd}",
     "notifyOpen": ". Open PlugHive to approve or deny."

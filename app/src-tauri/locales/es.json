@@ -26,6 +26,7 @@
     "one": "1 aprobación pendiente…",
     "other": "{count} aprobaciones pendientes…",
     "waiting": "{tool} está esperando tu aprobación",
+    "many": "{count} aprobaciones nuevas están pendientes",
     "notifyTitle": "PlugHive pregunta antes de ejecutar una llamada",
     "estimate": ". Coste estimado: ${usd}",
     "notifyOpen": ". Abre PlugHive para aprobarla o rechazarla."

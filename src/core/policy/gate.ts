@@ -31,6 +31,7 @@ import { type Cap, PolicyCache, type PolicyState, rulesFor } from "./policy.js";
 import {
   type SpendReservation,
   currentPolicyRun,
+  runNotPreApproved,
   runPreApproved,
   runWithReservation,
 } from "./run-context.js";
@@ -522,6 +523,12 @@ export class PolicyGate {
     signal: AbortSignal | undefined,
     run: () => Promise<T>,
   ): Promise<T> {
+    // A workflow called from inside an approved run is checked on its own:
+    // that approval covered the outer run's plan, which counts a nested
+    // workflow as free, so it never covers the nested run's cost.
+    if (currentPolicyRun().preApproved === true) {
+      return runNotPreApproved(() => this.runWorkflow(workflow, signal, run));
+    }
     if (workflow.maxUsd === 0) return run();
     const state = this.policy();
     if (!state.ok) {

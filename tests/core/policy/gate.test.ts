@@ -20,7 +20,11 @@ import {
   readPolicy,
   writePolicy,
 } from "../../../src/core/policy/policy.js";
-import { runInPolicyJob, runPreApproved } from "../../../src/core/policy/run-context.js";
+import {
+  currentPolicyRun,
+  runInPolicyJob,
+  runPreApproved,
+} from "../../../src/core/policy/run-context.js";
 import { type RegisteredTool, ToolRegistry } from "../../../src/core/tools/registry.js";
 import { UsageLedger } from "../../../src/lib/usage.js";
 import { expectMode } from "../../support/platform.js";
@@ -272,6 +276,26 @@ describe("spend policy gate", () => {
       expect(
         await gate.runWorkflow({ name: "wf_c", args: {}, maxUsd: 0.6 }, undefined, async () => "y"),
       ).toBe("y");
+    });
+
+    it("D-H1: a workflow nested in an approved run is checked on its own", async () => {
+      policy({ rules: { auto_approve_under_usd: 0.5 } });
+      const child = () =>
+        gate.runWorkflow({ name: "wf_child", args: {}, maxUsd: 5 }, undefined, async () => "ran");
+      // Inside an approved parent run the child still needs its own approval.
+      const err = await rejection(runPreApproved(child));
+      expect(err.code).toBe("APPROVAL_REQUIRED");
+      expect(err.message).toMatch(/up to \$5\.00/);
+      // A nested child that fits under the rules runs, and its body is not pre-approved.
+      let inner: boolean | undefined;
+      const small = await runPreApproved(() =>
+        gate.runWorkflow({ name: "wf_small", args: {}, maxUsd: 0.1 }, undefined, async () => {
+          inner = currentPolicyRun().preApproved;
+          return "ok";
+        }),
+      );
+      expect(small).toBe("ok");
+      expect(inner).toBe(false);
     });
   });
 

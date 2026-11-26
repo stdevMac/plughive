@@ -18,6 +18,7 @@ import { type ArtifactKind, CapabilityError, type PackContext } from "plughive/p
 import { artifactIdProblem, assertSafePath, run, stderrTail } from "./lib/ffmpeg.js";
 import { binaryStatus, requireBinary } from "./lib/probe.js";
 import { HINTS, LocalBackendError, artifactOut, withWorkDir } from "./lib/util.js";
+import { scanZipDocument } from "./lib/zip-scan.js";
 
 const TOOL_TIMEOUT_MS = 10 * 60_000;
 const MAX_TEXT_BYTES = 64 * 1024 * 1024;
@@ -142,6 +143,9 @@ function nameType(record: { meta: Record<string, unknown> | null }): DocType | n
   return null;
 }
 
+/** ZIP containers: checked (bomb bounds, external entities, file:// targets) before any tool opens them. */
+const ZIP_TYPES = new Set<DocType>(["docx", "xlsx", "pptx", "odt", "odp", "ods", "epub"]);
+
 /** Copy the artifact into the work dir as `in.<ext>`. */
 export async function stageDocument(ctx: PackContext, work: string, id: string) {
   const problem = artifactIdProblem(id);
@@ -157,6 +161,9 @@ export async function stageDocument(ctx: PackContext, work: string, id: string) 
   const path = join(work, `in.${type}`);
   const copy = await ctx.library.materialize(id, { dir: relative(ctx.pack.dataDir, work) });
   await rename(copy.path, path);
+  // Office/epub containers are ZIPs whose entries pandoc/LibreOffice open
+  // one by one: refuse bombs and external file references before that.
+  if (ZIP_TYPES.has(type)) scanZipDocument(path);
   return { path, type, record };
 }
 
@@ -507,42 +514,175 @@ export function safeHtmlUrl(u: string): boolean {
   return t === "" || t.startsWith("#") || t.slice(0, 5).toLowerCase() === "data:";
 }
 
+// URL attributes rewritten to "#" when they are not a fragment or data: URL.
+// srcset is handled separately: it holds several candidates, not one URL.
 const ATTR_URL =
-  /\b(src|srcset|href|data|action|formaction|poster|background|lowsrc|dynsrc|longdesc|codebase|archive|classid|usemap|cite|xlink:href)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi;
+  /\b(src|href|data|action|formaction|poster|background|lowsrc|dynsrc|longdesc|codebase|archive|classid|usemap|cite|xlink:href|ping|manifest|code)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi;
+const ATTR_SRCSET = /\bsrcset\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi;
+
+/**
+ * Drop every `<!DOCTYPE ...>` and `<?...?>` processing instruction. In XHTML
+ * (also read as "html" here) a DOCTYPE can name an external DTD — whose
+ * entity declarations are XXE — and an `<?xml-stylesheet href="file://..."?>`
+ * PI can pull a local file; neither is needed for conversion, so both are
+ * removed whole, internal subset included.
+ */
+function stripDoctypeAndPi(html: string): string {
+  let out = "";
+  let i = 0;
+  while (i < html.length) {
+    const lt = html.indexOf("<", i);
+    if (lt < 0) {
+      out += html.slice(i);
+      break;
+    }
+    out += html.slice(i, lt);
+    if (html.startsWith("<?", lt)) {
+      const end = html.indexOf("?>", lt + 2);
+      i = end < 0 ? html.length : end + 2;
+      continue;
+    }
+    if (/^<!doctype/i.test(html.slice(lt, lt + 9))) {
+      // Scan past a [...] internal subset so a ">" inside it does not end early.
+      let j = lt + 9;
+      let depth = 0;
+      while (j < html.length) {
+        const c = html[j] as string;
+        if (c === "[") depth++;
+        else if (c === "]") depth = Math.max(0, depth - 1);
+        else if (c === ">" && depth === 0) {
+          j++;
+          break;
+        }
+        j++;
+      }
+      i = j;
+      continue;
+    }
+    out += "<";
+    i = lt + 1;
+  }
+  return out;
+}
+
+/**
+ * srcset holds "url descriptor" candidates separated by commas, and a data:
+ * URL may itself contain commas, so the value is scanned candidate by
+ * candidate: every URL must be a fragment or data: URL, otherwise the whole
+ * attribute is dropped (fail closed — a second candidate after a data: one
+ * must not slip a file: URL past a check of the first token only).
+ */
+export function safeSrcset(value: string): boolean {
+  let i = 0;
+  const n = value.length;
+  while (i < n) {
+    while (i < n && (value[i] === "," || /\s/.test(value[i] as string))) i++;
+    if (i >= n) return true;
+    const start = i;
+    if (value.slice(i, i + 5).toLowerCase() === "data:") {
+      // A data: URL ends at whitespace only; commas belong to it.
+      while (i < n && !/\s/.test(value[i] as string)) i++;
+    } else {
+      while (i < n && !/[\s,]/.test(value[i] as string)) i++;
+    }
+    if (!safeHtmlUrl(value.slice(start, i))) return false;
+    // Skip this candidate's descriptors, up to the separating comma.
+    while (i < n && /\s/.test(value[i] as string)) {
+      i++;
+      const d = i;
+      while (i < n && !/[\s,]/.test(value[i] as string)) i++;
+      if (i === d) break;
+    }
+  }
+  return true;
+}
+
+const CSS_COMMENT = /\/\*[\s\S]*?\*\//g;
+const CSS_URL = /url\(\s*(?:"([^"]*)"|'([^']*)'|([^)]*))\)/gi;
+const CSS_IMPORT = /@import\s+(?:url\(\s*)?(?:"([^"]*)"|'([^']*)'|([^\s;)]+))[^;]*;?/gi;
+// image-set() and -webkit-image-set() also take quoted strings as URLs, not only url().
+const CSS_IMAGE_SET = /(-webkit-)?image-set\(([^)]*)\)/gi;
+const CSS_QUOTED = /"([^"]*)"|'([^']*)'/g;
+
+/** Keep only fragment/data: URLs in url()/@import/image-set(); comments are stripped first. */
+function sanitizeCssUrls(css: string): string {
+  let out = css.replace(CSS_COMMENT, " ");
+  out = out.replace(CSS_URL, (m, dq?: string, sq?: string, bare?: string) => {
+    const raw = (dq ?? sq ?? bare ?? "").trim();
+    return safeHtmlUrl(raw) ? m : "url(#)";
+  });
+  out = out.replace(CSS_IMPORT, (m, dq?: string, sq?: string, bare?: string) => {
+    const raw = (dq ?? sq ?? bare ?? "").trim();
+    return safeHtmlUrl(raw) ? m : "";
+  });
+  out = out.replace(CSS_IMAGE_SET, (m, _prefix: string, inner: string) => {
+    for (const q of inner.matchAll(CSS_QUOTED)) {
+      if (!safeHtmlUrl((q[1] ?? q[2] ?? "").trim())) return "url(#)";
+    }
+    return m;
+  });
+  return out;
+}
 
 /**
  * Neutralise every remote or local-file reference in an HTML document:
- * URL attributes that are not a fragment or data: become "#", a
- * <base> tag (which would make relative URLs remote) and meta refresh are
- * dropped, and url()/@import in CSS only keep data: URLs.
+ * URL attributes that are not a fragment or data: become "#" (srcset per
+ * candidate, and dropped when any candidate is not), srcdoc is dropped
+ * (its inline markup decodes entities when parsed, which this scan cannot
+ * vouch for), DOCTYPE/processing instructions are removed, a <base> tag
+ * (which would make relative URLs remote) and meta refresh are dropped,
+ * and url()/@import/image-set in CSS only keep data: URLs.
  * Best-effort on untrusted markup, on top of the profile's dead proxy.
  */
 export function sanitizeHtmlRefs(html: string): string {
-  let out = html.replace(ATTR_URL, (m, attr: string, dq?: string, sq?: string, bare?: string) => {
+  // 1. XML/XHTML declarations first: a DOCTYPE's external subset and
+  //    <?xml-stylesheet?> can name file:// resources.
+  let out = stripDoctypeAndPi(html);
+  // 2. <style> blocks and style="" attributes. A value carrying a backslash
+  //    or (in an attribute) an HTML entity can spell "url(" invisibly to the
+  //    scans below — CSS escapes and entities decode only when parsed — so
+  //    the whole CSS is dropped in that case. Fail closed.
+  out = out.replace(
+    /(<style\b[^>]*>)([\s\S]*?)(<\/style\s*>)/gi,
+    (m, open: string, css: string, close: string) =>
+      css.includes("\\") ? `${open}${close}` : `${open}${sanitizeCssUrls(css)}${close}`,
+  );
+  out = out.replace(
+    /\bstyle\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi,
+    (m, dq?: string, sq?: string, bare?: string) => {
+      const q = dq !== undefined ? '"' : sq !== undefined ? "'" : "";
+      const v = dq ?? sq ?? bare ?? "";
+      if (v.includes("\\") || v.includes("&")) return `style=${q}${q}`;
+      return `style=${q}${sanitizeCssUrls(v)}${q}`;
+    },
+  );
+  // 3. srcdoc: an inline document whose markup this attribute scan cannot
+  //    parse reliably — always drop the attribute.
+  out = out.replace(/\s+srcdoc(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?/gi, "");
+  // 4. URL attributes; srcset candidate by candidate.
+  out = out.replace(ATTR_SRCSET, (m, dq?: string, sq?: string, bare?: string) =>
+    safeSrcset(dq ?? sq ?? bare ?? "") ? m : "",
+  );
+  out = out.replace(ATTR_URL, (m, attr: string, dq?: string, sq?: string, bare?: string) => {
     const raw = (dq ?? sq ?? bare ?? "").trim();
     if (safeHtmlUrl(raw)) return m;
     const q = dq !== undefined ? '"' : sq !== undefined ? "'" : "";
     return `${attr}=${q}#${q}`;
   });
-  // A <base> tag redirects every relative URL: remove it entirely.
+  // 5. A <base> tag redirects every relative URL: remove it entirely.
   out = out.replace(/<base\b[^>]*>/gi, "");
   // <meta http-equiv="refresh" content="0;url=..."> navigates on load.
   out = out.replace(/<meta\b[^>]*http-equiv\s*=\s*["']?refresh["']?[^>]*>/gi, "");
-  // CSS url() and @import.
-  out = out.replace(
-    /url\(\s*(?:"([^"]*)"|'([^']*)'|([^)]*))\)/gi,
-    (m, dq?: string, sq?: string, bare?: string) => {
-      const raw = (dq ?? sq ?? bare ?? "").trim();
-      return safeHtmlUrl(raw) ? m : "url(#)";
-    },
-  );
-  out = out.replace(
-    /@import\s+(?:url\(\s*)?(?:"([^"]*)"|'([^']*)'|([^\s;)]+))[^;]*;?/gi,
-    (m, dq?: string, sq?: string, bare?: string) => {
-      const raw = (dq ?? sq ?? bare ?? "").trim();
-      return safeHtmlUrl(raw) ? m : "";
-    },
-  );
+  // 6. url()/@import anywhere else (outside style contexts comments are not
+  //    stripped, so this pass stays best-effort there).
+  out = out.replace(CSS_URL, (m, dq?: string, sq?: string, bare?: string) => {
+    const raw = (dq ?? sq ?? bare ?? "").trim();
+    return safeHtmlUrl(raw) ? m : "url(#)";
+  });
+  out = out.replace(CSS_IMPORT, (m, dq?: string, sq?: string, bare?: string) => {
+    const raw = (dq ?? sq ?? bare ?? "").trim();
+    return safeHtmlUrl(raw) ? m : "";
+  });
   return out;
 }
 

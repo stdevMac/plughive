@@ -122,6 +122,32 @@ describe("logged tool arguments", () => {
   });
 });
 
+describe("tool results", () => {
+  it("R2-L4: private paths are hidden in a success result, as in errors", async () => {
+    const registry = new ToolRegistry({
+      logger: capture().logger,
+      logArgs: false,
+      scrubPaths: (t) => t.split("/Users/someone").join("~"),
+    });
+    registry.registerPack("p", [
+      {
+        ...echo,
+        name: "where",
+        run: async () => ({
+          path: "/Users/someone/.plughive/tools/ffmpeg",
+          list: ["/Users/someone/a", 3, null],
+          "/Users/someone/key": true,
+        }),
+      },
+    ]);
+    const out = await registry.call("where", {});
+    expect(out).toEqual({
+      ok: true,
+      result: { path: "~/.plughive/tools/ffmpeg", list: ["~/a", 3, null], "~/key": true },
+    });
+  });
+});
+
 describe("logged errors", () => {
   it("a failing usage sink is logged with secrets redacted and paths hidden", async () => {
     const { lines, logger } = capture();

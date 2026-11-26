@@ -457,7 +457,8 @@ export class ToolRegistry {
     );
     try {
       if (!ran.ok) throw ran.error;
-      const result = this.redact(ran.value);
+      // Secrets redacted and private paths hidden, as for errors.
+      const result = this.scrubDeep(this.redact(ran.value));
       // A result nobody can serialise (cycle, BigInt) is a tool error, not a crash later.
       if (result !== undefined) {
         try {
@@ -529,6 +530,28 @@ export class ToolRegistry {
 
   private scrub(text: string): string {
     return this.pathScrubber ? this.pathScrubber(text) : text;
+  }
+
+  /** Every string (value or key) in a result with private paths hidden. */
+  private scrubDeep<T>(value: T): T {
+    const scrub = this.pathScrubber;
+    if (!scrub) return value;
+    const seen = new WeakSet<object>();
+    const walk = (v: unknown): unknown => {
+      if (typeof v === "string") return scrub(v);
+      if (v === null || typeof v !== "object" || seen.has(v)) return v;
+      if (Array.isArray(v)) {
+        seen.add(v);
+        return v.map(walk);
+      }
+      const proto = Object.getPrototypeOf(v);
+      if (proto !== Object.prototype && proto !== null) return v;
+      seen.add(v);
+      const out: Record<string, unknown> = {};
+      for (const [key, item] of Object.entries(v)) out[scrub(key)] = walk(item);
+      return out;
+    };
+    return walk(value) as T;
   }
 
   /** An error as it may be logged: stored secrets redacted, private paths hidden, bounded. */

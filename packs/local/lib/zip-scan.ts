@@ -55,13 +55,67 @@ function entryNameProblem(name: string): string | null {
 /** External entities and local-file references in an XML part. */
 const XML_DANGERS: ReadonlyArray<[RegExp, string]> = [
   [/<!\s*ENTITY[^>]*?\b(?:SYSTEM|PUBLIC)\b/i, "an external entity declaration (XXE)"],
-  [
-    /(?:xlink:href|href|src|Target|action|data|poster)\s*=\s*["']\s*(?:file:|\\\\|\/\/)/i,
-    "a file:// or UNC reference",
-  ],
 ];
 
+/** Reference attributes, read with their quoted value. */
+const REF_ATTR =
+  /\b(xlink:href|href|src|Target|action|data|poster)\s*=\s*(?:"([^"]*)"|'([^']*)')/gi;
+
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+};
+
+/**
+ * An attribute value as the converter reads it: XML character and named
+ * entities decoded (so `&#x66;ile:` is `file:`), then every control or
+ * space character removed, since URL parsers drop tabs and newlines inside a
+ * scheme. Lowercased for the prefix checks.
+ */
+export function refValue(raw: string): string {
+  const decoded = raw.replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z]+);/gi, (m, ref: string) => {
+    if (ref[0] === "#") {
+      const code =
+        ref[1] === "x" || ref[1] === "X"
+          ? Number.parseInt(ref.slice(2), 16)
+          : Number.parseInt(ref.slice(1), 10);
+      return Number.isFinite(code) && code >= 0 && code <= 0x10ffff
+        ? String.fromCodePoint(code)
+        : "";
+    }
+    return NAMED_ENTITIES[ref.toLowerCase()] ?? m;
+  });
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: removing them is the point
+  return decoded.replace(/[\u0000-\u0020\u007f]/g, "").toLowerCase();
+}
+
+/** Why a reference attribute points outside the package, or null. */
+function refProblem(attr: string, value: string): string | null {
+  const v = refValue(value);
+  if (v.startsWith("file:") || v.startsWith("\\\\") || v.startsWith("//") || v.startsWith("\\/"))
+    return "a file:// or UNC reference";
+  // ODF xlink:href is relative to the document's folder, not the package:
+  // "../" or an absolute path reaches the file system beside it.
+  if (attr.toLowerCase() === "xlink:href") {
+    if (v.startsWith("/") || v.startsWith("\\") || /^[a-z]:(?:[/\\]|$)/.test(v))
+      return "an absolute local path";
+    if (v.split(/[/\\]/).includes("..")) return 'a reference outside the document (a ".." segment)';
+  }
+  return null;
+}
+
 function scanXmlPart(label: string, name: string, text: string): void {
+  for (const m of text.matchAll(REF_ATTR)) {
+    const what = refProblem(m[1] as string, m[2] ?? m[3] ?? "");
+    if (what) {
+      throw new ZipScanError(
+        `${label}: the ZIP entry ${JSON.stringify(name)} contains ${what}; external entities and local-file references are refused before the document is opened`,
+      );
+    }
+  }
   for (const [re, what] of XML_DANGERS) {
     if (re.test(text)) {
       throw new ZipScanError(
@@ -77,9 +131,11 @@ function scanXmlPart(label: string, name: string, text: string): void {
       if (!/TargetMode\s*=\s*["']External["']/i.test(t)) continue;
       const target =
         /Target\s*=\s*"([^"]*)"/i.exec(t)?.[1] ?? /Target\s*=\s*'([^']*)'/i.exec(t)?.[1] ?? "";
-      if (!/^https?:\/\//i.test(target)) {
+      const v = refValue(target);
+      // http(s) goes to the dead proxy; mailto: and tel: open nothing.
+      if (!/^(?:https?:\/\/|mailto:|tel:)/.test(v)) {
         throw new ZipScanError(
-          `${label}: ${JSON.stringify(name)} has an external relationship to ${JSON.stringify(target.slice(0, 120))}, which is not http(s); file:// and UNC targets are refused`,
+          `${label}: ${JSON.stringify(name)} has an external relationship to ${JSON.stringify(target.slice(0, 120))}, which is not http(s), mailto: or tel:; file:// and UNC targets are refused`,
         );
       }
     }

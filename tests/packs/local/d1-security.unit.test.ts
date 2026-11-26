@@ -259,6 +259,53 @@ describe("scanZipDocument (D-L3 / H-1)", () => {
     expect(() => scanZipDocument(p)).toThrow(/file:\/\/ or UNC|external relationship/);
   });
 
+  it("allows mailto:, tel: and https external relationships and internal relative targets", () => {
+    const p = writeZip(
+      makeZip([
+        {
+          name: "word/_rels/document.xml.rels",
+          data: '<Relationships><Relationship Id="r1" Type="http://x" Target="mailto:a@example.com" TargetMode="External"/><Relationship Id="r2" Type="http://y" Target="tel:+15550100" TargetMode="External"/><Relationship Id="r3" Type="http://z" Target="https://example.com/" TargetMode="External"/><Relationship Id="r4" Type="http://w" Target="../media/x.png"/></Relationships>',
+        },
+      ]),
+    );
+    expect(() => scanZipDocument(p)).not.toThrow();
+  });
+
+  it("refuses entity-encoded file: references", () => {
+    const p = writeZip(
+      makeZip([
+        {
+          name: "content.xml",
+          data: '<office:document><draw:image xlink:href="&#x66;ile:///etc/passwd"/></office:document>',
+        },
+      ]),
+    );
+    expect(() => scanZipDocument(p)).toThrow(/file:\/\/ or UNC/);
+  });
+
+  it("refuses ODF xlink:href with an absolute path or a .. segment, allows https links", () => {
+    for (const href of ["/etc/passwd", "C:\\secret.txt", "../../outside.png", "Pictures/../../x"]) {
+      const p = writeZip(
+        makeZip([
+          {
+            name: "content.xml",
+            data: `<office:document><draw:image xlink:href="${href}"/></office:document>`,
+          },
+        ]),
+      );
+      expect(() => scanZipDocument(p), href).toThrow();
+    }
+    const ok = writeZip(
+      makeZip([
+        {
+          name: "content.xml",
+          data: '<office:document><text:a xlink:href="https://example.com/"/><draw:image xlink:href="Pictures/a.png"/></office:document>',
+        },
+      ]),
+    );
+    expect(() => scanZipDocument(ok)).not.toThrow();
+  });
+
   it("refuses a non-ZIP file", () => {
     const p = writeZip(Buffer.from("this is not a zip at all........"));
     expect(() => scanZipDocument(p)).toThrow(/not a ZIP/);

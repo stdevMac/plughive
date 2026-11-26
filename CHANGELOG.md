@@ -94,6 +94,13 @@ error names the setting to change.
   the port first gets nothing. Its logs carry no secrets.
 - Dashboard: only same-origin media renders inline, external links must be
   http(s), and form drafts cannot set prototype keys.
+- Release: every job that publishes (npm, Docker, the GitHub Release) runs
+  in the `release` environment, so `DOCKERHUB_TOKEN` can live there instead
+  of in the repository. npm is pinned to an exact version and installed
+  without scripts, the package is packed in a step that holds no token and
+  published with `--ignore-scripts`, and release images are built without a
+  shared registry cache. The README's `docker run` keeps the access key and
+  passphrase in a private `plughive.env` instead of the command line.
 - CI: actions are pinned to commits, workflows have least-privilege
   permissions, and Dependabot watches npm, actions and cargo.
 - Profiles: the default profile's excludes now also stop capability

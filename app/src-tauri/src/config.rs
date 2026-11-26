@@ -87,23 +87,80 @@ impl AppConfig {
 
     /// Atomic write (temp file + rename), mode 0600 on macOS and Linux. On
     /// Windows the file inherits the per-user ACL of the app data folder.
+    /// The temp file has an unguessable name and is created new, so nothing
+    /// planted in the folder (a symlink, another file) is ever written to.
     pub fn save(&self, path: &Path) -> std::io::Result<()> {
         let dir = path.parent().ok_or_else(|| std::io::Error::other("no parent"))?;
         fs::create_dir_all(dir)?;
-        let tmp = dir.join(format!(".app-config.{}.tmp", std::process::id()));
-        {
-            let mut opts = fs::OpenOptions::new();
-            opts.write(true).create(true).truncate(true);
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::OpenOptionsExt;
-                opts.mode(0o600);
-            }
-            let mut f = opts.open(&tmp)?;
-            f.write_all(&serde_json::to_vec_pretty(self).map_err(std::io::Error::other)?)?;
-            f.write_all(b"\n")?;
-            f.sync_all()?;
+        let body = serde_json::to_vec_pretty(self).map_err(std::io::Error::other)?;
+        let (tmp, mut f) = create_temp(dir)?;
+        let written = f.write_all(&body).and_then(|()| f.write_all(b"\n")).and_then(|()| f.sync_all());
+        drop(f);
+        if let Err(e) = written.and_then(|()| fs::rename(&tmp, path)) {
+            let _ = fs::remove_file(&tmp);
+            return Err(e);
         }
-        fs::rename(&tmp, path)
+        Ok(())
+    }
+}
+
+/// A new, owner-only temp file in `dir` with a random name.
+fn create_temp(dir: &Path) -> std::io::Result<(PathBuf, fs::File)> {
+    use std::hash::{BuildHasher, Hasher};
+    let mut last = None;
+    for attempt in 0u32..8 {
+        // RandomState is seeded from the OS's random source.
+        let mut h = std::collections::hash_map::RandomState::new().build_hasher();
+        h.write_u32(std::process::id());
+        h.write_u32(attempt);
+        h.write_u128(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos());
+        let tmp = dir.join(format!(".app-config.{:016x}.tmp", h.finish()));
+        let mut opts = fs::OpenOptions::new();
+        opts.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            opts.mode(0o600);
+        }
+        match opts.open(&tmp) {
+            Ok(f) => return Ok((tmp, f)),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => last = Some(e),
+            Err(e) => return Err(e),
+        }
+    }
+    Err(last.unwrap_or_else(|| std::io::Error::other("could not create a temp file")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AppConfig;
+
+    #[cfg(unix)]
+    #[test]
+    fn save_never_writes_through_a_planted_temp_file() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("plughive-config-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let victim = dir.join("victim");
+        std::fs::write(&victim, "keep").unwrap();
+        // The name older versions used: pid-based, so guessable.
+        std::os::unix::fs::symlink(&victim, dir.join(format!(".app-config.{}.tmp", std::process::id()))).unwrap();
+        let path = dir.join("app-config.json");
+        std::fs::write(&path, "{}").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+
+        let cfg = AppConfig { port: 4242, ..Default::default() };
+        cfg.save(&path).unwrap();
+        assert_eq!(std::fs::read_to_string(&victim).unwrap(), "keep");
+        assert_eq!(AppConfig::load(&path).port, 4242);
+        assert_eq!(std::fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
+        let left: Vec<_> = std::fs::read_dir(&dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().is_file() && !e.path().is_symlink() && e.file_name().to_string_lossy().ends_with(".tmp"))
+            .collect();
+        assert!(left.is_empty(), "temp files left behind");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

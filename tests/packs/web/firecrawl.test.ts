@@ -115,6 +115,44 @@ describe("FirecrawlClient", () => {
     expect(call(f, 1)[0]).toBe("https://api.firecrawl.dev/v2/crawl/j1?skip=1");
   });
 
+  it("follows `next` only within the same crawl job, once per page", async () => {
+    const page = (markdown: string, next?: string) =>
+      jsonResponse({ status: "completed", data: [{ markdown }], ...(next ? { next } : {}) });
+    const other = vi
+      .fn()
+      .mockResolvedValueOnce(page("a", "https://api.firecrawl.dev/v2/crawl/j2?skip=1"))
+      .mockResolvedValueOnce(page("x", "https://api.firecrawl.dev/v1/team/credit-usage"));
+    const s1 = await new FirecrawlClient(other as never, "k").crawlStatus("j1");
+    expect(s1.data?.map((d) => d.markdown)).toEqual(["a"]);
+    expect(other).toHaveBeenCalledTimes(1);
+
+    const loop = vi
+      .fn()
+      .mockResolvedValueOnce(page("a", "https://api.firecrawl.dev/v2/crawl/j1?skip=1"))
+      .mockResolvedValueOnce(page("b", "https://api.firecrawl.dev/v2/crawl/j1?skip=1"))
+      .mockResolvedValue(page("c", "https://api.firecrawl.dev/v2/crawl/j1?skip=1"));
+    const s2 = await new FirecrawlClient(loop as never, "k").crawlStatus("j1");
+    expect(s2.data?.map((d) => d.markdown)).toEqual(["a", "b"]);
+    expect(loop).toHaveBeenCalledTimes(2);
+  });
+
+  it("refuses a crawl result over the total byte cap", async () => {
+    const big = "x".repeat(600);
+    const f = vi.fn(async (url: string) => {
+      const skip = Number(new URL(url).searchParams.get("skip") ?? "0");
+      return jsonResponse({
+        status: "completed",
+        data: [{ markdown: big }],
+        next: `https://api.firecrawl.dev/v2/crawl/j1?skip=${skip + 1}`,
+      });
+    });
+    const err = await failure(
+      new FirecrawlClient(f as never, "k", { maxCrawlBytes: 2000 }).crawlStatus("j1"),
+    );
+    expect(err.message).toMatch(/over 2000 bytes; crawl fewer pages/);
+    expect(f.mock.calls.length).toBeLessThan(5);
+  });
+
   it("passes the signal and a timeout to fetch", async () => {
     const f = vi.fn(async () => jsonResponse({ success: true, data: {} }));
     const ac = new AbortController();

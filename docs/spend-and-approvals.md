@@ -87,6 +87,9 @@ ledger cannot be read, every cap counts as used up.
   dashboard link, and the call runs as soon as you approve. The answer then
   comes from the MCP client, not from the dashboard, so turn this on only for
   clients you trust to show the form to you rather than answer it themselves.
+  Only an answer to a form plughive actually showed counts: an answer sent
+  along with the first call approves nothing. plughive still cannot tell
+  whether you or the client filled the form in.
   Closing the form leaves the request open on the Approvals page.
 
 `profiles` overrides any of these rules for one profile. A field left out

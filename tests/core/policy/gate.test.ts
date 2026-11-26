@@ -698,24 +698,41 @@ describe("spend policy gate", () => {
       const opened = await registry.call("send_email", {});
       const id = opened.ok ? "" : (opened.error.approval?.id ?? "");
       expect(id).toMatch(/^apr_/);
+      const token = gate.chatFormShown(id);
       // Off by default.
       expect(gate.chatApprovalsAllowed("default")).toBe(false);
-      expect(gate.decideInChat(id, true, "default")).toBe(false);
+      expect(gate.decideInChat(id, true, "default", token)).toBe(false);
       policy({ rules: { approve_in_chat: true } });
       // Another profile cannot decide this profile's request.
-      expect(gate.decideInChat(id, true, "bot")).toBe(false);
+      expect(gate.decideInChat(id, true, "bot", token)).toBe(false);
       // A profile can opt out on its own.
       policy({
         rules: { approve_in_chat: true },
         profiles: { default: { approve_in_chat: false } },
       });
-      expect(gate.decideInChat(id, true, "default")).toBe(false);
+      expect(gate.decideInChat(id, true, "default", token)).toBe(false);
       policy({ rules: { approve_in_chat: true } });
-      expect(gate.decideInChat(id, true, "default")).toBe(true);
+      expect(gate.decideInChat(id, true, "default", token)).toBe(true);
       expect(approvals.get(id)).toMatchObject({ status: "approved", decided_by: "mcp-chat" });
       // Decided once.
-      expect(gate.decideInChat(id, false, "default")).toBe(false);
+      expect(gate.decideInChat(id, false, "default", token)).toBe(false);
       expect((await registry.call("send_email", {})).ok).toBe(true);
+    });
+
+    it("R2-M2: decideInChat needs the token of a form that was shown", async () => {
+      policy({ rules: { approve_in_chat: true } });
+      const opened = await registry.call("send_email", {});
+      const id = opened.ok ? "" : (opened.error.approval?.id ?? "");
+      // No form shown yet: nothing to answer.
+      expect(gate.decideInChat(id, true, "default", undefined)).toBe(false);
+      expect(gate.decideInChat(id, true, "default", "made-up")).toBe(false);
+      const token = gate.chatFormShown(id);
+      expect(gate.decideInChat(id, true, "default", `${token.slice(0, -1)}x`)).toBe(false);
+      // A form shown for another request does not answer this one.
+      const other = gate.chatFormShown("apr_other");
+      expect(gate.decideInChat(id, true, "default", other)).toBe(false);
+      expect(approvals.get(id)?.status).toBe("pending");
+      expect(gate.decideInChat(id, true, "default", token)).toBe(true);
     });
 
     it("always-ask tools ask", async () => {

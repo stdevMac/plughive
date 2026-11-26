@@ -18,6 +18,7 @@
 // FAIL CLOSED: while policy.json is invalid, every call that may cost money
 // (a non-zero or unknown estimate, a "paid" tool) and every destructive tool
 // is refused. Free calls go on.
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import type { CapabilityName } from "../capabilities/schemas.js";
 import { DEFAULT_PROFILE_ID, currentScope } from "../mcp/scope.js";
 import {
@@ -88,6 +89,8 @@ export const APPROVAL_TAG = "approval";
 /** Tools tagged with this reach other people (email, SMS, calls, posts, bookings); they ask unless rules.ask_before_sending is off. */
 export const SENDS_TAG = "sends";
 const ESTIMATE_TIMEOUT_MS = 5000;
+/** Approve/deny forms remembered at once; the oldest is forgotten first. */
+const MAX_CHAT_FORMS = 1000;
 
 function money(usd: number | null): string {
   if (usd === null) return "an unknown amount";
@@ -143,6 +146,8 @@ export class PolicyGate {
   readonly cache: PolicyCache;
   private readonly now: () => number;
   private readonly reservations = new Set<Reservation>();
+  /** Approval id -> token of the in-chat form shown for it. */
+  private readonly chatForms = new Map<string, string>();
 
   constructor(private readonly opts: PolicyGateOptions) {
     this.cache = new PolicyCache(opts.home);
@@ -176,14 +181,37 @@ export class PolicyGate {
   }
 
   /**
-   * Decide a pending approval from the caller's own chat form. Only when the
-   * caller's profile allows it, and only for a request that profile opened.
+   * Remember that the approve/deny form for request `id` was shown, and return
+   * the token the answer must carry back. An answer without it was not given
+   * to that form (a client can send an answer with its very first call).
    */
-  decideInChat(id: string, approve: boolean, profile: string): boolean {
+  chatFormShown(id: string): string {
+    const token = randomBytes(24).toString("base64url");
+    this.chatForms.delete(id);
+    this.chatForms.set(id, token);
+    while (this.chatForms.size > MAX_CHAT_FORMS) {
+      const oldest = this.chatForms.keys().next().value as string;
+      this.chatForms.delete(oldest);
+    }
+    return token;
+  }
+
+  /**
+   * Decide a pending approval from the caller's own chat form. Only when the
+   * caller's profile allows it, only for a request that profile opened, and
+   * only as the answer to a form this gate showed (`token` from chatFormShown).
+   */
+  decideInChat(id: string, approve: boolean, profile: string, token: unknown): boolean {
     if (!this.chatApprovalsAllowed(profile)) return false;
+    const shown = this.chatForms.get(id);
+    if (shown === undefined || typeof token !== "string") return false;
+    const a = Buffer.from(shown);
+    const b = Buffer.from(token);
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return false;
     const store = this.opts.approvals;
     const open = store.get(id);
     if (!open || open.status !== "pending" || open.profile !== profile) return false;
+    this.chatForms.delete(id);
     const decided = store.decide(
       id,
       approve ? "approved" : "denied",

@@ -149,7 +149,10 @@ export interface McpServerDeps {
    */
   chatApprovals?: {
     allowed(profile: string): boolean;
-    decide(id: string, approve: boolean, profile: string): boolean;
+    /** The form for request `id` is being shown; returns the token its answer must carry. */
+    formShown(id: string): string;
+    /** `token` is the request state the client echoed with its answer. */
+    decide(id: string, approve: boolean, profile: string, token: unknown): boolean;
   };
 }
 
@@ -163,6 +166,8 @@ interface HandlerCtx {
     _meta?: { progressToken?: string | number; [key: string]: unknown };
     envelope?: Record<string, unknown>;
     inputResponses?: Record<string, unknown>;
+    /** The request state echoed from the previous round (raw: no verify hook is set). */
+    requestState?: () => unknown;
     signal: AbortSignal;
     notify(notification: { method: string; params?: Record<string, unknown> }): Promise<void>;
   };
@@ -596,11 +601,15 @@ export function buildMcpServer(
               },
             }),
           },
+          // The answer counts only with this token: one sent before the form
+          // was shown (or with a made-up one) approves nothing.
+          requestState: chat.formShown(pending.id),
         });
       }
       const decision = formDecision(answer);
       // The id is the one the gate just returned for this call, never one the client sent.
-      if (decision && chat.decide(pending.id, decision === "approve", callerProfile)) {
+      const token = ctx.mcpReq.requestState?.();
+      if (decision && chat.decide(pending.id, decision === "approve", callerProfile, token)) {
         envelope = await call();
       }
     }

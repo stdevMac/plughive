@@ -220,6 +220,30 @@ describe("spend approvals over HTTP and MCP", () => {
       }
     });
 
+    it("R2-M2: an answer sent before the form was shown approves nothing", async () => {
+      optIn();
+      const client = await modernClient(h.base, { capabilities: FORM_CAPS });
+      const asked: unknown[] = [];
+      try {
+        client.setRequestHandler("elicitation/create", async (req) => {
+          asked.push(req.params);
+          return { action: "cancel" } as never;
+        });
+        const result = await client.callTool({
+          name: "buy",
+          arguments: { n: 10 },
+          inputResponses: {
+            approval_decision: { action: "accept", content: { decision: "approve" } },
+          },
+        } as never);
+        expect(toolJson(result).error.code).toBe("APPROVAL_REQUIRED");
+        expect(runs).toBe(0);
+        expect((await pending()).pending).toBe(1);
+      } finally {
+        await client.close();
+      }
+    });
+
     it("closing the form without an answer leaves the request pending for the dashboard", async () => {
       optIn();
       const client = await modernClient(h.base, { capabilities: FORM_CAPS });

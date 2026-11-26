@@ -9,6 +9,7 @@ import {
   createTestContext,
 } from "plughive/pack/testing";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { TelegramClient } from "../../../packs/telegram/client.js";
 import telegramPack from "../../../packs/telegram/index.js";
 import { PackLoader } from "../../../src/core/packs/loader.js";
 import { parseManifest } from "../../../src/core/packs/manifest.js";
@@ -318,6 +319,37 @@ describe("telegram pack: send_telegram", () => {
         fakeCtx({ fetch, settings: { defaultChatId: "1" } }),
       ),
     ).rejects.toThrow("telegram sendMessage -> chat not found");
+  });
+
+  it("scrubs the token from an API error in its raw, URL-encoded and base64 forms", async () => {
+    const token = "123456:AAH-secret_tok";
+    for (const form of [token, encodeURIComponent(token), Buffer.from(token).toString("base64")]) {
+      const fetch = vi.fn(
+        async () => new Response(JSON.stringify({ ok: false, description: `bad bot ${form}` })),
+      );
+      const err = await new TelegramClient(fetch as never, token)
+        .sendMessage("1", "x")
+        .catch((e: Error) => e);
+      expect(String(err)).toContain("bad bot [token]");
+      expect(String(err)).not.toContain("AAH");
+    }
+  });
+
+  it("refuses a response body over 1 MiB instead of reading it whole", async () => {
+    let pulled = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(c) {
+        pulled++;
+        if (pulled > 100) return c.close();
+        c.enqueue(new Uint8Array(64 * 1024).fill(32));
+      },
+    });
+    const fetch = vi.fn(async () => new Response(body));
+    const err = await new TelegramClient(fetch as never, FAKE_TOKEN)
+      .sendMessage("1", "x")
+      .catch((e: Error) => e);
+    expect(String(err)).toContain("telegram sendMessage -> unreadable response");
+    expect(pulled).toBeLessThan(30);
   });
 
   it("runs under the real permission checks: undeclared hosts and secrets are refused", async () => {

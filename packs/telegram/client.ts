@@ -9,6 +9,9 @@ export interface TelegramMessage {
   chat?: { id?: number | string };
 }
 
+/** Telegram answers a send with a small JSON object; anything bigger is refused. */
+const MAX_RESPONSE_BYTES = 1024 * 1024;
+
 export type MediaField = "photo" | "video" | "document";
 
 const METHOD_FOR: Record<MediaField, string> = {
@@ -68,21 +71,50 @@ export class TelegramClient {
       const kind = e instanceof Error && e.name !== "Error" ? ` (${e.name})` : "";
       throw new Error(`telegram ${method} -> request failed${kind}`);
     }
-    if (!r.ok) throw new Error(`telegram ${method} -> ${r.status}`);
+    if (!r.ok) {
+      await r.body?.cancel().catch(() => {});
+      throw new Error(`telegram ${method} -> ${r.status}`);
+    }
     let j: { ok: boolean; description?: string; result?: TelegramMessage };
     try {
-      j = (await r.json()) as typeof j;
+      j = JSON.parse(await readCapped(r, MAX_RESPONSE_BYTES)) as typeof j;
     } catch {
       throw new Error(`telegram ${method} -> unreadable response`);
     }
-    if (!j.ok || !j.result) {
-      const why = String(j.description ?? "unknown")
-        .split(this.token)
-        .join("[token]");
-      throw new Error(`telegram ${method} -> ${why}`);
+    if (!j || !j.ok || !j.result) {
+      throw new Error(`telegram ${method} -> ${this.scrub(String(j?.description ?? "unknown"))}`);
     }
     return j.result;
   }
+
+  /** The token in any form it may be quoted in (raw, URL-encoded, base64) becomes [token]. */
+  private scrub(text: string): string {
+    let out = text;
+    const t = this.token;
+    for (const form of new Set([t, encodeURIComponent(t), Buffer.from(t).toString("base64")])) {
+      if (form) out = out.split(form).join("[token]");
+    }
+    return out.length > 300 ? `${out.slice(0, 300)}...` : out;
+  }
+}
+
+/** The body as text, refused when it is over `max` bytes. */
+async function readCapped(r: Response, max: number): Promise<string> {
+  if (!r.body) return "";
+  const reader = r.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > max) {
+      await reader.cancel().catch(() => {});
+      throw new Error("response too large");
+    }
+    chunks.push(value);
+  }
+  return new TextDecoder().decode(Buffer.concat(chunks));
 }
 
 export function mediaFieldFor(mime: string): MediaField {

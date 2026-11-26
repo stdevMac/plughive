@@ -13,6 +13,7 @@ import { readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { CapabilityError, type PackContext } from "plughive/pack";
 import type { TranscriptSegment } from "./engines.js";
+import { speechLanguageProblem } from "./engines.js";
 import {
   MAX_OUTPUT_SECONDS,
   assertSafePath,
@@ -91,19 +92,30 @@ function hasVtt(tracks: SubTrack[] | undefined): boolean {
 const base = (code: string) => code.toLowerCase().split(/[-_]/)[0] ?? code;
 
 /**
+ * Subtitle keys come from yt-dlp's metadata (untrusted) and the chosen one is
+ * passed to `--sub-langs` argv, so only plain language-code keys are ever
+ * considered: no leading "-", no dots or other regex metacharacters that
+ * could turn the escaped pattern into something else.
+ */
+const SUB_KEY = /^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/;
+
+/**
  * Which subtitle track to fetch: uploaded subtitles in the wanted language,
  * then automatic captions (the original-language track, `xx-orig`, before
  * machine translations). With no language asked for, the video's own
- * language, else English, else the only uploaded track.
+ * language, else English, else the only uploaded track. Keys that are not
+ * plain language codes are ignored (fail closed).
  */
 export function pickSubtitles(
   info: VideoInfo,
   language?: string,
 ): { key: string; auto: boolean; language: string } | null {
   const subs = Object.entries(info.subtitles ?? {}).filter(
-    ([k, v]) => k !== "live_chat" && hasVtt(v),
+    ([k, v]) => k !== "live_chat" && SUB_KEY.test(k) && hasVtt(v),
   );
-  const autos = Object.entries(info.automatic_captions ?? {}).filter(([, v]) => hasVtt(v));
+  const autos = Object.entries(info.automatic_captions ?? {}).filter(
+    ([k, v]) => SUB_KEY.test(k) && hasVtt(v),
+  );
   const wanted = language ? [language] : [info.language, "en"].filter((l): l is string => !!l);
   for (const lang of wanted) {
     const l = lang.toLowerCase();
@@ -354,6 +366,12 @@ async function downloadSubtitles(
   infoPath: string,
   pick: { key: string; auto: boolean },
 ): Promise<string | null> {
+  // The key reached --sub-langs argv: it must be a plain language code.
+  if (!SUB_KEY.test(pick.key)) {
+    throw new Error(
+      `refusing subtitle key ${JSON.stringify(pick.key.slice(0, 80))}: not a plain language code`,
+    );
+  }
   await ytdlp(
     ctx,
     work,
@@ -418,6 +436,12 @@ export async function mediaTranscript(
 ): Promise<MediaTranscriptResult> {
   const verdict = await checkUrl(input.url, { allowLocal: false }, { topLevel: true });
   if (!verdict.ok) throw new Error(`URL refused: ${verdict.reason}`);
+  // The language reaches the speech engines' argv when there are no
+  // subtitles, so refuse anything that is not a plain code up front.
+  if (input.language !== undefined) {
+    const problem = speechLanguageProblem(input.language);
+    if (problem) throw new Error(problem);
+  }
   await requireBinary(ctx, "yt-dlp", HINTS.ytdlp);
   return withWorkDir(ctx, async (work) => {
     const pin = await startPinProxy(pinDecide);

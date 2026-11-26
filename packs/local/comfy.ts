@@ -158,6 +158,39 @@ interface HistoryEntry {
   status?: { status_str?: string; completed?: boolean; messages?: unknown[] };
 }
 
+// biome-ignore lint/suspicious/noControlCharactersInRegex: rejecting control characters is the point
+const OUTPUT_CONTROL = /[\u0000-\u001f\u007f]/;
+
+/**
+ * The output names come from ComfyUI's history (the workflow's nodes decide
+ * them) and are sent to `/view`, whose server side joins them onto the output
+ * folder — so a name with path segments or a leading "-" is refused here
+ * before the request is made. Returns null when both are plain names.
+ */
+export function outputPathProblem(filename: string, subfolder: string): string | null {
+  if (filename.length === 0 || filename.length > 1024)
+    return "the output filename is empty or over 1024 characters";
+  if (
+    /[/\\]/.test(filename) ||
+    filename.startsWith("-") ||
+    OUTPUT_CONTROL.test(filename) ||
+    filename === "." ||
+    filename === ".."
+  ) {
+    return 'the output filename must be a plain name: no slashes, no leading "-", not "." or ".."';
+  }
+  if (subfolder.length > 1024) return "the output subfolder is over 1024 characters";
+  if (/\\/.test(subfolder) || OUTPUT_CONTROL.test(subfolder))
+    return "the output subfolder must not contain backslashes or control characters";
+  if (subfolder !== "") {
+    for (const seg of subfolder.split("/")) {
+      if (seg === "" || seg === "." || seg === ".." || seg.startsWith("-"))
+        return "the output subfolder must be slash-separated plain names (no empty, dot or dot-dot segments, no leading dash)";
+    }
+  }
+  return null;
+}
+
 export function collectOutputs(entry: HistoryEntry): OutputFile[] {
   const files: OutputFile[] = [];
   for (const out of Object.values(entry.outputs ?? {})) {
@@ -166,9 +199,18 @@ export function collectOutputs(entry: HistoryEntry): OutputFile[] {
       for (const f of list) {
         const o = f as Partial<OutputFile>;
         if (typeof o?.filename === "string" && o.type === "output") {
+          const subfolder = typeof o.subfolder === "string" ? o.subfolder : "";
+          // Fail closed: a name that could traverse out of ComfyUI's output
+          // folder on /view refuses the run instead of being fetched.
+          const problem = outputPathProblem(o.filename, subfolder);
+          if (problem) {
+            throw new Error(
+              `refusing a ComfyUI output: ${problem} (filename ${JSON.stringify(o.filename.slice(0, 80))}, subfolder ${JSON.stringify(subfolder.slice(0, 80))})`,
+            );
+          }
           files.push({
             filename: o.filename,
-            subfolder: typeof o.subfolder === "string" ? o.subfolder : "",
+            subfolder,
             type: "output",
           });
         }

@@ -22,6 +22,7 @@ import {
   runHex,
   runParakeet,
   runWhisperx,
+  speechLanguageProblem,
   writeSrt,
 } from "./engines.js";
 import {
@@ -155,6 +156,12 @@ export function whisperArgs(
   assertSafePath(model);
   assertSafePath(wav);
   assertSafePath(outBase);
+  // The language becomes the value of -l: refuse anything that is not a plain
+  // language code before the argv exists (the capability schema is looser).
+  if (language !== undefined) {
+    const problem = speechLanguageProblem(language);
+    if (problem) throw new Error(problem);
+  }
   return [
     "-m",
     model,
@@ -315,6 +322,12 @@ export async function runEngines(
   engines: readonly Engine[],
   input: EngineInput,
 ): Promise<{ result: EngineResult; engine: Engine }> {
+  // Every engine takes the language on its command line (-l / --language),
+  // so it is validated here no matter which caller (tool or capability) set it.
+  if (input.language !== undefined) {
+    const problem = speechLanguageProblem(input.language);
+    if (problem) throw new Error(problem);
+  }
   let lastMissing: unknown;
   for (const engine of engines) {
     throwIfCancelled(ctx);
@@ -361,6 +374,12 @@ export async function transcribe(
   input: TranscribeArgs,
   tool = "local_transcribe",
 ) {
+  // Fail before any work when the language is not a plain code: it reaches
+  // engine argv, and the capability schema (unlike this tool's own) is loose.
+  if (input.language !== undefined) {
+    const problem = speechLanguageProblem(input.language);
+    if (problem) throw new Error(problem);
+  }
   const byModel = engineFromModel(input.model);
   const model = byModel ? undefined : input.model;
   const engines = await planEngines(ctx, {

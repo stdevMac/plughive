@@ -423,12 +423,14 @@ describe("jobs", () => {
   });
 
   it("M4: a job whose handler never appears fails clearly after the grace period", async () => {
-    const q = new JobQueue({ db, concurrency: 1, handlerGraceMs: 80 });
+    // A grace period well above the 30 ms check below: a loaded CI runner can
+    // fire that timer late.
+    const q = new JobQueue({ db, concurrency: 1, handlerGraceMs: 1000 });
     const id = q.enqueue("ghost_tool", {});
     q.startWorker({ intervalMs: 5 });
     await new Promise((r) => setTimeout(r, 30));
     expect(q.get(id)?.status).toBe("queued");
-    await waitFor(() => q.get(id)?.status === "failed", 2000);
+    await waitFor(() => q.get(id)?.status === "failed", 5000);
     q.stopWorker();
     expect(q.get(id)?.error).toBe(
       "no handler is registered for ghost_tool; the pack or feature that runs it is not loaded",

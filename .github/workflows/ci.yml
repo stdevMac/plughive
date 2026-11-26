@@ -43,6 +43,14 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: node-gyp that knows Visual Studio 2026
+        if: runner.os == 'Windows'
+        # better-sqlite3 compiles from source. pnpm 9 bundles node-gyp 10,
+        # which does not recognise the runner's Visual Studio 18.
+        run: |
+          npm install -g node-gyp@13
+          echo "npm_config_node_gyp=$(npm root -g)/node-gyp/bin/node-gyp.js" >> "$GITHUB_ENV"
+
       - name: Install
         run: pnpm install --frozen-lockfile
 

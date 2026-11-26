@@ -880,7 +880,13 @@ export class CapabilityRouter implements HostCapabilities {
   }
 
   private finalError(err: unknown, e: Entry, capability: CapabilityName, ambiguous = false): Error {
-    if (err instanceof CapabilityError || err instanceof MissingSecretError) return err;
+    if (err instanceof MissingSecretError) return err;
+    if (err instanceof CapabilityError) {
+      // Kept as is for its code and flags, but a provider may have put a key
+      // or a signed URL in the text.
+      err.message = this.redact(err.message);
+      return err;
+    }
     const message = this.redact(err instanceof Error ? err.message : String(err));
     const out = new Error(
       `${capability} via ${e.id} failed: ${message}${ambiguous ? ` ${AMBIGUOUS_NOTE}` : ""}`,

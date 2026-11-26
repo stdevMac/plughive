@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { MAX_SECRET_VALUE_LENGTH } from "../../../src/core/http/secret-setup.js";
 import {
   LONG_SECRET_LENGTH,
   MIN_REDACT_LENGTH,
@@ -272,6 +273,14 @@ describe("Redactor review regressions", () => {
       `log ${REDACTED} ${REDACTED} line`,
     );
     expect(r.redactDeep({ a: "b" })).toEqual({ a: "b" });
+  }, 60_000);
+
+  it("R4b: every value the dashboard accepts gets its encoded forms masked", () => {
+    expect(LONG_SECRET_LENGTH).toBeGreaterThanOrEqual(MAX_SECRET_VALUE_LENGTH);
+    const long = `sk-${"q7Z/x+9".repeat(800)}`.slice(0, 6000);
+    const r = make(long);
+    expect(r.redact(`k=${encodeURIComponent(long)}`)).toBe(`k=${REDACTED}`);
+    expect(r.redact(Buffer.from(long).toString("base64"))).toBe(REDACTED);
   }, 60_000);
 
   it("R5: overlapping secrets leave no fragment", () => {

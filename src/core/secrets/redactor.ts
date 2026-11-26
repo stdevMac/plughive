@@ -41,8 +41,12 @@ export const REDACTION_FAILED = "[redaction failed]";
 /** Values shorter than this are not registered: they would shred normal text. */
 export const MIN_REDACT_LENGTH = 6;
 
-/** Above this length only the raw and JSON-escaped forms are matched. */
-export const LONG_SECRET_LENGTH = 4096;
+/**
+ * Above this length only the raw and JSON-escaped forms are matched. Equal to
+ * the longest value the dashboard accepts (MAX_SECRET_VALUE_LENGTH), so every
+ * key a user can save gets the full set of encodings.
+ */
+export const LONG_SECRET_LENGTH = 8192;
 
 /** Minimum length for a derived base64 fragment to be used as a pattern. */
 const MIN_BASE64_FRAGMENT = MIN_REDACT_LENGTH;

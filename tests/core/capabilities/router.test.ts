@@ -512,6 +512,28 @@ describe("CapabilityRouter", () => {
     expect(err.message).toContain("[redacted]");
   });
 
+  it("redacts a CapabilityError's text and keeps its code", async () => {
+    const redacting = new CapabilityRouter({
+      home,
+      logger: silent,
+      redact: (s) => s.replaceAll("fixture-secret", "[redacted]"),
+    });
+    redacting.registerPack("prov", "builtin", [
+      provider("prov", {
+        id: "p",
+        run: () => {
+          throw new CapabilityError("refused key fixture-secret", { code: "PROVIDER_AUTH" });
+        },
+      }),
+    ]);
+    const err = (await redacting
+      .run("image.generate", { prompt: "x" }, {}, caller())
+      .catch((e: unknown) => e)) as CapabilityError;
+    expect(err).toBeInstanceOf(CapabilityError);
+    expect(err.code).toBe("PROVIDER_AUTH");
+    expect(err.message).toBe("refused key [redacted]");
+  });
+
   it("records usage per provider attempt", async () => {
     const usage = { record: vi.fn() };
     const r = new CapabilityRouter({ home, logger: silent, usage });

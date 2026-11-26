@@ -491,6 +491,10 @@ describe("pack context", () => {
     // L3
     it("gives the child exactly the allowlist: PATH, HOME, TMPDIR, XDG, the locale and the pack's env", async () => {
       const saved = { ...process.env };
+      // Start from no locale: CI runners set LC_ALL and friends of their own.
+      for (const k of Object.keys(process.env)) {
+        if (/^(LANG|LC_[A-Z]+)$/.test(k)) Reflect.deleteProperty(process.env, k);
+      }
       process.env.LANG = "de_DE.UTF-8";
       process.env.LC_CTYPE = "de_DE.UTF-8";
       process.env.LC_BAD = "x$(touch y)";

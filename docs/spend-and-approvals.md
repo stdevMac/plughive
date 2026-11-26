@@ -75,7 +75,8 @@ ledger cannot be read, every cap counts as used up.
   default), so with this on, unhinted mounted tools ask.
 - `ask_before_sending` (on by default): ask before tools that reach other
   people: sending an email or SMS, placing a call, posting or deleting a
-  social post, creating or cancelling a booking. These tools are tagged
+  social post, creating or cancelling a booking, publishing or removing a
+  public share link. These tools are tagged
   `sends`. They ask even inside an approved workflow run (that approval
   covers the run's cost, not its messages), so a scheduled workflow that
   sends needs this off for its profile. Turn it off only for a profile you

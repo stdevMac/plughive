@@ -4,6 +4,23 @@ All notable changes are listed here. Versions follow semantic versioning.
 
 ## Unreleased
 
+## 0.1.1
+
+### Fixed
+
+- Windows: files that must not be followed through a symlink (the admin
+  token, CLI artifact downloads, machines state) are now checked on Windows,
+  which has no `O_NOFOLLOW`; a symlink is refused.
+- Windows: a path inside the root written with another spelling of the root
+  (an 8.3 short name or a symlinked prefix) is accepted.
+- `plughive service` and the compile cache build paths for the target
+  platform, not the host's.
+- Capability settings changed twice within the same moment are no longer
+  missed.
+- local: staging a document on Windows works when the old file is read-only,
+  and a staged file the zip check rejects is removed.
+- Tests pass on Windows, so CI checks all three platforms.
+
 ## 0.1.0
 
 The first public release.

@@ -486,6 +486,29 @@ terminal:
     );
   });
 
+  it("D-M16: keeps a # inside a quoted value", () => {
+    expect(
+      getYamlSection('mcp_servers:\n  a:\n    url: "http://x/ #frag"  # note\n', "mcp_servers"),
+    ).toEqual({
+      a: { url: "http://x/ #frag" },
+    });
+  });
+
+  it("D-M16: refuses to splice a section that uses anchors, aliases or merge keys", () => {
+    for (const text of [
+      'mcp_servers:\n  base: &base\n    url: "http://b"\n  other: *base\n',
+      'mcp_servers:\n  other:\n    <<: *base\n    url: "http://o"\n',
+    ]) {
+      write(P, text);
+      expect(() => connectClient("hermes", { ...env(), url: URL1 })).toThrow(ClientConfigError);
+      expect(read(P)).toBe(text);
+    }
+    const quoted = 'mcp_servers:\n  other:\n    url: "http://o/&x*y"  # &not *an alias\n';
+    write(P, quoted);
+    connectClient("hermes", { ...env(), url: URL1 });
+    expect(read(P)).toContain("plughive:");
+  });
+
   it("creates the section, and turns an empty flow mapping into a block", () => {
     write(P, "a: 1\n");
     connectClient("hermes", { ...env(), url: URL1 });

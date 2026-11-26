@@ -69,11 +69,35 @@ function mappingKey(line: string): { key: string; rest: string } | undefined {
   return { key, rest: after.slice(colon[0].length) };
 }
 
-/** The value part after `key:`, without a trailing comment. */
+/** The value part after `key:`, without a trailing comment. A `#` inside quotes is kept. */
 function inlineValue(rest: string): string {
   const trimmed = rest.trim();
   if (trimmed.startsWith("#")) return "";
+  const quoted = trimmed.match(/^(?:"(?:[^"\\]|\\.)*"|'(?:[^']|'')*')/)?.[0];
+  if (quoted) return quoted + trimmed.slice(quoted.length).replace(/\s+#.*$/, "");
   return trimmed.replace(/\s+#.*$/, "");
+}
+
+/**
+ * Refuse to splice a section that uses anchors (`&a`), aliases (`*a`) or
+ * merge keys (`<<:`): moving or removing lines could leave an alias pointing
+ * at nothing. Quoted strings and comments are ignored.
+ */
+function assertNoAnchors(lines: Line[], sec: Section, section: string): void {
+  if (sec.keyLine < 0) return;
+  for (let n = sec.keyLine; n < sec.to; n++) {
+    const l = lines[n] as Line;
+    if (l.indent < 0) continue;
+    const bare = l.text
+      .replace(/\r?\n$/, "")
+      .replace(/(^|[\s:[{,])(?:"(?:[^"\\]|\\.)*"|'(?:[^']|'')*')/g, '$1""')
+      .replace(/(^|\s)#.*$/, "");
+    if (/(^|[\s[{,])[&*][^\s,[\]{}]/.test(bare) || /(^|[\s{,])<<\s*:/.test(bare)) {
+      throw new ClientConfigError(
+        `"${section}" uses YAML anchors, aliases or merge keys (line ${n + 1}); edit this file by hand`,
+      );
+    }
+  }
 }
 
 function isEmptyValue(v: string): boolean {
@@ -309,6 +333,7 @@ export function setYamlEntry(
   entry: Record<string, unknown>,
 ): string {
   const { lines, sec, indent, children } = prepare(text, section);
+  assertNoAnchors(lines, sec, section);
   const nl = eol(text);
   const unit = indent > 0 ? " ".repeat(indent) : "  ";
   const childIndent = indent > 0 ? " ".repeat(indent) : unit;
@@ -343,6 +368,7 @@ export function removeYamlEntry(text: string, section: string, name: string): st
   const { lines, sec, children } = prepare(text, section);
   const existing = children.get(name);
   if (!existing) return text;
+  assertNoAnchors(lines, sec, section);
   const at = (n: number) => (n < lines.length ? (lines[n] as Line).start : text.length);
   const out = text.slice(0, at(existing.from)) + text.slice(at(existing.to));
   if (children.size > 1) return out;

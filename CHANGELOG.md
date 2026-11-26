@@ -4,6 +4,30 @@ All notable changes are listed here. Versions follow semantic versioning.
 
 ## Unreleased
 
+## 0.1.3
+
+### Fixed
+
+- The daemon reports its real version on `/health`, in the MCP handshake and
+  on the dashboard. 0.1.1 and 0.1.2 reported 0.1.0.
+- `pack enable` keeps the secrets a pack already has (`--revoke` drops them).
+- `triggers update` merges `k=v` into the stored arguments (`--replace-args`
+  replaces them); `--args` and `k=v` deep-merge in `tools call` and triggers.
+- `watch` shows job progress and messages; `policy` shows the cap mode and
+  warns about a broken policy file.
+- A failed artifact download no longer leaves a partial file behind.
+- API errors list the daemon's validation issues and show non-JSON error
+  bodies.
+
+### Changed
+
+- `watch` reconnects when the daemon restarts (`--no-reconnect` to exit).
+- `approve`, `secrets unset`, `mounts remove`/`logout` and `smart park`/`apply`
+  with no ids ask first (`-y` to skip).
+- `usage` takes `--since 7d`/`24h` or a date, `--days N` and `--by-day`.
+- `plughive <group> <command> --help` shows the help for that one command.
+- `setup <goal>` is short for `setup plan <goal>`; `api <path>` is a GET.
+
 ## 0.1.2
 
 - npm releases are now published through npm trusted publishing (OIDC from

@@ -43,7 +43,7 @@ export const PROFILES_HELP = `Usage: plughive profiles <command> [options]
 
 A profile decides which tools an agent sees in tools/list (list mode), or a
 small search toolset in their place (search mode), and so how much context
-the tools cost. Agents pick one with ?profile=<id> on the MCP URL.
+the tools cost. Agents use one through its own endpoint, /p/<id>/mcp.
 
 Commands:
   list                    every profile (the default)
@@ -179,7 +179,7 @@ export async function runProfiles(argv: string[], io: CliIo): Promise<number> {
         const id = positionals[0] ?? "";
         await confirm(
           io,
-          `Delete profile ${id}? Agents that use it fall back to the default.`,
+          `Delete profile ${id}? Agents that use /p/${id}/mcp will get an error.`,
           values.yes === true,
         );
         await ctx.api().delete(`/api/profiles/${enc(id)}`);

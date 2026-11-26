@@ -83,7 +83,9 @@ Commands:
       k=v | k:=json ...   the workflow's arguments (or --args JSON|@file|-)
   update <id>             change a trigger: --name, --cron, --tz, --catch-up/--no-catch-up,
                           --use-body/--no-use-body, --callback-url, --telegram,
-                          --no-callback, --args, k=v ...
+                          --no-callback, --args, k=v ... (k=v and --args are merged
+                          into the stored arguments)
+      --replace-args      replace the stored arguments instead of merging
   enable <id>             switch it on
   disable <id>            switch it off
   delete <id>             delete it (-y to skip the question)
@@ -161,10 +163,7 @@ function callbackOf(values: {
 
 function argsOf(values: { args?: string }, pairs: string[]): Record<string, unknown> | undefined {
   if (!values.args && !pairs.length) return undefined;
-  return {
-    ...(values.args ? readJsonObject(values.args, "--args") : {}),
-    ...parseAssignments(pairs),
-  };
+  return parseAssignments(pairs, values.args ? readJsonObject(values.args, "--args") : {});
 }
 
 async function getTrigger(ctx: Ctx, id: string) {
@@ -326,6 +325,7 @@ export async function runTriggers(argv: string[], io: CliIo): Promise<number> {
             "use-body": { type: "boolean" },
             "no-use-body": { type: "boolean" },
             "no-callback": { type: "boolean" },
+            "replace-args": { type: "boolean" },
             ...CALLBACK_OPTIONS,
           },
           { min: 1, max: 1000, usage: "<id> [options] [k=v ...]" },
@@ -334,7 +334,18 @@ export async function runTriggers(argv: string[], io: CliIo): Promise<number> {
         const callback = callbackOf(values);
         if (callback && values["no-callback"])
           throw new CliError("give a callback or --no-callback, not both", EXIT_USAGE);
-        const a = argsOf(values, pairs);
+        // k=v and --args change the stored arguments; --replace-args starts
+        // from nothing instead.
+        let a = argsOf(values, pairs);
+        if (a && !values["replace-args"]) {
+          const { trigger } = await getTrigger(ctx, id);
+          a = parseAssignments(
+            pairs,
+            values.args
+              ? { ...trigger.args, ...readJsonObject(values.args, "--args") }
+              : trigger.args,
+          );
+        }
         const body: Record<string, unknown> = {
           ...(values.name ? { name: values.name } : {}),
           ...(a ? { args: a } : {}),
@@ -429,6 +440,9 @@ export async function runTriggers(argv: string[], io: CliIo): Promise<number> {
           { min: 1, max: 1, usage: "<id>" },
         );
         const id = positionals[0] ?? "";
+        const { trigger: current } = await getTrigger(ctx, id);
+        if (current.kind !== "webhook")
+          throw new CliError(`${id} is a ${current.kind} trigger; only webhooks have a secret`);
         await confirm(
           io,
           "Make a new secret? The old one stops working at once.",

@@ -5,11 +5,11 @@
 //
 // The escape hatch (anything the dashboard can do, through the same /api it
 // uses) and the live feed the dashboard listens to.
-import type { HttpMethod } from "./api.js";
+import { ApiError, type HttpMethod } from "./api.js";
 import { CliError, type CliIo, EXIT_FAIL, EXIT_OK, EXIT_USAGE, jsonText } from "./args.js";
 import { COMMON_HELP, readJsonInput, sub } from "./common.js";
 
-export const API_HELP = `Usage: plughive api <METHOD> <path> [options]
+export const API_HELP = `Usage: plughive api [METHOD] <path> [options]
 
 Calls the daemon's management API with the admin token, as the dashboard
 does, and prints the JSON answer. Exits 1 when the status is 4xx or 5xx.
@@ -22,6 +22,7 @@ does, and prints the JSON answer. Exits 1 when the status is 4xx or 5xx.
 ${COMMON_HELP}
 
 Examples:
+  plughive api /api/info                (a single path is a GET)
   plughive api GET /api/info
   plughive api PUT /api/preferences --data '{"locale":"fr"}'`;
 
@@ -37,12 +38,14 @@ export async function runApi(argv: string[], io: CliIo): Promise<number> {
     argv,
     io,
     { data: { type: "string", short: "d" }, include: { type: "boolean", short: "i" } },
-    { min: 2, max: 2, usage: "<METHOD> <path> [--data JSON]" },
+    { min: 1, max: 2, usage: "[METHOD] <path> [--data JSON]" },
   );
-  const method = (positionals[0] ?? "").toUpperCase();
+  // One argument is a path to GET ("plughive api /api/info").
+  const [first = "", second] = positionals;
+  const method = (second === undefined ? "GET" : first).toUpperCase();
   if (!METHODS.has(method))
-    throw new CliError(`"${positionals[0]}" is not GET, POST, PUT, PATCH or DELETE`, EXIT_USAGE);
-  let path = positionals[1] ?? "";
+    throw new CliError(`"${first}" is not GET, POST, PUT, PATCH or DELETE`, EXIT_USAGE);
+  let path = second ?? first;
   if (!path.startsWith("/")) path = `/${path}`;
   if (!path.startsWith("/api/") && path !== "/api") path = `/api${path}`;
   const body = values.data !== undefined ? readJsonInput(values.data, "--data") : undefined;
@@ -67,6 +70,8 @@ finishing, packs changing state, approvals requested and decided. Stops on
 Ctrl-C.
 
   --only KINDS          job, pack and/or approval, comma-separated
+  --no-reconnect        stop when the daemon goes away (by default it waits
+                        and reconnects; events in between are not replayed)
   --json                one JSON object per line: {"event": ..., "data": ...}
   --home DIR            the plughive home (default ~/.plughive)`;
 
@@ -122,14 +127,19 @@ function describe(f: Frame): string | null {
   const d = f.data as Record<string, unknown>;
   switch (f.event) {
     case "job": {
-      const progress = d.progress as { message?: string; percent?: number } | null | undefined;
+      // jobView: progress is a 0..1 number, message sits beside it.
+      const progress = typeof d.progress === "number" ? d.progress : null;
+      const message = typeof d.message === "string" ? d.message : "";
       const err = d.error as { message?: string } | string | null | undefined;
+      const pctText = progress !== null ? ` (${Math.round(progress * 100)}%)` : "";
       const extra =
         d.status === "failed" && err
           ? `: ${typeof err === "string" ? err : (err.message ?? "")}`
-          : progress?.message
-            ? `: ${progress.message}${progress.percent !== undefined ? ` (${progress.percent}%)` : ""}`
-            : "";
+          : message
+            ? `: ${message}${pctText}`
+            : d.status === "running" && pctText
+              ? pctText
+              : "";
       return `${time}  job       ${d.job_id} ${d.tool ?? ""} ${d.status}${extra}`;
     }
     case "pack":
@@ -146,7 +156,10 @@ export async function runWatch(argv: string[], io: CliIo): Promise<number> {
     io.out(WATCH_HELP);
     return EXIT_OK;
   }
-  const { values, ctx } = sub("watch", argv, io, { only: { type: "string" } });
+  const { values, ctx } = sub("watch", argv, io, {
+    only: { type: "string" },
+    "no-reconnect": { type: "boolean" },
+  });
   const only = values.only ? new Set(values.only.split(",").map((s) => s.trim())) : null;
   if (only) {
     for (const k of only) {
@@ -157,25 +170,64 @@ export async function runWatch(argv: string[], io: CliIo): Promise<number> {
   const controller = new AbortController();
   const stop = () => controller.abort();
   process.once("SIGINT", stop);
+  let delay = 1000;
+  let connected = false;
   try {
-    const res = await ctx.api().stream("/api/events", controller.signal);
-    if (!res.body) throw new CliError("the daemon sent no event stream");
-    if (!ctx.json) io.err("Watching jobs, packs and approvals. Ctrl-C to stop.");
-    for await (const f of sseFrames(res.body)) {
-      if (f.event === "hello") continue;
-      if (only && !only.has(f.event)) continue;
-      if (ctx.json) io.out(jsonText(f));
-      else {
-        const line = describe(f);
-        if (line) io.out(line);
+    for (;;) {
+      try {
+        const res = await ctx.api().stream("/api/events", controller.signal);
+        if (!res.body) throw new CliError("the daemon sent no event stream");
+        if (!ctx.json)
+          io.err(
+            connected ? "Reconnected." : "Watching jobs, packs and approvals. Ctrl-C to stop.",
+          );
+        connected = true;
+        delay = 1000;
+        for await (const f of sseFrames(res.body)) {
+          if (f.event === "hello") continue;
+          if (only && !only.has(f.event)) continue;
+          if (ctx.json) io.out(jsonText(f));
+          else {
+            const line = describe(f);
+            if (line) io.out(line);
+          }
+        }
+        if (values["no-reconnect"]) {
+          io.err("The daemon closed the stream.");
+          return EXIT_FAIL;
+        }
+        io.err("The daemon closed the stream; reconnecting.");
+      } catch (e) {
+        if (controller.signal.aborted) return EXIT_OK;
+        if (values["no-reconnect"] || !connected || !retryable(e)) throw e;
+        io.err(`${e instanceof Error ? e.message : String(e)}; retrying in ${delay / 1000} s.`);
       }
+      if (!(await wait(delay, controller.signal))) return EXIT_OK;
+      delay = Math.min(delay * 2, 30_000);
     }
-    io.err("The daemon closed the stream.");
-    return EXIT_FAIL;
-  } catch (e) {
-    if (controller.signal.aborted) return EXIT_OK;
-    throw e;
   } finally {
     process.off("SIGINT", stop);
   }
+}
+
+/** A dropped stream, an unreachable daemon, a restart (503) or a rate limit. */
+function retryable(e: unknown): boolean {
+  if (e instanceof ApiError) return e.status === 429 || e.status >= 500;
+  return e instanceof CliError || e instanceof TypeError;
+}
+
+/** Sleeps; false when Ctrl-C came first. */
+function wait(ms: number, signal: AbortSignal): Promise<boolean> {
+  return new Promise((done) => {
+    if (signal.aborted) return done(false);
+    const t = setTimeout(() => done(true), ms);
+    signal.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(t);
+        done(false);
+      },
+      { once: true },
+    );
+  });
 }

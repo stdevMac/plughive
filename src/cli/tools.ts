@@ -5,7 +5,7 @@
 // The Playground and Capabilities pages: every tool the daemon serves, its
 // input, and a way to run one exactly as the dashboard does (as the default
 // profile, through the spend policy, queued when it runs long).
-import { ApiError } from "./api.js";
+import { ApiError, issueLines } from "./api.js";
 import { CliError, type CliIo, EXIT_FAIL, EXIT_OK, EXIT_USAGE, jsonText } from "./args.js";
 import {
   COMMON_HELP,
@@ -96,8 +96,10 @@ export function approvalIdOf(e: ApiError): string | null {
 async function call(ctx: Ctx, name: string, pairs: string[], values: Record<string, unknown>) {
   const io = ctx.io;
   const args = {
-    ...(typeof values.args === "string" ? readJsonObject(values.args, "--args") : {}),
-    ...parseAssignments(pairs),
+    ...parseAssignments(
+      pairs,
+      typeof values.args === "string" ? readJsonObject(values.args, "--args") : {},
+    ),
   };
   const background = values.background === true;
   const headers: Record<string, string> = {};
@@ -114,10 +116,9 @@ async function call(ctx: Ctx, name: string, pairs: string[], values: Record<stri
       );
   } catch (e) {
     if (!(e instanceof ApiError)) throw e;
-    const err = (e.body as { error?: { issues?: { path: string; message: string }[] } } | null)
-      ?.error;
-    if (e.code === "INVALID_ARGUMENTS" && err?.issues?.length) {
-      const lines = err.issues.map((i) => `  ${i.path || "(arguments)"}: ${i.message}`);
+    const err = (e.body as { error?: { issues?: unknown } } | null)?.error;
+    const lines = issueLines(err?.issues);
+    if (e.code === "INVALID_ARGUMENTS" && lines.length) {
       throw new CliError(
         `the arguments are not valid for ${name}:\n${lines.join("\n")}\nRun "plughive tools show ${name}" for its arguments.`,
         EXIT_USAGE,

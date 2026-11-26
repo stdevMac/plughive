@@ -105,7 +105,8 @@ async function install(
   const force = values.force ? { force: true } : {};
   let start = (await ctx.api().post<{ result: InstallStart }>(path, force)).result;
   if (start.status === "approval_required") {
-    io.err(`${start.message} (${start.size_mb} MB, ${start.license})`);
+    // The daemon's message points at the dashboard; here the question is ours.
+    io.err(`${id} is ${start.size_mb} MB, licence ${start.license}.`);
     await confirm(io, "Install it?", values.yes === true);
     start = (await ctx.api().post<{ result: InstallStart }>(path, { ...force, approve: true }))
       .result;
@@ -261,6 +262,8 @@ interface PlanOption {
   needs_approval?: boolean;
   needs: string;
   pack?: string;
+  install?: string[];
+  pack_enabled?: boolean;
 }
 
 interface SetupPlan {
@@ -286,21 +289,38 @@ with the free and local options first.
 Commands:
   goals                 the goals it knows (the default)
   plan <goal>           the steps for a goal: done or not, and how to do each
+  <goal>                the same as "plan <goal>"
                         (the goal is an id, a title or a few words)
 
 ${COMMON_HELP}`;
 
 /** The CLI command that does what an option's `how` describes, when there is one. */
 function cliHint(o: PlanOption): string | null {
-  if (o.needs === "install") return `plughive software install ${o.id}`;
-  if (o.needs === "key" && o.pack) return `plughive secrets set ${o.pack} ${o.id}`;
+  if (o.needs === "install") {
+    // Every part still missing (a program and its model), or the daemon's
+    // words when it is installed by hand (a download page, apt).
+    const ids = o.install ?? (o.how.tool === "install_software" ? [o.id] : []);
+    return ids.length ? ids.map((id) => `plughive software install ${id}`).join(" && ") : null;
+  }
+  if (o.needs === "key" && o.pack) {
+    const set = `plughive secrets set ${o.pack} ${o.id}`;
+    return o.pack_enabled === false
+      ? `${set} && plughive pack enable ${o.pack} --grant ${o.id}`
+      : set;
+  }
   if (o.needs === "enable_pack") return `plughive pack enable ${o.id}`;
   if (o.needs === "login")
     return `plughive mounts show ${o.id}  (then "mounts enable" or "mounts login")`;
   return null;
 }
 
-export async function runSetup(argv: string[], io: CliIo): Promise<number> {
+export async function runSetup(input: string[], io: CliIo): Promise<number> {
+  // "plughive setup make music" is "plughive setup plan make music".
+  const first = input[0];
+  const argv =
+    first !== undefined && !first.startsWith("-") && !["goals", "plan", "help"].includes(first)
+      ? ["plan", ...input]
+      : input;
   return runGroup(
     "setup",
     SETUP_HELP,

@@ -10,6 +10,7 @@ import {
   COMMON_HELP,
   type Ctx,
   ago,
+  confirm,
   enc,
   printFields,
   printTable,
@@ -60,18 +61,20 @@ Commands:
                           "plughive secrets set user NAME".
   enable <owner/id>       switch a mount on
   disable <owner/id>      switch it off
-  remove <id>             delete one of your own mounts (user/<id>)
+  remove <id>             delete one of your own mounts (user/<id>); asks first
+                          (-y to skip)
   login <owner/id>        OAuth sign-in: opens the vendor's page and waits
       --no-open           print the link instead of opening a browser
       --timeout SEC       how long to wait for the sign-in (default 300)
-  logout <owner/id>       forget the sign-in
+  logout <owner/id>       forget the sign-in; asks first (-y to skip)
   smart                   smart mount: idle mounts, suggestions, token savings
   smart set [mode=off|suggest|auto] [idleDays=N] [wake=auto|ask]
             [--keep owner/id ...] [--no-keep]
                           change its settings
   smart park [owner/id ...]
-                          park these mounts (or every park suggestion)
-  smart apply [KEY ...]   apply these suggestions (or every one)
+                          park these mounts (or, after asking, every park
+                          suggestion; -y to skip the question)
+  smart apply [KEY ...]   apply these suggestions (or, after asking, every one)
   smart undo KEY ...      undo applied profile changes
 
 <owner> is the pack that declares the mount, or "user" for your own.
@@ -267,19 +270,40 @@ async function smart(args: string[], io: CliIo): Promise<number> {
       return EXIT_OK;
     }
     case "park": {
-      const { positionals, ctx } = sub("mounts smart park", rest, io, {}, { max: 64 });
+      const { values, positionals, ctx } = sub(
+        "mounts smart park",
+        rest,
+        io,
+        { yes: { type: "boolean", short: "y" } },
+        { max: 64 },
+      );
+      if (!positionals.length)
+        await confirm(io, "Park every mount smart mount suggests?", values.yes === true);
       const body = await ctx
         .api()
-        .post<{ parked?: string[] }>(
+        .post<{ parked?: string[]; skipped?: string[] }>(
           "/api/mounts/smart/park",
           positionals.length ? { ids: positionals } : {},
         );
       if (ctx.json) ctx.printJson(body);
-      else io.out(body.parked?.length ? `Parked ${body.parked.join(", ")}.` : "Nothing to park.");
-      return EXIT_OK;
+      else {
+        io.out(body.parked?.length ? `Parked ${body.parked.join(", ")}.` : "Nothing to park.");
+        if (body.skipped?.length)
+          io.err(`Not parked (unknown, off, or already parked): ${body.skipped.join(", ")}`);
+      }
+      // Asked for named mounts and none of them could be parked.
+      return positionals.length && !body.parked?.length ? EXIT_FAIL : EXIT_OK;
     }
     case "apply": {
-      const { positionals, ctx } = sub("mounts smart apply", rest, io, {}, { max: 64 });
+      const { values, positionals, ctx } = sub(
+        "mounts smart apply",
+        rest,
+        io,
+        { yes: { type: "boolean", short: "y" } },
+        { max: 64 },
+      );
+      if (!positionals.length)
+        await confirm(io, "Apply every smart mount suggestion?", values.yes === true);
       const body = await ctx
         .api()
         .post<Record<string, unknown>>(
@@ -374,14 +398,15 @@ export async function runMounts(argv: string[], io: CliIo): Promise<number> {
       enable: async (args) => toggle("enable", args, io),
       disable: async (args) => toggle("disable", args, io),
       remove: async (args) => {
-        const { positionals, ctx } = sub(
+        const { values, positionals, ctx } = sub(
           "mounts remove",
           args,
           io,
-          {},
-          { min: 1, max: 1, usage: "<id>" },
+          { yes: { type: "boolean", short: "y" } },
+          { min: 1, max: 1, usage: "<id> [--yes]" },
         );
         const id = (positionals[0] ?? "").replace(/^user\//, "");
+        await confirm(io, `Delete the mount user/${id}?`, values.yes === true);
         const body = await ctx.api().delete<{ removed: string }>(`/api/mounts/user/${enc(id)}`);
         if (ctx.json) ctx.printJson(body);
         else io.out(`Removed ${body.removed}.`);
@@ -428,12 +453,17 @@ export async function runMounts(argv: string[], io: CliIo): Promise<number> {
         return EXIT_FAIL;
       },
       logout: async (args) => {
-        const { positionals, ctx } = sub(
+        const { values, positionals, ctx } = sub(
           "mounts logout",
           args,
           io,
-          {},
-          { min: 1, max: 1, usage: "<owner/id>" },
+          { yes: { type: "boolean", short: "y" } },
+          { min: 1, max: 1, usage: "<owner/id> [--yes]" },
+        );
+        await confirm(
+          io,
+          `Forget the sign-in for ${positionals[0]}? You will have to sign in again.`,
+          values.yes === true,
         );
         const body = await ctx
           .api()

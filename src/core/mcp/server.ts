@@ -17,6 +17,7 @@ import {
   inputRequired,
 } from "@modelcontextprotocol/server";
 import { z } from "zod";
+import { packageVersion } from "../../lib/version.js";
 import { type Exposure, LIST_ALL_PROFILE, type Profile, resolveExposure } from "../profiles.js";
 import {
   NOT_SERIALISABLE_MESSAGE,
@@ -57,7 +58,7 @@ import {
 
 export type { RequestScope } from "./scope.js";
 
-export const SERVER_INFO = { name: "plughive", version: "0.1.0" } as const;
+export const SERVER_INFO = { name: "plughive", version: packageVersion() } as const;
 /** A tools/call result text larger than this is cut, with a notice. */
 export const MAX_RESULT_TEXT_BYTES = 1024 * 1024;
 const RESULT_PREVIEW_CHARS = 100_000;

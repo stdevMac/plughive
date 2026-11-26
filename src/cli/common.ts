@@ -79,7 +79,7 @@ export async function runGroup(
   if (sub === undefined || sub.startsWith("-")) {
     if (defaultSub === undefined) {
       io.out(help);
-      return sub === undefined ? EXIT_USAGE : EXIT_USAGE;
+      return EXIT_USAGE;
     }
     sub = defaultSub;
     rest = argv;
@@ -92,10 +92,32 @@ export async function runGroup(
     );
   }
   if (rest.includes("--help") || rest.includes("-h")) {
-    io.out(help);
+    io.out(subHelp(group, help, sub));
     return EXIT_OK;
   }
   return handler(rest, io);
+}
+
+/**
+ * The lines of a group's help about one sub-command: each "  <sub> ..." line
+ * of the Commands list with the more indented lines under it. The whole help
+ * when the list does not name it.
+ */
+export function subHelp(group: string, help: string, name: string): string {
+  const lines = help.split("\n");
+  const start = lines.findIndex((l) => l.trim() === "Commands:");
+  if (start < 0) return help;
+  const picked: string[] = [];
+  let inside = false;
+  for (const line of lines.slice(start + 1)) {
+    if (line.trim() === "") continue;
+    if (!line.startsWith(" ")) break; // the end of the Commands list
+    const head = /^ {2}(\S+)/.exec(line);
+    if (head) inside = head[1] === name;
+    if (inside) picked.push(line);
+  }
+  if (!picked.length) return help;
+  return `Usage: plughive ${group} ${name} [options]\n\n${picked.join("\n")}\n\n${COMMON_HELP}\n\nRun "plughive ${group} --help" for every command.`;
 }
 
 /**
@@ -297,10 +319,14 @@ export function assertSafeKey(key: string): void {
 /**
  * `key=value` pairs into an object. `key=value` is a string, `key:=json` a
  * JSON value (number, boolean, array, object, null). Dotted keys nest:
- * `a.b=1` gives {a: {b: "1"}}.
+ * `a.b=1` gives {a: {b: "1"}}. Pairs are merged into a copy of `base`, so
+ * `a.b=1` over {a: {c: 2}} gives {a: {c: 2, b: "1"}}.
  */
-export function parseAssignments(pairs: string[]): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
+export function parseAssignments(
+  pairs: string[],
+  base: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const out: Record<string, unknown> = structuredClone(base);
   for (const pair of pairs) {
     const m = /^([^=:]+?)(:?)=(.*)$/s.exec(pair);
     if (!m) {

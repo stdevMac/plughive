@@ -5,11 +5,11 @@
 // sets the global fetch dispatcher before anything else can call fetch().
 import "./lib/network.js";
 
-import { existsSync, readFileSync, realpathSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { CliError, type CliIo, EXIT_OK, EXIT_USAGE, processIo, safeIo } from "./cli/args.js";
 import { enablePrivateCompileCache } from "./lib/compile-cache.js";
+import { packageVersion } from "./lib/version.js";
 
 export const MAIN_HELP = `Usage: plughive [command] [options]
 
@@ -20,7 +20,7 @@ Commands:
   dashboard     open the dashboard, signed in (--print to print the link)
   doctor        check that this machine can run the daemon
   status        show whether the daemon runs, with pack and tool counts
-  pack          packs: list, show, consent, enable, disable, settings, add, remove
+  pack          packs: list, show, consent, enable, disable, reload, settings, add, remove
   cursor-link   print a link that adds the daemon to Cursor
   clients       list MCP clients on this computer and their state
   connect       add the daemon to a client (claude-code, cursor, codex, ...)
@@ -29,7 +29,7 @@ Commands:
 
 What the dashboard shows and does (the daemon must run):
   tools         list, show and call tools (the Playground)
-  jobs          list, follow, wait for and cancel background jobs
+  jobs          list, show, wait for and cancel background jobs
   artifacts     list, download and delete generated files (the Library)
   approvals     pending spend requests: approve or deny them
   policy        spend caps and approval rules
@@ -51,26 +51,7 @@ Settings come from environment variables (PLUGHIVE_PORT, PLUGHIVE_HOME,
 PLUGHIVE_ACCESS_KEY, ...). The CLI does not read a .env file; use
 "node --env-file=.env" or export the variables. See docs/configuration.md.`;
 
-/** The version in the package.json next to this file (src/ or dist/src/). */
-export function packageVersion(): string {
-  let dir = dirname(fileURLToPath(import.meta.url));
-  for (let i = 0; i < 4; i++) {
-    const candidate = join(dir, "package.json");
-    if (existsSync(candidate)) {
-      try {
-        const pkg = JSON.parse(readFileSync(candidate, "utf8")) as {
-          name?: string;
-          version?: string;
-        };
-        if (pkg.name === "plughive" && pkg.version) return pkg.version;
-      } catch {
-        // Keep looking.
-      }
-    }
-    dir = dirname(dir);
-  }
-  return "unknown";
-}
+export { packageVersion };
 
 /**
  * Runs one command. Resolves the exit code, or null when the command keeps

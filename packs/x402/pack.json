@@ -45,7 +45,7 @@
         "type": "array",
         "items": { "type": "string" },
         "title": "Allowed hosts",
-        "description": "Optional: only pay these hosts (api.example.com or *.example.com). Empty means any https host.",
+        "description": "Optional: only pay these hosts (api.example.com or *.example.com). Empty means any https host, but x402_quote then sends no extra headers.",
         "default": []
       }
     }

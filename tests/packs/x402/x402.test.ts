@@ -428,6 +428,25 @@ describe("x402 pack", () => {
 });
 
 describe("x402 hardening", () => {
+  it("x402_quote sends caller headers only when allowedHosts is set and matches (R2-M4)", async () => {
+    const seen: Seen = { payloads: [] };
+    const fetch = v2Server([option()], seen);
+    const open = setup(fetch, {}, "x402_quote");
+    await expect(open.call({ url: URL_, headers: { "x-api-key": "k" } })).rejects.toThrow(
+      /set allowedHosts/,
+    );
+    expect(fetch.calls).toHaveLength(0);
+    // A plain quote stays open, like fetch_web.
+    expect(((await open.call({ url: URL_ })) as any).payment_required).toBe(true);
+    const listed = setup(fetch, { allowedHosts: ["api.paid.test"] }, "x402_quote");
+    await listed.call({ url: URL_, headers: { "x-api-key": "k" } });
+    expect(fetch.calls.at(-1)!.headers["x-api-key"]).toBe("k");
+    const other = setup(fetch, { allowedHosts: ["other.test"] }, "x402_quote");
+    await expect(other.call({ url: URL_, headers: { "x-api-key": "k" } })).rejects.toThrow(
+      /not in this pack's allowed hosts/,
+    );
+  });
+
   it("x402_quote accepts only GET/HEAD and no body (a quote must not mutate)", () => {
     const q = toolOf(x402Pack, "x402_quote");
     expect(q.input.safeParse({ url: URL_ }).success).toBe(true);

@@ -127,9 +127,26 @@ export function sub<O extends Options>(
 
 // ---- output ----------------------------------------------------------------
 
+/**
+ * Text from the daemon (pack manifests, tool descriptions, error messages)
+ * without control characters, so an escape sequence in it cannot move the
+ * cursor, recolour or rewrite what the terminal shows. Newlines and tabs stay.
+ */
+export function clean(text: string): string {
+  let out = "";
+  for (const ch of text) {
+    const c = ch.charCodeAt(0);
+    if (ch === "\n" || ch === "\t" || (c >= 0x20 && c !== 0x7f && (c < 0x80 || c > 0x9f)))
+      out += ch;
+  }
+  return out;
+}
+
 /** A left-aligned table with a header row; empty cells for null/undefined. */
 export function printTable(io: CliIo, head: string[], rows: unknown[][]): void {
-  const cells = rows.map((r) => r.map((c) => (c === null || c === undefined ? "" : String(c))));
+  const cells = rows.map((r) =>
+    r.map((c) => (c === null || c === undefined ? "" : clean(String(c)).replace(/[\n\t]/g, " "))),
+  );
   const widths = head.map((h, i) => Math.max(h.length, ...cells.map((r) => (r[i] ?? "").length)));
   const line = (r: string[]) =>
     r
@@ -145,7 +162,7 @@ export function printFields(io: CliIo, fields: [string, unknown][]): void {
   const shown = fields.filter(([, v]) => v !== null && v !== undefined && v !== "");
   const width = Math.max(0, ...shown.map(([k]) => k.length));
   for (const [k, v] of shown) {
-    const text = typeof v === "object" ? JSON.stringify(v) : String(v);
+    const text = clean(typeof v === "object" ? JSON.stringify(v) : String(v));
     io.out(`${`${k}:`.padEnd(width + 2)}${text}`);
   }
 }

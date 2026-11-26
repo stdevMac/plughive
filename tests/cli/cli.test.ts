@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runCli } from "../../src/cli.js";
 import type { CliIo } from "../../src/cli/args.js";
+import { clean } from "../../src/cli/common.js";
 import { runConnect } from "../../src/cli/connect.js";
 import { cursorDeeplink, cursorServerConfig } from "../../src/cli/cursor-link.js";
 import { checkHome, checkNode, checkPort } from "../../src/cli/doctor.js";
@@ -686,5 +687,13 @@ describe("sseFrames", () => {
       { event: "job", data: { job_id: "j1" } },
       { event: "pack", data: { id: "media" } },
     ]);
+  });
+});
+
+describe("clean", () => {
+  it("drops escape sequences' control characters but keeps newlines and tabs", () => {
+    expect(clean("ok\u001b[2K\u001b[1Arewritten\u009b\u0007\tend\n")).toBe(
+      "ok[2K[1Arewritten\tend\n",
+    );
   });
 });

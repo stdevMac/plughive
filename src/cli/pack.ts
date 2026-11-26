@@ -30,6 +30,7 @@ import {
   COMMON_HELP,
   COMMON_OPTIONS,
   type Ctx,
+  clean,
   confirm,
   enc,
   homeEnv,
@@ -273,6 +274,8 @@ interface ConsentView {
     granted: boolean;
     grantable: boolean;
     stored: boolean;
+    declaredBy?: string[];
+    warnings?: string[];
   }[];
   manifestHash: string;
   entryHash: string;
@@ -287,17 +290,21 @@ async function findPack(ctx: Ctx, id: string): Promise<PackView> {
 }
 
 function printConsent(io: CliIo, c: ConsentView): void {
-  io.out(`${c.name} ${c.version} (${c.id}, ${c.source} pack) asks for:`);
+  // Everything here comes from the pack's own manifest: strip control
+  // characters so it cannot rewrite the consent text on screen.
+  const out = (line: string) => io.out(clean(line));
+  out(`${c.name} ${c.version} (${c.id}, ${c.source} pack) asks for:`);
   for (const item of c.items) {
-    io.out(`  ${item.risk === "high" ? "[high-risk] " : ""}${item.text}`);
+    out(`  ${item.risk === "high" ? "[high-risk] " : ""}${item.text}`);
   }
-  if (!c.items.length) io.out("  nothing");
+  if (!c.items.length) out("  nothing");
+  if (c.highRisk) out("\nSome of what it asks for is high-risk (marked above).");
   if (c.runsCode) {
-    io.out("\nThis pack ships code. It runs inside the daemon with your user's rights;");
-    io.out("the items above are what the daemon mediates, not a sandbox.");
+    out("\nThis pack ships code. It runs inside the daemon with your user's rights;");
+    out("the items above are what the daemon mediates, not a sandbox.");
   }
   if (c.secrets.length) {
-    io.out("\nSecrets it can be granted (--grant NAME):");
+    out("\nSecrets it can be granted (--grant NAME):");
     for (const s of c.secrets) {
       const notes = [
         s.required ? "required" : "optional",
@@ -305,10 +312,11 @@ function printConsent(io: CliIo, c: ConsentView): void {
         s.stored ? "a value is stored" : null,
         s.grantable ? null : "cannot be granted to this pack",
       ].filter(Boolean);
-      io.out(`  ${s.name}${s.label ? ` (${s.label})` : ""}: ${notes.join(", ")}`);
+      out(`  ${s.name}${s.label ? ` (${s.label})` : ""}: ${notes.join(", ")}`);
+      for (const w of s.warnings ?? []) out(`    [high-risk] ${w}`);
     }
   }
-  if (c.review) io.out("\nThe pack changed since you last enabled it; review it again.");
+  if (c.review) out("\nThe pack changed since you last enabled it; review it again.");
 }
 
 async function packSub(
@@ -387,7 +395,14 @@ async function packSub(
         if (!s.grantable) throw new CliError(`${g} cannot be granted to ${id}`, EXIT_USAGE);
       }
       if (!ctx.json || !values.yes) printConsent(ctx.json ? { ...io, out: io.err } : io, consent);
-      if (grants.length) io.err(`\nGranting: ${grants.join(", ")}`);
+      if (grants.length) {
+        io.err(`\nGranting: ${grants.join(", ")}`);
+        // Shown even with --yes: a grant can hand this pack another pack's key.
+        for (const g of grants) {
+          for (const w of consent.secrets.find((x) => x.name === g)?.warnings ?? [])
+            io.err(clean(`  [high-risk] ${w}`));
+        }
+      }
       await confirm(io, `\nEnable ${id}?`, values.yes === true);
       const { pack } = await ctx
         .api()

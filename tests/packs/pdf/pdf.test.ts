@@ -138,7 +138,7 @@ describe("pandoc hardening", () => {
       shell_escape: "f",
       TMPDIR: "/d/work/x",
       TEXMFOUTPUT: "/d/work/x",
-      TEXMFHOME: "/d/texmf/home",
+      TEXMFHOME: join("/d/texmf", "home"),
     });
   });
 });

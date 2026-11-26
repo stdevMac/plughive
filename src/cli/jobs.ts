@@ -5,10 +5,11 @@
 //   plughive usage [--since DATE]
 //
 // The Jobs, Library and Usage pages of the dashboard, through the same /api.
-import { constants, closeSync, createWriteStream, openSync } from "node:fs";
+import { constants, closeSync, createWriteStream } from "node:fs";
 import { basename, resolve } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import { openSyncNoFollow } from "../lib/platform.js";
 import { daemonTarget } from "./api.js";
 import { CliError, type CliIo, EXIT_FAIL, EXIT_OK, EXIT_USAGE, jsonText } from "./args.js";
 import {
@@ -386,12 +387,12 @@ export async function runArtifacts(argv: string[], io: CliIo): Promise<number> {
         }
         // O_NOFOLLOW: a symlink planted at the destination is refused, not
         // followed, even with --force.
-        const { O_WRONLY, O_CREAT, O_EXCL, O_TRUNC, O_NOFOLLOW } = constants;
+        const { O_WRONLY, O_CREAT, O_EXCL, O_TRUNC } = constants;
         let fd: number;
         try {
-          fd = openSync(
+          fd = openSyncNoFollow(
             dest,
-            O_WRONLY | O_CREAT | O_NOFOLLOW | (values.force ? O_TRUNC : O_EXCL),
+            O_WRONLY | O_CREAT | (values.force ? O_TRUNC : O_EXCL),
             0o644,
           );
         } catch (e) {

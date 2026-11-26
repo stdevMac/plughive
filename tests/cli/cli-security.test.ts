@@ -23,6 +23,7 @@ import { runConnect } from "../../src/cli/connect.js";
 import { redactUrl } from "../../src/cli/pack.js";
 import { sseFrames } from "../../src/cli/raw.js";
 import { loadOrCreateAdminToken } from "../../src/lib/admin-token.js";
+import { itPosix } from "../support/platform.js";
 
 interface Captured extends CliIo {
   stdout: string[];
@@ -98,10 +99,14 @@ describe("prototype pollution", () => {
 });
 
 describe("bounded input", () => {
-  it("refuses a FIFO and a file over the cap for @file", () => {
+  // FIFOs are POSIX-only (Git for Windows' mkfifo makes no real one).
+  itPosix("refuses a FIFO for @file", () => {
     const fifo = join(home, "fifo");
     execFileSync("mkfifo", [fifo]);
     expect(() => readJsonInput(`@${fifo}`, "--data")).toThrow(/not a regular file/);
+  });
+
+  it("refuses a file over the cap for @file", () => {
     const big = join(home, "big.json");
     writeFileSync(big, `"${"x".repeat(MAX_INPUT_BYTES)}"`);
     expect(() => readJsonInput(`@${big}`, "--data")).toThrow(/larger than/);
@@ -302,7 +307,7 @@ describe("pack add validation", () => {
   const env = () => ({ PLUGHIVE_HOME: join(home, "data"), PLUGHIVE_PORT: "1" });
   const dest = () => join(home, "data", "packs", "demo-pack");
 
-  it("refuses a FIFO in the pack and leaves nothing behind", async () => {
+  itPosix("refuses a FIFO in the pack and leaves nothing behind", async () => {
     const src = join(home, "src");
     writePack(src);
     execFileSync("mkfifo", [join(src, "pipe")]);

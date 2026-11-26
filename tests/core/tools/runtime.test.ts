@@ -82,7 +82,7 @@ describe("createPackRuntime", () => {
   };
 
   beforeEach(() => {
-    tmp = realpathSync(mkdtempSync(join(tmpdir(), "plughive-runtime-")));
+    tmp = realpathSync.native(mkdtempSync(join(tmpdir(), "plughive-runtime-")));
     builtinDir = join(tmp, "builtin");
     mkdirSync(builtinDir, { recursive: true });
     library = new Library({ root: tmp, baseUrl: "http://127.0.0.1:0" });

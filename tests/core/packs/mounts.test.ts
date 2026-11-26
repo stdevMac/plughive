@@ -98,7 +98,7 @@ describe("built-in media and mounts packs", () => {
     new PackLoader({ home, registry, host, userDir, capabilities, ...extra });
 
   beforeEach(() => {
-    tmp = realpathSync(mkdtempSync(join(tmpdir(), "plughive-mounts-")));
+    tmp = realpathSync.native(mkdtempSync(join(tmpdir(), "plughive-mounts-")));
     home = join(tmp, "home");
     userDir = join(home, "packs");
     mkdirSync(userDir, { recursive: true });

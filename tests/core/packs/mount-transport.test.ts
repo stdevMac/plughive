@@ -232,7 +232,7 @@ createInterface({ input: process.stdin }).on("line", (line) => {
 
 describe("PackMounts result size", () => {
   it("refuses a stdio tool result larger than the http response cap", async () => {
-    const dir = realpathSync(mkdtempSync(join(tmpdir(), "plughive-bigmount-")));
+    const dir = realpathSync.native(mkdtempSync(join(tmpdir(), "plughive-bigmount-")));
     try {
       const script = join(dir, "server.mjs");
       writeFileSync(script, BIG_SERVER);

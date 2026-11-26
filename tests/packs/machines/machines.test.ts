@@ -76,7 +76,7 @@ let remoteDir: string;
 let savedPath: string | undefined;
 
 beforeAll(() => {
-  root = realpathSync(mkdtempSync(join(tmpdir(), "machines-pack-")));
+  root = realpathSync.native(mkdtempSync(join(tmpdir(), "machines-pack-")));
   binDir = join(root, "bin");
   remoteDir = join(root, "remote");
   mkdirSync(binDir);
@@ -194,7 +194,7 @@ describe.skipIf(process.platform === "win32")("machines pack", () => {
     });
 
   beforeEach(async () => {
-    tmp = realpathSync(mkdtempSync(join(tmpdir(), "machines-home-")));
+    tmp = realpathSync.native(mkdtempSync(join(tmpdir(), "machines-home-")));
     home = join(tmp, "home");
     mkdirSync(join(tmp, "lib"));
     library = memoryLibrary(join(tmp, "lib"));

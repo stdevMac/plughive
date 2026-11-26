@@ -63,7 +63,7 @@ describe("core built-in tools", () => {
     rt.registry.call("import_artifact", { source_path, kind });
 
   beforeEach(() => {
-    tmp = realpathSync(mkdtempSync(join(tmpdir(), "plughive-builtin-")));
+    tmp = realpathSync.native(mkdtempSync(join(tmpdir(), "plughive-builtin-")));
     root = join(tmp, "imports");
     outside = join(tmp, "imports-private");
     mkdirSync(join(root, "sub"), { recursive: true });

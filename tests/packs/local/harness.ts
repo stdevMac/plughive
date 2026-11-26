@@ -8,6 +8,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -93,7 +94,7 @@ export function makeEnv(
     signal?: AbortSignal;
   } = {},
 ): Env {
-  const dir = mkdtempSync(join(tmpdir(), "local-pack-test-"));
+  const dir = realpathSync.native(mkdtempSync(join(tmpdir(), "local-pack-test-")));
   const dataDir = join(dir, "data");
   const libDir = join(dir, "lib");
   mkdirSync(dataDir, { recursive: true });

@@ -320,7 +320,7 @@ export const FIXTURE_SECRETS = {
 
 /** The real PackLoader over a temp builtin dir with the mock packs and the bundled workflows. */
 export async function bootLoader(opts: LoaderOptions = {}): Promise<LoaderHarness> {
-  const dir = realpathSync(mkdtempSync(join(tmpdir(), "plughive-wf-")));
+  const dir = realpathSync.native(mkdtempSync(join(tmpdir(), "plughive-wf-")));
   const builtinDir = join(dir, "builtin");
   mkdirSync(builtinDir, { recursive: true });
   for (const id of opts.packs ?? Object.keys(MOCK_PACKS)) {

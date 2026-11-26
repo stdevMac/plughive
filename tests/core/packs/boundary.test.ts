@@ -58,8 +58,8 @@ function codeFiles(dir: string): string[] {
 
 describe("pack boundary", () => {
   it("the checker catches violations", () => {
-    const dir = "/repo/packs/demo";
-    const file = `${dir}/index.ts`;
+    const dir = resolve("/repo/packs/demo");
+    const file = join(dir, "index.ts");
     const bad = [
       'import { Library } from "../../src/lib/library.js";',
       'import x from "execa";',

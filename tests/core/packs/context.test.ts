@@ -32,7 +32,24 @@ import { ManifestError, parseManifest } from "../../../src/core/packs/manifest.j
 import { createMemoryLibrary } from "../../../src/core/packs/testing.js";
 import { MissingSecretError, createSecretStore } from "../../../src/core/secrets/index.js";
 import type { CallContext, ToolEnvelope } from "../../../src/core/tools/registry.js";
-import { canSymlink, expectMode, itSymlink } from "../../support/platform.js";
+import { homeEnv, systemChildEnv } from "../../../src/lib/platform.js";
+import { IS_WINDOWS, canSymlink, expectMode, itSymlink } from "../../support/platform.js";
+
+// libuv copies these into every Windows child's environment block, from the
+// parent, when the env the caller passed lacks them (uv_spawn "required vars").
+const LIBUV_REQUIRED_ENV = [
+  "HOMEDRIVE",
+  "HOMEPATH",
+  "LOGONSERVER",
+  "PATH",
+  "SYSTEMDRIVE",
+  "SYSTEMROOT",
+  "TEMP",
+  "USERDOMAIN",
+  "USERNAME",
+  "USERPROFILE",
+  "WINDIR",
+];
 
 const silent = { debug() {}, info() {}, warn() {}, error() {} };
 
@@ -46,7 +63,7 @@ describe("pack context", () => {
   let host: PackHost;
 
   beforeEach(() => {
-    tmp = realpathSync(mkdtempSync(join(tmpdir(), "plughive-ctx-")));
+    tmp = realpathSync.native(mkdtempSync(join(tmpdir(), "plughive-ctx-")));
     dir = join(tmp, "data");
     mkdirSync(dir);
     host = {
@@ -550,21 +567,38 @@ describe("pack context", () => {
         const names = Object.keys(env)
           .filter((k) => k !== "__CF_USER_TEXT_ENCODING")
           .sort();
-        expect(names).toEqual(
-          [
-            "DEMO_SETTING",
-            "HOME",
-            "LANG",
-            "LC_CTYPE",
-            "PATH",
-            "TEXMFVAR",
-            "TMPDIR",
-            "XDG_CACHE_HOME",
-            "XDG_CONFIG_HOME",
-            "XDG_DATA_HOME",
-            "XDG_STATE_HOME",
-          ].sort(),
-        );
+        const allowlist = [
+          "DEMO_SETTING",
+          "HOME",
+          "LANG",
+          "LC_CTYPE",
+          "PATH",
+          "TEXMFVAR",
+          "TMPDIR",
+          "XDG_CACHE_HOME",
+          "XDG_CONFIG_HOME",
+          "XDG_DATA_HOME",
+          "XDG_STATE_HOME",
+        ];
+        if (IS_WINDOWS) {
+          // Windows adds the system variables programs need to start, the
+          // per-user folder variables (pointed at the pack's home), and the ones
+          // libuv always copies into a child's environment block. Names there
+          // are case-insensitive.
+          const allowed = new Set(
+            [
+              ...allowlist,
+              ...Object.keys(systemChildEnv()),
+              ...Object.keys(homeEnv("h", "t", "win32")),
+              ...LIBUV_REQUIRED_ENV,
+            ].map((k) => k.toUpperCase()),
+          );
+          const upper = names.map((k) => k.toUpperCase());
+          expect(upper.filter((k) => !allowed.has(k))).toEqual([]);
+          for (const k of allowlist) expect(upper).toContain(k);
+        } else {
+          expect(names).toEqual(allowlist.sort());
+        }
         expect(env.LANG).toBe("de_DE.UTF-8");
       } finally {
         for (const k of Object.keys(process.env))
@@ -793,7 +827,7 @@ describe("pack context", () => {
 
       it("packChildEnv falls back to the pack's HOME when no real one is known", () => {
         expect(packChildEnv("/d", true, "").env.HOME).toBe(join("/d", ".home"));
-        expect(packChildEnv("/d", true, "/Users/u").env).toEqual({
+        expect(packChildEnv("/d", true, "/Users/u", "linux").env).toEqual({
           HOME: "/Users/u",
           TMPDIR: join("/d", ".tmp"),
         });
@@ -808,9 +842,9 @@ describe("pack context", () => {
       const inside = await base.spawn("node", ["-e", "process.stdout.write(process.cwd())"], {
         cwd: "work",
       });
-      expect(realpathSync(inside.stdout)).toBe(join(dir, "work"));
+      expect(realpathSync.native(inside.stdout)).toBe(join(dir, "work"));
       const dflt = await base.spawn("node", ["-e", "process.stdout.write(process.cwd())"]);
-      expect(realpathSync(dflt.stdout)).toBe(dir);
+      expect(realpathSync.native(dflt.stdout)).toBe(dir);
       for (const cwd of ["/", "..", tmp, "escape"]) {
         await expect(base.spawn("node", ["-v"], { cwd }), cwd).rejects.toThrow();
       }

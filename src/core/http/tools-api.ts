@@ -84,6 +84,7 @@ export function mountToolsApi(app: Express, deps: ToolsApiDeps): void {
           capability: t.capability ?? null,
           requires_secrets: t.requiresSecrets,
           long_running: t.longRunning,
+          annotations: t.annotations ?? null,
           input_schema: t.inputSchema,
         })),
       });

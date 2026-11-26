@@ -108,5 +108,17 @@
     "keep": "Mantenerlo",
     "confirm": "Eliminar disparador",
     "body": "Deja de ejecutarse y su dirección de webhook deja de funcionar. Los trabajos que ya ha iniciado se conservan."
+  },
+  "runConfirm": {
+    "title": "¿Ejecutar {name} ahora?",
+    "cancel": "Cancelar",
+    "confirm": "Ejecutar ahora",
+    "body": "Inicia {workflow} ahora mismo como trabajo en segundo plano. Las herramientas que llame pueden cambiar datos o consumir saldo."
+  },
+  "rotateConfirm": {
+    "title": "¿Reemplazar el secreto de {name}?",
+    "cancel": "Mantener el secreto actual",
+    "confirm": "Crear secreto nuevo",
+    "body": "El secreto de firma actual deja de funcionar de inmediato para los webhooks entrantes y las devoluciones."
   }
 }

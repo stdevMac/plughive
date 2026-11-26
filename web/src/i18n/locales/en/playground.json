@@ -36,6 +36,7 @@
     "longRunning": "Runs as a background job",
     "needsSecrets": "Needs {secrets}",
     "mayCost": "May cost money with the provider",
+    "destructive": "May change data or send externally",
     "argsLabel": "Arguments (JSON)",
     "jsonPlaceholder": "JSON value",
     "argsNotObject": "The arguments must be a JSON object.",
@@ -49,6 +50,12 @@
     "idleHint": "Run the tool to see its result here. Files it makes are saved to the Library.",
     "running": "Running",
     "copyToolName": "tool name"
+  },
+  "confirm": {
+    "title": "Run {tool}?",
+    "cancel": "Cancel",
+    "run": "Run anyway",
+    "body": "This tool is marked as destructive or sends messages outside plughive. Check the arguments before running it."
   },
   "empty": {
     "noToolsTitle": "No tools yet",

@@ -69,5 +69,12 @@
     "limitError": "Límite {n}: el valor debe ser un importe en dólares, como 5 o 0.50.",
     "scopeError": "Límite {n}: indica el {scope} (letras, dígitos y . _ : -).",
     "duplicateError": "El límite {n} repite un límite anterior con el mismo ámbito y periodo."
+  },
+  "confirm": {
+    "title": "¿Aprobar {tool}?",
+    "cancel": "Cancelar",
+    "approve": "Aprobar una vez",
+    "unknownCost": "No se conoce el coste de esta llamada antes de ejecutarse.",
+    "truncatedArgs": "El resumen de los argumentos está recortado, así que algunos valores no se muestran aquí."
   }
 }

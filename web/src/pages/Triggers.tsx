@@ -43,30 +43,23 @@ interface Secret {
 function TriggerRow({
   trig,
   onChanged,
+  onRunNow,
+  onRotate,
   onRemove,
-  onSecret,
 }: {
   trig: TriggerInfo;
   onChanged: (t: TriggerInfo) => void;
+  onRunNow: () => void;
+  onRotate: () => void;
   onRemove: () => void;
-  onSecret: (s: Secret) => void;
 }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const last = lastRunState(trig);
 
-  const act = async (fn: () => Promise<void>) => {
+  const toggle = async (on: boolean) => {
     setBusy(true);
     try {
-      await fn();
-    } catch (e) {
-      toast.error(errorMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-  const toggle = (on: boolean) =>
-    act(async () => {
       const r = await api.request<{ trigger: TriggerInfo }>(`/api/triggers/${trig.id}`, {
         method: "PATCH",
         body: { enabled: on },
@@ -78,22 +71,12 @@ function TriggerRow({
           state: t(on ? "triggers.row.on" : "triggers.row.off"),
         }),
       );
-    });
-  const runNow = () =>
-    act(async () => {
-      await api.post(`/api/triggers/${trig.id}/run`);
-      toast.ok(t("triggers.row.started", { name: trig.name }));
-      const r = await api.get<{ trigger: TriggerInfo }>(`/api/triggers/${trig.id}`);
-      onChanged(r.trigger);
-    });
-  const rotate = () =>
-    act(async () => {
-      const r = await api.post<{ trigger: TriggerInfo; secret: string }>(
-        `/api/triggers/${trig.id}/rotate-secret`,
-      );
-      onChanged(r.trigger);
-      onSecret({ name: trig.name, secret: r.secret, url: r.trigger.webhook_url });
-    });
+    } catch (e) {
+      toast.error(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <li className="mount">
@@ -158,11 +141,11 @@ function TriggerRow({
           ) : null}
         </div>
         <div className="mount-actions">
-          <Button size="sm" variant="secondary" icon="play" busy={busy} onClick={runNow}>
+          <Button size="sm" variant="secondary" icon="play" disabled={busy} onClick={onRunNow}>
             {t("triggers.row.runNow")}
           </Button>
           {trig.kind === "webhook" || trig.callback?.type === "webhook" ? (
-            <Button size="sm" variant="ghost" icon="key" onClick={rotate} disabled={busy}>
+            <Button size="sm" variant="ghost" icon="key" onClick={onRotate} disabled={busy}>
               {t("triggers.row.newSecret")}
             </Button>
           ) : null}
@@ -423,6 +406,8 @@ export function TriggersPage() {
     return { triggers: t.triggers, workflows: w.workflows };
   }, []);
   const [adding, setAdding] = useState(false);
+  const [runningNow, setRunningNow] = useState<TriggerInfo | null>(null);
+  const [rotating, setRotating] = useState<TriggerInfo | null>(null);
   const [removing, setRemoving] = useState<TriggerInfo | null>(null);
   const [secret, setSecret] = useState<Secret | null>(null);
   const [busy, setBusy] = useState(false);
@@ -431,6 +416,40 @@ export function TriggersPage() {
     data.mutate((d) =>
       d ? { ...d, triggers: d.triggers.map((x) => (x.id === t.id ? t : x)) } : d,
     );
+
+  const runNow = async () => {
+    if (!runningNow) return;
+    setBusy(true);
+    try {
+      await api.post(`/api/triggers/${runningNow.id}/run`);
+      toast.ok(t("triggers.row.started", { name: runningNow.name }));
+      const r = await api.get<{ trigger: TriggerInfo }>(`/api/triggers/${runningNow.id}`);
+      update(r.trigger);
+      setRunningNow(null);
+    } catch (e) {
+      toast.error(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const rotate = async () => {
+    if (!rotating) return;
+    setBusy(true);
+    try {
+      const r = await api.post<{ trigger: TriggerInfo; secret: string }>(
+        `/api/triggers/${rotating.id}/rotate-secret`,
+      );
+      update(r.trigger);
+      const name = rotating.name;
+      setRotating(null);
+      setSecret({ name, secret: r.secret, url: r.trigger.webhook_url });
+    } catch (e) {
+      toast.error(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const remove = async () => {
     if (!removing) return;
@@ -477,8 +496,9 @@ export function TriggersPage() {
                   key={t.id}
                   trig={t}
                   onChanged={update}
+                  onRunNow={() => setRunningNow(t)}
+                  onRotate={() => setRotating(t)}
                   onRemove={() => setRemoving(t)}
-                  onSecret={setSecret}
                 />
               ))}
             </ul>
@@ -526,6 +546,52 @@ export function TriggersPage() {
             {t("triggers.secret.hint4")}
           </p>
         </div>
+      </Dialog>
+      <Dialog
+        open={!!runningNow}
+        onClose={() => setRunningNow(null)}
+        title={t("triggers.runConfirm.title", {
+          name: runningNow?.name ?? t("triggers.delete.fallbackName"),
+        })}
+        size="sm"
+        role="alertdialog"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setRunningNow(null)} data-autofocus>
+              {t("triggers.runConfirm.cancel")}
+            </Button>
+            <Button variant="danger" busy={busy} onClick={runNow}>
+              {t("triggers.runConfirm.confirm")}
+            </Button>
+          </>
+        }
+      >
+        <p>
+          {t("triggers.runConfirm.body", {
+            workflow: runningNow ? workflowLabel(runningNow.workflow) : "",
+          })}
+        </p>
+      </Dialog>
+      <Dialog
+        open={!!rotating}
+        onClose={() => setRotating(null)}
+        title={t("triggers.rotateConfirm.title", {
+          name: rotating?.name ?? t("triggers.delete.fallbackName"),
+        })}
+        size="sm"
+        role="alertdialog"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setRotating(null)} data-autofocus>
+              {t("triggers.rotateConfirm.cancel")}
+            </Button>
+            <Button variant="danger" busy={busy} onClick={rotate}>
+              {t("triggers.rotateConfirm.confirm")}
+            </Button>
+          </>
+        }
+      >
+        <p>{t("triggers.rotateConfirm.body")}</p>
       </Dialog>
       <Dialog
         open={!!removing}

@@ -52,7 +52,10 @@
     "mayNothing": "Nada más allá de trabajar con lo que le pasas.",
     "keysTitle": "Claves que puede leer",
     "keysHint": "El paquete solo ve las claves que permitas aquí.",
-    "requiredSuffix": " (necesaria para sus herramientas)"
+    "requiredSuffix": " (necesaria para sus herramientas)",
+    "notGrantable": "No se puede conceder a este paquete (credencial conocida de otra herramienta).",
+    "declaredBy": "También la usa: {packs}. Concederla deja que este paquete lea esa clave.",
+    "stored": "Ya hay un valor guardado; concederla entrega ese valor existente a este paquete."
   },
   "settings": {
     "title": "Ajustes",

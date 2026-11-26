@@ -57,11 +57,17 @@ function shapeOf(e: unknown): Shape {
 }
 
 const keyLink = (pack: string) => `/packs?pack=${encodeURIComponent(pack)}&key=1`;
+// Tool namespaces that are not packs: they have no key to replace.
+const NON_KEY_PACKS = new Set(["core", "gateway"]);
 
 /** `pack` is a fallback when the error does not name one (e.g. the tool's pack). */
-export function humanError(e: unknown, opts: { pack?: string } = {}): HumanError {
+export function humanError(
+  e: unknown,
+  opts: { pack?: string; canUseKey?: boolean } = {},
+): HumanError {
   const s = shapeOf(e);
   const pack = s.pack ?? opts.pack;
+  const keyPack = pack && !NON_KEY_PACKS.has(pack) ? pack : undefined;
   const name = pack ? displayName(pack) : null;
   const raw = s.message;
 
@@ -71,12 +77,14 @@ export function humanError(e: unknown, opts: { pack?: string } = {}): HumanError
       why: s.label
         ? t("errors.missingSecret.whyLabel", { label: s.label })
         : t("errors.missingSecret.why"),
-      ...(pack
-        ? { next: { label: t("errors.missingSecret.next", { name }), to: keyLink(pack) } }
+      ...(keyPack
+        ? { next: { label: t("errors.missingSecret.next", { name }), to: keyLink(keyPack) } }
         : {}),
     };
   }
-  if (s.status === 0 || /failed to fetch|networkerror|network error/i.test(raw)) {
+  // Upstream prose about a network error inside a tool error is not this
+  // page losing the daemon.
+  if (s.status === 0 || (!s.code && /failed to fetch|networkerror|network error/i.test(raw))) {
     return {
       what: t("errors.network.what"),
       why: t("errors.network.why"),
@@ -98,14 +106,20 @@ export function humanError(e: unknown, opts: { pack?: string } = {}): HumanError
   if (s.code === "CANCELLED" || /cancel+ed/i.test(raw)) {
     return { what: t("errors.cancelled"), detail: raw };
   }
-  // Provider answers, seen through tool errors.
+  // Provider answers, seen through tool errors. Only a tool error of a tool
+  // that uses a key can mean "your key was refused": a policy refusal, a
+  // daemon error or generic prose ("authentication", "403") must not send the
+  // user to replace a key that is fine.
   if (
-    /\b(401|403)\b|unauthori[sz]ed|invalid api key|invalid key|forbidden|authentication/i.test(raw)
+    keyPack &&
+    opts.canUseKey !== false &&
+    (!s.code || s.code === "TOOL_ERROR") &&
+    /\b401\b|\bunauthori[sz]ed\b|invalid api key/i.test(raw)
   ) {
     return {
       what: name ? t("errors.auth.what", { name }) : t("errors.auth.whatNoName"),
       why: t("errors.auth.why"),
-      ...(pack ? { next: { label: t("errors.auth.next", { name }), to: keyLink(pack) } } : {}),
+      next: { label: t("errors.auth.next", { name }), to: keyLink(keyPack) },
       detail: raw,
     };
   }

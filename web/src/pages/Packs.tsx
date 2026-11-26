@@ -25,7 +25,13 @@ import { capabilityLabel } from "../lib/capabilities";
 import { useEvent } from "../lib/events";
 import { displayName } from "../lib/format";
 import { useDocumentTitle, useResource } from "../lib/hooks";
-import { describePermissions, isBundled, packStateLabel } from "../lib/packs";
+import {
+  describePermissions,
+  initialConsentGrants,
+  isBundled,
+  packStateLabel,
+  toggleConsentGrant,
+} from "../lib/packs";
 import { Link, useRouter } from "../lib/router";
 import {
   type Draft,
@@ -70,7 +76,7 @@ function ConsentDialog({
   const c = consent.data;
 
   useEffect(() => {
-    if (c) setGrants(new Set(c.secrets.filter((s) => s.granted || s.required).map((s) => s.name)));
+    if (c) setGrants(initialConsentGrants(c.secrets));
     setError(null);
   }, [c]);
 
@@ -158,30 +164,45 @@ function ConsentDialog({
               <h3 className="h-sub">{t("packs.consent.keysTitle")}</h3>
               <p className="small muted">{t("packs.consent.keysHint")}</p>
               <ul className="grant-list">
-                {c.secrets.map((s) => (
-                  <li key={s.name}>
-                    <label className="check">
-                      <input
-                        type="checkbox"
-                        checked={grants.has(s.name)}
-                        onChange={(e) =>
-                          setGrants((g) => {
-                            const n = new Set(g);
-                            if (e.target.checked) n.add(s.name);
-                            else n.delete(s.name);
-                            return n;
-                          })
-                        }
-                      />
-                      <span>
-                        {s.label ?? s.name} <code className="small muted">{s.name}</code>
-                        {s.required ? (
-                          <span className="small muted">{t("packs.consent.requiredSuffix")}</span>
-                        ) : null}
-                      </span>
-                    </label>
-                  </li>
-                ))}
+                {c.secrets.map((s) => {
+                  // The same notes the CLI and the daemon give; a bundled pack
+                  // owns its keys, so sharing and stored values only matter for
+                  // a user pack.
+                  const grantable = s.grantable !== false;
+                  const userPack = c.source === "user";
+                  const declaredBy = userPack ? (s.declaredBy ?? []) : [];
+                  return (
+                    <li key={s.name}>
+                      <label className="check">
+                        <input
+                          type="checkbox"
+                          disabled={!grantable}
+                          checked={grantable && grants.has(s.name)}
+                          onChange={(e) =>
+                            setGrants((g) => toggleConsentGrant(g, s, e.target.checked))
+                          }
+                        />
+                        <span>
+                          {s.label ?? s.name} <code className="small muted">{s.name}</code>
+                          {s.required ? (
+                            <span className="small muted">{t("packs.consent.requiredSuffix")}</span>
+                          ) : null}
+                        </span>
+                      </label>
+                      {!grantable ? (
+                        <p className="small perm-risk">{t("packs.consent.notGrantable")}</p>
+                      ) : null}
+                      {declaredBy.length > 0 ? (
+                        <p className="small perm-risk">
+                          {t("packs.consent.declaredBy", { packs: declaredBy.join(", ") })}
+                        </p>
+                      ) : null}
+                      {userPack && s.stored ? (
+                        <p className="small muted">{t("packs.consent.stored")}</p>
+                      ) : null}
+                    </li>
+                  );
+                })}
               </ul>
             </>
           ) : null}

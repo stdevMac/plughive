@@ -273,7 +273,13 @@ function fakePlaywright(
     goto: vi.fn(async () => ({ status: () => page.status ?? 200 })),
     waitForLoadState: vi.fn(async () => {}),
     content: vi.fn(async () => page.html ?? "<html><body><p>Hello</p></body></html>"),
-    evaluate: vi.fn(async () => page.text ?? "Hello"),
+    // The page cuts what it returns (browser-fetch passes how much to keep).
+    evaluate: vi.fn(async (_fn: unknown, arg: { html: boolean; keep: number }) =>
+      (arg.html
+        ? (page.html ?? "<html><body><p>Hello</p></body></html>")
+        : (page.text ?? "Hello")
+      ).slice(0, arg.keep),
+    ),
     title: vi.fn(async () => page.title ?? "Hi"),
     url: vi.fn(() => page.url ?? "https://example.com/"),
   };
@@ -335,7 +341,27 @@ describe("browser web.fetch", () => {
       ctx,
     );
     expect(out).toMatchObject({ content: html.slice(0, 100), format: "html", truncated: true });
-    expect(fake.page.evaluate).not.toHaveBeenCalled();
+  });
+
+  it("reads only max_chars + 1 characters out of the page, never the whole page", async () => {
+    const text = "y".repeat(5_000);
+    const fake = fakePlaywright({ text, html: `<html><body>${text}</body></html>` });
+    const p = browserProvider(async () => fake.pw);
+    for (const format of ["text", "html"] as const) {
+      fake.page.evaluate.mockClear();
+      const out = (await call(
+        p,
+        "web.fetch",
+        { url: "https://example.com/", format, max_chars: 100 },
+        ctx,
+      )) as { content: string; truncated?: boolean };
+      expect(out.content).toHaveLength(100);
+      expect(out.truncated).toBe(true);
+      expect(fake.page.evaluate).toHaveBeenCalledTimes(1);
+      expect(fake.page.evaluate.mock.calls[0]![1]).toEqual({ html: format === "html", keep: 101 });
+    }
+    // page.content() hands over the whole document, so it is not used.
+    expect(fake.page.content).not.toHaveBeenCalled();
   });
 
   it("refuses a local address before launching a browser", async () => {
@@ -460,6 +486,8 @@ describe("browser web.fetch (real Chromium, local server)", () => {
     expect(String(text.content)).toMatch(/Hello\s+from the test/);
     const html = await call(p, "web.fetch", { url, format: "html" }, local);
     expect(String(html.content)).toContain("<h1>Hello</h1>");
+    const cut = await call(p, "web.fetch", { url, format: "html", max_chars: 100 }, local);
+    expect(cut).toMatchObject({ content: String(html.content).slice(0, 100), truncated: true });
     expect(daemonHits).toEqual([]);
   }, 60_000);
 });

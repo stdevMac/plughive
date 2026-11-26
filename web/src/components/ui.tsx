@@ -310,8 +310,15 @@ function ErrorDetail({ h }: { h: HumanError }) {
 }
 
 /** Inline: what happened, why, and the next step. For results and forms. */
-export function HumanErrorAlert({ error, pack }: { error: unknown; pack?: string }) {
-  const h = humanError(error, pack ? { pack } : {});
+export function HumanErrorAlert({
+  error,
+  pack,
+  canUseKey,
+}: { error: unknown; pack?: string; canUseKey?: boolean }) {
+  const h = humanError(error, {
+    ...(pack ? { pack } : {}),
+    ...(canUseKey !== undefined ? { canUseKey } : {}),
+  });
   return (
     <div className="alert alert-danger" role="alert">
       <Icon name="alert" />
@@ -493,6 +500,7 @@ export function PasswordInput({
   onChange,
   label,
   placeholder,
+  autoComplete = "off",
   autoFocus,
   invalid,
   describedBy,
@@ -502,6 +510,7 @@ export function PasswordInput({
   onChange: (v: string) => void;
   label: string;
   placeholder?: string;
+  autoComplete?: "off" | "new-password";
   autoFocus?: boolean;
   invalid?: boolean;
   describedBy?: string;
@@ -516,7 +525,7 @@ export function PasswordInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        autoComplete="off"
+        autoComplete={autoComplete}
         autoCapitalize="off"
         autoCorrect="off"
         spellCheck={false}

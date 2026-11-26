@@ -240,6 +240,17 @@ export interface ToolRegistryOptions {
 export const NOT_SERIALISABLE_MESSAGE =
   "the tool returned a result that cannot be sent as JSON (circular or unsupported value)";
 export const MAX_MOUNTED_SCHEMA_BYTES = 16 * 1024;
+/** The largest result one call may return inline; bigger outputs belong in artifacts. */
+export const MAX_INLINE_RESULT_BYTES = 16 * 1024 * 1024;
+/** Error messages are cut to this many characters (after redaction). */
+export const MAX_ERROR_MESSAGE_CHARS = 4000;
+
+/** Cut a long message, saying so; redact before calling this so a secret is never half kept. */
+function capMessage(text: string): string {
+  return text.length > MAX_ERROR_MESSAGE_CHARS
+    ? `${text.slice(0, MAX_ERROR_MESSAGE_CHARS)}... (message cut)`
+    : text;
+}
 
 /**
  * Replace the user's home directory and the daemon data directory in text
@@ -437,8 +448,10 @@ export class ToolRegistry {
         ok: false,
         error: {
           code: "INVALID_ARGUMENTS",
-          message: this.scrub(
-            this.redact(`invalid arguments for ${tool.name}: ${z.prettifyError(parsed.error)}`),
+          message: capMessage(
+            this.scrub(
+              this.redact(`invalid arguments for ${tool.name}: ${z.prettifyError(parsed.error)}`),
+            ),
           ),
           retryable: false,
           issues: this.redact(parsed.error.issues),
@@ -460,10 +473,17 @@ export class ToolRegistry {
       const result = this.redact(ran.value);
       // A result nobody can serialise (cycle, BigInt) is a tool error, not a crash later.
       if (result !== undefined) {
+        let json: string | undefined;
         try {
-          JSON.stringify(result);
+          json = JSON.stringify(result);
         } catch {
           throw new Error(NOT_SERIALISABLE_MESSAGE);
+        }
+        const bytes = json === undefined ? 0 : Buffer.byteLength(json, "utf8");
+        if (bytes > MAX_INLINE_RESULT_BYTES) {
+          throw new Error(
+            `the tool returned ${bytes} bytes, over the ${MAX_INLINE_RESULT_BYTES} byte limit for a result. Large outputs belong in artifacts: ask the tool for a smaller result.`,
+          );
         }
       }
       const latencyMs = Date.now() - start;
@@ -508,7 +528,7 @@ export class ToolRegistry {
     if (e instanceof PolicyError) {
       return {
         code: e.code,
-        message: this.scrub(this.redact(e.message)),
+        message: capMessage(this.scrub(this.redact(e.message))),
         retryable: e.code === "APPROVAL_REQUIRED",
         ...(e.approval ? { approval: this.redact({ ...e.approval }) } : {}),
       };
@@ -519,7 +539,11 @@ export class ToolRegistry {
     } catch {
       msg = "the tool failed";
     }
-    return { code: "TOOL_ERROR", message: this.scrub(this.redact(msg)), retryable: false };
+    return {
+      code: "TOOL_ERROR",
+      message: capMessage(this.scrub(this.redact(msg))),
+      retryable: false,
+    };
   }
 
   /** Set after construction by the daemon, which knows the directories to hide. */

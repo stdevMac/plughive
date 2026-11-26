@@ -4,6 +4,8 @@ import { MissingSecretError, Redactor } from "../../../src/core/secrets/index.js
 import {
   InvalidArgumentsError,
   MAX_COST_USD,
+  MAX_ERROR_MESSAGE_CHARS,
+  MAX_INLINE_RESULT_BYTES,
   type MountedToolSource,
   type RegisteredTool,
   ToolNameConflictError,
@@ -81,6 +83,36 @@ function registryWithSecret() {
 }
 
 describe("ToolRegistry", () => {
+  // R2-L2 / D-M2: what one call returns inline, and its error message, are bounded.
+  it("refuses a result over the inline size limit and cuts a long error message", async () => {
+    const registry = new ToolRegistry();
+    registry.registerPack("p", [
+      tool("huge_tool", async () => ({ text: "x".repeat(MAX_INLINE_RESULT_BYTES + 1) })),
+      tool("loud_tool", async () => {
+        throw new Error("e".repeat(MAX_ERROR_MESSAGE_CHARS * 10));
+      }),
+    ]);
+    const huge = await registry.call("huge_tool", {});
+    expect(huge.ok).toBe(false);
+    expect(!huge.ok && huge.error.code).toBe("TOOL_ERROR");
+    expect(!huge.ok && huge.error.message).toContain("byte limit for a result");
+    const loud = await registry.call("loud_tool", {});
+    expect(!loud.ok && loud.error.message.length).toBeLessThan(MAX_ERROR_MESSAGE_CHARS + 50);
+    expect(!loud.ok && loud.error.message).toContain("(message cut)");
+  });
+
+  it("redacts a secret before cutting an error message, so no part of it is kept", async () => {
+    const { registry } = registryWithSecret();
+    const pad = "p".repeat(MAX_ERROR_MESSAGE_CHARS - 5);
+    registry.registerPack("p", [
+      tool("leaky_tool", async () => {
+        throw new Error(`${pad}${FIXTURE_SECRET}`);
+      }),
+    ]);
+    const res = await registry.call("leaky_tool", {});
+    expect(!res.ok && res.error.message).not.toContain(FIXTURE_SECRET.slice(0, 5));
+  });
+
   it("validates arguments with zod and returns INVALID_ARGUMENTS", async () => {
     const run = vi.fn(async () => "never");
     const registry = new ToolRegistry();

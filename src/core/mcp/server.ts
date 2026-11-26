@@ -805,7 +805,9 @@ function registerResourcesAndPrompts(
   );
   if (!library) return;
   handle("resources/list", async (req: { params?: { cursor?: unknown } }) =>
-    resourcesVisible(exposure()) ? listResources(library, req.params?.cursor) : { resources: [] },
+    resourcesVisible(exposure())
+      ? listResources(library, req.params?.cursor, redact)
+      : { resources: [] },
   );
   handle("resources/templates/list", async () =>
     resourcesVisible(exposure()) ? resourceTemplates() : { resourceTemplates: [] },

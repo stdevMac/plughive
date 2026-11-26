@@ -6,6 +6,7 @@ import { requestScope } from "../../../src/core/mcp/scope.js";
 import {
   BatchInput,
   CONTACT_SHEET_TOOL,
+  MAX_BATCH_RESULT_BYTES,
   batchTools,
   imageArtifactIds,
   pool,
@@ -62,6 +63,29 @@ function setup(extra: Parameters<ToolRegistry["registerPack"]>[1] = []) {
 }
 
 describe("batch_run", () => {
+  // R2-L2: the items together stay under one reply's limit; later ones keep a notice.
+  it("leaves out results once the batch passes its size limit, keeping ok and the order", async () => {
+    const big = "y".repeat(Math.ceil(MAX_BATCH_RESULT_BYTES / 3));
+    const env = setup([
+      mockTool("big_tool", async (input) => ({ n: input.n, text: big }), { input: ItemInput }),
+    ]);
+    const inputs = [1, 2, 3, 4, 5].map((n) => ({ n }));
+    const out = await env.registry.call("batch_run", {
+      tool: "big_tool",
+      inputs,
+      concurrency: 1,
+      max_items: 5,
+    });
+    expect(out.ok).toBe(true);
+    const r = res(out);
+    expect(r).toMatchObject({ total: 5, succeeded: 5, failed: 0 });
+    expect(r.items[0]?.result).toMatchObject({ n: 1, text: big });
+    expect(r.items[1]?.result).toMatchObject({ n: 2 });
+    expect(r.items[4]).toMatchObject({ index: 4, ok: true });
+    expect((r.items[4]?.result as { truncated?: string }).truncated).toContain("byte limit");
+    expect(Buffer.byteLength(JSON.stringify(r))).toBeLessThan(MAX_BATCH_RESULT_BYTES + 4096);
+  });
+
   it("runs every item with bounded concurrency and reports a failing item without stopping", async () => {
     const env = setup();
     const inputs = [1, 2, 3, 4, 5, 6].map((n) => ({ n }));

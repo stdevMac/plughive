@@ -4,6 +4,12 @@ All notable changes are listed here. Versions follow semantic versioning.
 
 ## Unreleased
 
+## 0.1.2
+
+- npm releases are now published through npm trusted publishing (OIDC from
+  GitHub Actions), with no npm token stored in the repository. No code
+  changes.
+
 ## 0.1.1
 
 ### Fixed

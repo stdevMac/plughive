@@ -17,6 +17,8 @@ export interface FirecrawlOpts {
   signal?: AbortSignal;
   /** Per request. Default 360 s (a scrape may itself wait up to 300 s). */
   timeoutMs?: number;
+  /** Most bytes a finished crawl may add up to across its `next` pages. Default 64 MiB. */
+  maxCrawlBytes?: number;
 }
 
 export interface ScrapeReq {
@@ -102,6 +104,8 @@ export interface CrawlStatusResp {
 const BASE = "https://api.firecrawl.dev";
 const MAX_RESPONSE_BYTES = 32 * 1024 * 1024;
 const MAX_CRAWL_PAGES = 50;
+/** Most bytes a crawl result may add up to across all its `next` pages. */
+const MAX_CRAWL_BYTES = 64 * 1024 * 1024;
 
 /**
  * Every POST endpoint this client calls, classified by billing. Scrape,
@@ -122,6 +126,7 @@ export class FirecrawlClient {
   private readonly maxAttempts: number;
   private readonly signal: AbortSignal | undefined;
   private readonly timeoutMs: number;
+  private readonly maxCrawlBytes: number;
 
   constructor(
     private readonly fetchFn: PackFetch,
@@ -133,6 +138,7 @@ export class FirecrawlClient {
     this.maxAttempts = opts.maxAttempts ?? 3;
     this.signal = opts.signal;
     this.timeoutMs = opts.timeoutMs ?? 360_000;
+    this.maxCrawlBytes = opts.maxCrawlBytes ?? MAX_CRAWL_BYTES;
   }
 
   async scrape(req: ScrapeReq): Promise<FirecrawlDocument> {
@@ -176,15 +182,15 @@ export class FirecrawlClient {
    * their documents appended. Free: polling does not consume credits.
    */
   async crawlStatus(jobId: string): Promise<CrawlStatusResp> {
-    const first = (await this.request(
-      "GET",
-      `/v2/crawl/${encodeURIComponent(jobId)}`,
-      "/v2/crawl/:id",
-    )) as CrawlStatusResp;
+    const path = `/v2/crawl/${encodeURIComponent(jobId)}`;
+    const firstRes = await this.requestSized("GET", path, "/v2/crawl/:id");
+    const first = firstRes.out as CrawlStatusResp;
     if (first.status !== "completed") return first;
     const data = Array.isArray(first.data) ? [...first.data] : [];
+    let total = firstRes.bytes;
     let next = typeof first.next === "string" ? first.next : null;
     const origin = new URL(this.baseUrl).origin;
+    const seen = new Set<string>();
     for (let page = 0; next && page < MAX_CRAWL_PAGES; page++) {
       let u: URL;
       try {
@@ -192,14 +198,23 @@ export class FirecrawlClient {
       } catch {
         break;
       }
-      if (u.origin !== origin) break;
-      const more = (await this.request(
+      // Only further pages of this same job, each fetched once.
+      if (u.origin !== origin || u.pathname !== path || seen.has(u.search)) break;
+      seen.add(u.search);
+      const more = await this.requestSized(
         "GET",
         u.pathname + u.search,
         "/v2/crawl/:id (next page)",
-      )) as CrawlStatusResp;
-      if (Array.isArray(more.data)) data.push(...more.data);
-      next = typeof more.next === "string" ? more.next : null;
+      );
+      total += more.bytes;
+      if (total > this.maxCrawlBytes) {
+        throw new Error(
+          `Firecrawl crawl ${jobId}: the result is over ${this.maxCrawlBytes} bytes; crawl fewer pages (limit) or narrow include_paths`,
+        );
+      }
+      const body = more.out as CrawlStatusResp;
+      if (Array.isArray(body.data)) data.push(...body.data);
+      next = typeof body.next === "string" ? body.next : null;
     }
     return { ...first, data, next: next ?? undefined };
   }
@@ -214,6 +229,16 @@ export class FirecrawlClient {
     endpoint: string,
     body?: string,
   ): Promise<Record<string, unknown>> {
+    return (await this.requestSized(method, path, endpoint, body)).out;
+  }
+
+  /** A request, with the size of the body it answered. */
+  private async requestSized(
+    method: "GET" | "POST",
+    path: string,
+    endpoint: string,
+    body?: string,
+  ): Promise<{ out: Record<string, unknown>; bytes: number }> {
     const billing: Billing =
       method === "GET" ? "free" : FIRECRAWL_BILLING[endpoint as FirecrawlPath];
     const res = await meteredRequest({
@@ -245,7 +270,7 @@ export class FirecrawlClient {
     if (out.success === false) {
       throw new Error(`Firecrawl ${endpoint}: ${oneLine(out.error) || "request failed"}`);
     }
-    return out;
+    return { out, bytes: Buffer.byteLength(res.text, "utf8") };
   }
 }
 

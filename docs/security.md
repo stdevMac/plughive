@@ -61,7 +61,16 @@ oldest of them is a minute old.
   would carry the session cookie.
 - The Mac app starts the daemon with a fresh id and hands over the admin token
   only after `/health` echoes that id, so a program that took the port first
-  is never given it.
+  is never given it. Its logs (redacted, lines capped at 64 KiB) and its
+  config are written 0600 without following symbolic links, and its
+  single-instance lock lives in its private data folder, not `/tmp`.
+- The `plughive` CLI sends the admin token over plain http only to this
+  machine, refuses redirects and keeps every request under `/api`. Text from
+  the daemon is cleaned of terminal control and bidi characters before it is
+  printed, so a tool name or error cannot rewrite your terminal.
+- The dashboard asks before it runs a trigger, rotates a trigger secret,
+  approves a request whose cost is unknown or whose summary was cut, or runs
+  a destructive or sending tool from the Playground.
 
 ## Provider keys
 
@@ -90,9 +99,13 @@ oldest of them is a minute old.
   file) for the retention window. Only values that look like secrets are
   scrubbed. A stored result is capped at 8 MB. Every database and cache under
   the home folder is created 0600 in a 0700 folder.
-- Tool results and `resources/read` go through the redactor. Local file paths
-  in results are not hidden: the caller is the owner's own agent, which needs
-  them to open the files.
+- Tool results, errors and `resources/read` go through the redactor, and the
+  prompts `resources/list` shows are redacted before they are cut. In results
+  and errors the daemon's home folder is shown as `$PLUGHIVE_HOME` and your
+  home folder as `~`. Files reach agents as artifact links, not paths.
+- The daemon refuses to start with a secrets file that other users can write.
+  Every key set in the environment is registered with the redactor at
+  startup, and values up to 8192 characters are redacted.
 
 ## Packs
 
@@ -125,7 +138,9 @@ Only add packs whose code you have read or whose author you trust.
   (exact `host:port`) are allowed.
 - Every resolved address is checked. Private and loopback addresses are
   blocked unless listed in `localNetwork`. Link-local addresses and cloud
-  metadata endpoints are blocked always.
+  metadata endpoints are blocked always, including when they are carried
+  inside an IPv6 address (NAT64, 6to4, Teredo). Only `2000::/3` counts as
+  public IPv6.
 - The socket is opened to the checked IP, so DNS cannot change between the
   check and the connection.
 - At most 5 redirects, each checked again. Cross-origin redirects keep only a
@@ -243,6 +258,12 @@ Treat what it returns as untrusted.
   path only, so a key carried in a query string (Browserbase) is not printed.
 - For a stdio mount you add, pass secrets in `env`, not in arguments: other
   local users can see a process's arguments in `ps`.
+- Mount headers may not contain CR, LF or NUL. A bad header is refused by
+  name; its value is never echoed.
+- Upstream tool descriptions lose control, bidi and zero-width characters
+  before they are cut to 2000 characters, and an upstream error is cut after
+  redaction. A tool result over 16 MiB is refused (write an artifact), and a
+  `batch` stops including results once they pass 8 MiB.
 
 ### Mounts an agent proposes
 
@@ -338,7 +359,20 @@ See [spend-and-approvals.md](spend-and-approvals.md) for how they work.
 - Calls still running count against caps, so parallel calls cannot pass a cap
   together. Always-ask and destructive tools still ask inside an approved
   workflow run, and a paid-cache hit asks when a rule says so.
+- A workflow started inside an approved run is checked against its own
+  rules, so an approval for the outer call does not carry into it.
 - A request keeps a redacted summary of the arguments, never the arguments.
+  The summary keeps every key (each value gets a share of the space), and
+  control and bidi characters are removed from it and from the tool and
+  reason, so a long or crafted argument cannot hide another one.
+- With `approve_in_chat` on, an answer counts only if it echoes the token of
+  a form the daemon showed. A client that answers that form itself still
+  approves: the daemon cannot tell who filled it in.
+- `max_sends_per_hour` (off by default) caps calls to `sends` tools per
+  profile. The count is in memory and starts again when the daemon restarts.
+- A trigger webhook cannot change what the trigger runs: the saved args win
+  over the request body, and `dry_run` in the body is ignored. A trigger has
+  at most 5 runs unfinished at a time. See [triggers.md](triggers.md).
 - `policy.json` is written atomically, mode 0600. A file that does not
   validate is never overwritten, and the daemon fails closed while it is
   broken: calls that may cost money and destructive tools are refused.
@@ -382,3 +416,18 @@ tools you call, mounts you enable and the dashboard loading its own files.
 - x402 compares amounts with ordinary BigInt arithmetic, not in constant
   time. The amounts are public (they come from the server's quote), so this
   leaks nothing secret.
+- A `wf_*` step counts as free in the parent workflow's plan, and a paid tool
+  called from inside a code tool that is not tagged `paid` is not seen by the
+  caps. Caps on the inner tool's own calls still apply.
+- Tools tagged only destructive (`uninstall_software`, `remove_mount`,
+  `forget`, closing a browser session) ask only when `ask_before_destructive`
+  is on, which it is not by default. Add them to `always_ask_tools` to make
+  them ask.
+- Trigger webhooks limit unsigned requests per hook, not per client, so a
+  flood of unsigned requests can use up one hook's budget for a minute. Signed
+  requests have their own budget.
+- Trust in a mounted server's tool hints only adds friction: a server that
+  claims a tool is read-only controls what that tool does anyway.
+- `web_screenshot` with `allowLocalUrls` follows a redirect to a local
+  host and port the page already requested directly.
+- The Mac app does not use the hardened runtime.

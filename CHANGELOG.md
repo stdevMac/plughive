@@ -131,6 +131,60 @@ error names the setting to change.
 - local: LibreOffice conversions run with macros, OLE, link updates and web
   access off, and HTML input keeps only `data:` and `#` references. An OCR
   `language` must be codes joined by `+`.
+- Triggers: the trigger's saved args now win over the webhook body, and
+  `dry_run` in the body is ignored. Before, the body could override both.
+  Unsigned requests no longer use up a hook's signed run budget, a trigger
+  has at most 5 runs unfinished at a time (the webhook answers `429 BUSY`
+  past that), and callbacks are sent at most 4 at a time.
+- Workflows: a workflow started inside an approved run is checked against
+  its own cost rules, a `forEach` fallback is counted once per item, and
+  `join`, `concat` and the run output have size limits (`concat` at 10,000
+  items, the output at 1 MB).
+- Approvals: an in-chat answer counts only if it answers a form the daemon
+  showed, so a client cannot pre-supply `approval_decision` with its first
+  call. Argument summaries keep every key, and control and bidi characters
+  are removed from them and from the tool and reason. The new opt-in
+  `max_sends_per_hour` rule caps calls to `sends` tools per profile.
+- share: `share_artifact` and `share_unshare` carry the `sends` tag, so they
+  ask by default. Active web types (HTML, SVG, XML, JS) are uploaded as
+  `application/octet-stream`, so a share link cannot run script.
+- Secrets: the daemon refuses a secrets file that other users can write.
+  Every key from the environment is redacted from the start, values up to
+  8192 characters are redacted, and errors, stored job results and success
+  results are redacted and path-scrubbed. Preferences are written
+  atomically at 0600, and the compile cache checks every parent folder.
+- CLI: text from the daemon is cleaned of terminal control and bidi
+  characters before it is printed. The CLI refuses to send the admin token
+  over plain http to a host that is not this machine, refuses redirects, and
+  keeps API paths under `/api`. Downloads stay inside the artifact path and
+  never follow a symlink. `--set` refuses `__proto__`, `constructor` and
+  `prototype`. `pack add` runs `git clone` without `file://` transports or
+  symlinks.
+- Network: IPv6 forms that carry an IPv4 address (NAT64, 6to4, Teredo) are
+  checked for metadata and local addresses, and the web and local packs
+  refuse everything outside `2000::/3`. `localhost.` counts as local.
+  `web_screenshot` with `allowLocalUrls` blocks a redirect or a top-frame
+  navigation from a public page to a local address.
+- Mounts: mount headers may not contain CR, LF or NUL. Upstream tool
+  descriptions lose control, bidi and zero-width characters, and upstream
+  error messages are cut after redaction. A tool result over 16 MiB is
+  refused (use artifacts), and a batch stops including results past 8 MiB.
+  `resources/list` redacts the prompts it shows.
+- Packs: firecrawl follows only further pages of the same crawl, up to 64
+  MiB. growth no longer drafts for leads marked skipped or lost and keeps a
+  lead's status when it redrafts. telegram responses are capped at 1 MiB.
+  `research_prospect` carries `paid`. `x402_quote` sends the caller's
+  headers only when `allowedHosts` is set.
+- Dashboard: running a trigger now, rotating its secret, approving a request
+  with an unknown cost or a cut summary, and running a destructive or
+  sending tool from the Playground each ask first. The live event stream
+  stops retrying after a sign-out, and config snippets quote values for the
+  shell, TOML and YAML. The browser `web.fetch` provider cuts the page inside
+  the browser.
+- Mac app: log lines are capped and redacted before they are cut, logs and
+  the app config are written 0600 without following symlinks, and
+  notifications are cleaned and capped. The single-instance lock moved from
+  `/tmp` to the app's private data folder.
 
 ### Added
 

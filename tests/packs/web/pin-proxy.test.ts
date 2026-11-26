@@ -95,6 +95,50 @@ describe("pinning proxy", () => {
     ]);
   });
 
+  // D-L1: headers the Connection header names are for one hop only, in both directions.
+  it("drops the headers a Connection header names, on the request and the response", async () => {
+    let got: Record<string, unknown> = {};
+    const hop = createServer((req, res) => {
+      got = req.headers;
+      res.writeHead(200, { connection: "x-up-hop", "x-up-hop": "1", "x-up-kept": "1" });
+      res.end("ok");
+    });
+    await new Promise<void>((r) => hop.listen(0, "127.0.0.1", r));
+    const port = (hop.address() as AddressInfo).port;
+    try {
+      proxy = await startPinProxy(async () => ({ ok: true, address: "127.0.0.1" }));
+      const p = proxy;
+      const url = `http://hop.test:${port}/x`;
+      const resHeaders = await new Promise<Record<string, unknown>>((resolve, reject) => {
+        const req = request(
+          {
+            host: "127.0.0.1",
+            port: p.port,
+            path: url,
+            headers: {
+              host: `hop.test:${port}`,
+              connection: "X-Down-Hop, keep-alive",
+              "x-down-hop": "1",
+              "x-down-kept": "1",
+            },
+          },
+          (res) => {
+            res.resume();
+            res.on("end", () => resolve(res.headers));
+          },
+        );
+        req.on("error", reject);
+        req.end();
+      });
+      expect(got["x-down-hop"]).toBeUndefined();
+      expect(got["x-down-kept"]).toBe("1");
+      expect(resHeaders["x-up-hop"]).toBeUndefined();
+      expect(resHeaders["x-up-kept"]).toBe("1");
+    } finally {
+      await new Promise<void>((r) => hop.close(() => r()));
+    }
+  });
+
   it("answers 403 with the reason and makes no connection when the check refuses", async () => {
     proxy = await startPinProxy(async () => ({ ok: false, reason: "loopback is blocked" }));
     const res = await viaProxy(proxy, `http://127.0.0.1:${originPort}/secret`);

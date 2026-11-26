@@ -166,6 +166,37 @@ describe("resources", () => {
     }
   });
 
+  // R2-L1: the artifact prompt shown in resources/list is redacted too, before it is cut.
+  it("redacts stored secret values in the prompts resources/list shows", async () => {
+    const env = setup(home);
+    const SECRET = "super-secret-value-12345";
+    const pad = "p".repeat(150);
+    env.library.save({
+      kind: "image",
+      mime: "image/png",
+      bytes: Buffer.from([1]),
+      tool: "t",
+      prompt: `use the key ${SECRET} please`,
+    });
+    env.library.save({
+      kind: "image",
+      mime: "image/png",
+      bytes: Buffer.from([2]),
+      tool: "t",
+      prompt: `${pad}${SECRET}`,
+    });
+    const redact = (s: string) => s.split(SECRET).join("[redacted]");
+    const { client, close } = await connect(env, "default", { redact });
+    try {
+      const list = JSON.stringify(await client.listResources());
+      expect(list).toContain("use the key [redacted] please");
+      expect(list).not.toContain(SECRET.slice(0, 8));
+    } finally {
+      await close();
+      env.library.close();
+    }
+  });
+
   it("is empty for a profile that does not expose list_artifacts, and refuses reads", async () => {
     const env = setup(home);
     const doc = env.library.save({

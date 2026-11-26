@@ -83,6 +83,10 @@ export const MOUNT_MAX_TOOLS = 200;
 export const MOUNT_MAX_DESCRIPTION = 2000;
 /** Largest upstream HTTP response body accepted (tool lists and results). */
 export const MOUNT_MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
+/** An upstream error message is cut to this many characters (after redaction). */
+export const MOUNT_MAX_ERROR_CHARS = 2000;
+/** A result nested deeper than this counts as too large. */
+const MOUNT_MAX_RESULT_DEPTH = 64;
 export const MOUNT_CONNECT_TIMEOUT_MS = 15_000;
 export const MOUNT_CALL_TIMEOUT_MS = 5 * 60_000;
 /** The status of an OAuth mount nobody has signed in to (or whose sign-in lapsed). */
@@ -231,10 +235,31 @@ export function mountFetchPolicy(
   };
 }
 
+/**
+ * Throws, naming the header but never its value (which may be a credential),
+ * when a mount's configured headers are not valid HTTP headers.
+ */
+function checkMountHeaders(headers: Record<string, string> | undefined): void {
+  for (const [name, value] of Object.entries(headers ?? {})) {
+    try {
+      new Headers([[name, value]]);
+    } catch {
+      const shown = /^[!#$%&'*+.^_`|~0-9A-Za-z-]{1,128}$/.test(name) ? name : "<invalid name>";
+      throw new MountPolicyError(`the mount header "${shown}" is not a valid HTTP header`);
+    }
+  }
+}
+
 /** Adds the header that marks a request as made on behalf of a pack or mount. */
 function withMarker(base: typeof fetch, pack: string): typeof fetch {
   return (async (input: string | URL | Request, init?: RequestInit) => {
-    const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : {}));
+    let headers: Headers;
+    try {
+      headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : {}));
+    } catch {
+      // The platform message quotes the offending value.
+      throw new TypeError("mount request has an invalid header");
+    }
     headers.set(PACK_MARKER_HEADER, pack);
     return base(input, { ...init, headers });
   }) as typeof fetch;
@@ -354,6 +379,11 @@ function needsSignIn(e: unknown): boolean {
   return false;
 }
 
+/** C0/C1 controls except tab and newline, and the bidi/invisible formatting marks. */
+const HIDDEN_CHARS =
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: these are the characters stripped
+  /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u061c\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g;
+
 /** Keep what a client can show from an untrusted tool list. */
 export function sanitizeUpstreamTools(
   mount: Pick<ResolvedMount, "id" | "prefix">,
@@ -371,7 +401,9 @@ export function sanitizeUpstreamTools(
     const name = typeof t.name === "string" ? t.name : "";
     if (!UPSTREAM_TOOL_NAME.test(name) || name.includes("__") || seen.has(name)) continue;
     seen.add(name);
-    const raw = typeof t.description === "string" ? t.description : "";
+    // Control and bidirectional-override characters can hide or reorder text
+    // a person reads in a client; they never belong in a description.
+    const raw = typeof t.description === "string" ? t.description.replace(HIDDEN_CHARS, "") : "";
     out.push({
       qualifiedName: `${mount.prefix}__${name}`,
       mountId: mount.id,
@@ -537,7 +569,10 @@ export class PackMounts implements MountedToolSource {
         throw new Error(`mount ${mountId}: ${MOUNT_NEEDS_SIGN_IN}`);
       }
       throw new Error(
-        this.redact(scrubMountUrls(`mount ${mountId}: ${(e as Error).message}`, s.url)),
+        this.redact(scrubMountUrls(`mount ${mountId}: ${(e as Error).message}`, s.url)).slice(
+          0,
+          MOUNT_MAX_ERROR_CHARS,
+        ),
       );
     }
     // The http transport caps the response body; a stdio server has no such
@@ -648,6 +683,7 @@ export class PackMounts implements MountedToolSource {
       } else if (mount.oauth) {
         const hooks = this.opts.oauth;
         if (!hooks || !(await hooks.signedIn(mount))) throw new NeedsSignInError();
+        checkMountHeaders(mount.headers);
         const url = new URL(mount.url);
         const f = this.oauthFetch(mount);
         closeFetch = f.close;
@@ -661,6 +697,7 @@ export class PackMounts implements MountedToolSource {
           ...(this.opts.daemonPorts ? { daemonPorts: this.opts.daemonPorts } : {}),
           ...(this.opts.lookup ? { lookup: this.opts.lookup } : {}),
         });
+        checkMountHeaders(mount.headers);
         const url = new URL(mount.url);
         let guarded: SafeFetch | null = null;
         if (!this.opts.fetch) {
@@ -772,26 +809,30 @@ async function closeSession(s: Session): Promise<void> {
   await s.dispose();
 }
 
-/** Serialized size of a tool result, stopping early once it is clearly too large. */
+/**
+ * Serialized size of a tool result, stopping early once it is clearly too
+ * large. A result nested too deep counts as too large (no deep recursion).
+ */
 function resultBytes(value: unknown): number {
   let total = 0;
   const seen = new Set<object>();
-  const walk = (v: unknown): void => {
+  const walk = (v: unknown, depth: number): void => {
     if (total > MOUNT_MAX_RESPONSE_BYTES) return;
     if (typeof v === "string") total += Buffer.byteLength(v);
     else if (v === null || typeof v !== "object") total += 8;
+    else if (depth > MOUNT_MAX_RESULT_DEPTH) total = Number.POSITIVE_INFINITY;
     else if (!seen.has(v)) {
       seen.add(v);
-      if (Array.isArray(v)) for (const item of v) walk(item);
+      if (Array.isArray(v)) for (const item of v) walk(item, depth + 1);
       else {
         for (const [k, item] of Object.entries(v)) {
           total += k.length;
-          walk(item);
+          walk(item, depth + 1);
         }
       }
     }
   };
-  walk(value);
+  walk(value, 0);
   return total;
 }
 

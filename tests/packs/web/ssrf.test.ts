@@ -49,7 +49,22 @@ describe("classifyAddress", () => {
     expect(kind("::ffff:169.254.169.254")).toBe("never");
     expect(kind("::ffff:8.8.8.8")).toBe("public");
     expect(kind("64:ff9b::a9fe:a9fe")).toBe("never");
-    expect(kind("2002:7f00:0001::")).toBe("local");
+  });
+
+  it("refuses the IPv6 forms the daemon's own check refuses (only 2000::/3 is public)", () => {
+    // 6to4 and IPv4-compatible forms reach an IPv4 address through a relay or not at all.
+    expect(kind("2002:7f00:0001::")).toBe("never");
+    expect(kind("2002:0808:0808::1")).toBe("never");
+    expect(kind("::127.0.0.1")).toBe("never");
+    expect(kind("::8.8.8.8")).toBe("never");
+    expect(kind("::ffff:0:808:808")).toBe("never");
+    expect(kind("fec0::1")).toBe("never");
+    expect(kind("4000::1")).toBe("never");
+    expect(kind("e000::1")).toBe("never");
+    // A zone index names an interface, not a destination.
+    expect(kind("fe80::1%en0")).toBe("never");
+    expect(kind("2001:4860:4860::8888%en0")).toBe("never");
+    expect(kind("[2606:4700:4700::1111]")).toBe("public");
   });
 
   it("treats garbage as never", () => {
@@ -382,6 +397,32 @@ describe("installGuards", () => {
     expect(gate.localTop).toBe(false);
   });
 
+  it("with allowLocalUrls, the proxy reaches only the local hosts the page requested (no redirect pivot)", async () => {
+    // A public resource inside a local page answers 302 to a LAN host. The
+    // browser follows the redirect without the route handler seeing it, so
+    // only the proxy can refuse it.
+    const h = fakeContext();
+    const gate = makeGate({ allowLocal: true, resolve }, true);
+    await installGuards(h.ctx as never, gate);
+    await h.request("http://app.local.example/", { navigation: true, frame: frame("about:blank") });
+    const doc = frame("http://app.local.example/");
+    expect(
+      (await h.request("http://127.0.0.1:5173/app.js", { frame: doc })).continue,
+    ).toHaveBeenCalled();
+    expect(
+      (await h.request("https://public.example/pixel", { frame: doc })).continue,
+    ).toHaveBeenCalled();
+    expect(gate.localTop).toBe(true);
+
+    expect((await gateConnection(gate, "http://app.local.example/")).ok).toBe(true);
+    expect((await gateConnection(gate, "http://127.0.0.1:5173/app.js")).ok).toBe(true);
+    const pivot = await gateConnection(gate, "http://127.0.0.1:8080/admin");
+    expect(pivot).toMatchObject({ ok: false, reason: expect.stringMatching(/redirect/) });
+    expect(gate.blocked.at(-1)?.url).toBe("http://127.0.0.1:8080/admin");
+    // Public hosts still connect.
+    expect((await gateConnection(gate, "https://public.example/")).ok).toBe(true);
+  });
+
   it("an origin let through as local that the proxy connects to a public address stops being local", async () => {
     let answer = ["127.0.0.1"];
     const gate = makeGate({ allowLocal: true, resolve: async () => answer }, true);
@@ -479,6 +520,8 @@ describe("installGuards", () => {
     ).toBe(true);
     // And the proxy gives the same answer for a typed local page.
     const gate = makeGate({ allowLocal: true, resolve, daemonPorts: [7777] }, true);
+    gate.localTargets.add("127.0.0.1:7777");
+    gate.localTargets.add("127.0.0.1:3000");
     expect(await gateConnection(gate, "http://127.0.0.1:7777/")).toMatchObject({ ok: false });
     expect(await gateConnection(gate, "http://127.0.0.1:3000/")).toEqual({
       ok: true,

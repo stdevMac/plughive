@@ -12,6 +12,11 @@ describe("local pack classifyAddress", () => {
     "3fff::1",
     "64:ff9b:1::a00:1",
     "100::1",
+    "2002:7f00:1::",
+    "::127.0.0.1",
+    "fec0::1",
+    "4000::1",
+    "fe80::1%en0",
   ])("%s is never allowed", (addr) => {
     expect(classifyAddress(addr).kind).toBe("never");
   });

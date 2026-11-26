@@ -13,6 +13,7 @@ import { z } from "zod";
 import { currentScopeAllows } from "../../mcp/scope.js";
 import {
   type CallContext,
+  MAX_ERROR_MESSAGE_CHARS,
   type RegisteredTool,
   type ToolEnvelope,
   toolInputJsonSchema,
@@ -23,6 +24,8 @@ export const MAX_BATCH_ITEMS = 100;
 export const MAX_BATCH_CONCURRENCY = 8;
 export const DEFAULT_BATCH_CONCURRENCY = 2;
 export const CONTACT_SHEET_TOOL = "local_contact_sheet";
+/** Results kept inline across all items; later items past it keep only a notice. */
+export const MAX_BATCH_RESULT_BYTES = 8 * 1024 * 1024;
 /** Tools a batch item may never call: no batches of batches, no scripts. */
 export const BATCH_REFUSED: ReadonlySet<string> = new Set(["batch_run", "run_tool_script"]);
 
@@ -155,6 +158,7 @@ export async function runBatch(
   const concurrency = Math.min(input.concurrency ?? DEFAULT_BATCH_CONCURRENCY, total);
   const items: BatchItem[] = new Array(total);
   let done = 0;
+  let kept = 0;
   const nested: CallContext = {
     ...(callCtx.signal ? { signal: callCtx.signal } : {}),
     caller: CORE_PACK_ID,
@@ -174,9 +178,31 @@ export async function runBatch(
           error: { code: "TOOL_ERROR", message: (e as Error).message, retryable: false },
         };
       }
-      items[i] = env.ok
-        ? { index: i, ok: true, result: env.result }
-        : { index: i, ok: false, error: { code: env.error.code, message: env.error.message } };
+      if (env.ok) {
+        // The results together must still fit in one reply: once they pass
+        // the limit, an item keeps only a notice (it still ran).
+        const bytes = Buffer.byteLength(JSON.stringify(env.result) ?? "", "utf8");
+        const fits = kept + bytes <= MAX_BATCH_RESULT_BYTES;
+        if (fits) kept += bytes;
+        items[i] = {
+          index: i,
+          ok: true,
+          result: fits
+            ? env.result
+            : {
+                truncated: `this result (${bytes} bytes) was left out: the batch results passed the ${MAX_BATCH_RESULT_BYTES} byte limit. Run this item on its own to get it.`,
+              },
+        };
+      } else {
+        items[i] = {
+          index: i,
+          ok: false,
+          error: {
+            code: env.error.code,
+            message: env.error.message.slice(0, MAX_ERROR_MESSAGE_CHARS),
+          },
+        };
+      }
       done++;
       callCtx.progress?.(done / total, `${done}/${total} items`);
     },

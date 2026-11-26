@@ -100,12 +100,15 @@ function oneLine(text: string, max: number): string {
   return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
 }
 
-function itemOf(a: ResourceArtifact): McpResourceItem {
+function itemOf(a: ResourceArtifact, redact?: (text: string) => string): McpResourceItem {
   const label = a.kind ? `${a.kind} ${a.id}` : a.id;
   const parts = [a.tool ? `made by ${a.tool}` : "", a.createdAt ? `on ${a.createdAt}` : ""].filter(
     Boolean,
   );
-  const prompt = typeof a.prompt === "string" && a.prompt.trim() ? oneLine(a.prompt, 160) : "";
+  // The prompt is redacted whole, before it is cut, so no part of a secret pasted
+  // into it is listed.
+  const raw = typeof a.prompt === "string" ? (redact ? redact(a.prompt) : a.prompt) : "";
+  const prompt = raw.trim() ? oneLine(raw, 160) : "";
   const description = [parts.join(" "), prompt ? `prompt: ${prompt}` : ""]
     .filter(Boolean)
     .join("; ");
@@ -123,13 +126,14 @@ function itemOf(a: ResourceArtifact): McpResourceItem {
 export function listResources(
   library: ResourceLibrary,
   cursor: unknown,
+  redact?: (text: string) => string,
 ): { resources: McpResourceItem[]; nextCursor?: string } {
   const offset = decodeCursor(cursor);
   // One extra row tells whether another page exists.
   const rows = library.list({}, RESOURCE_PAGE_SIZE + 1, offset);
   const page = rows.slice(0, RESOURCE_PAGE_SIZE);
   return {
-    resources: page.map(itemOf),
+    resources: page.map((a) => itemOf(a, redact)),
     ...(rows.length > RESOURCE_PAGE_SIZE
       ? { nextCursor: encodeCursor(offset + RESOURCE_PAGE_SIZE) }
       : {}),

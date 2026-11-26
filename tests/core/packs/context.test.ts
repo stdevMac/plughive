@@ -317,23 +317,39 @@ describe("pack context", () => {
       host.logger = { ...silent, warn };
       const scoped = ctxFor(
         manifest({
-          permissions: { network: ["*"], localNetwork: ["169.254.169.254:80", "[fe80::1]:80"] },
+          permissions: {
+            network: ["*"],
+            localNetwork: [
+              "169.254.169.254:80",
+              "[fe80::1]:80",
+              "[64:ff9b::a9fe:a9fe]:80",
+              "[2002:a9fe:a9fe::]:80",
+            ],
+          },
         }),
       );
       for (const url of [
         "http://169.254.169.254/latest/meta-data/",
         "http://[fe80::1]/",
         "http://[::ffff:169.254.169.254]/",
+        "http://[64:ff9b::a9fe:a9fe]/latest/meta-data/",
+        "http://[2002:a9fe:a9fe::]/",
         "http://metadata.google.internal/computeMetadata/v1/",
       ]) {
         const err = await scoped.base.fetch(url).catch((e: unknown) => e);
         expect(err, url).toBeInstanceOf(PackPermissionError);
         expect(err, url).toMatchObject({ reason: "denied" });
       }
-      expect(warn).toHaveBeenCalledWith(
-        expect.objectContaining({ pack: "demo", entry: "169.254.169.254:80" }),
-        expect.stringContaining("localNetwork entry ignored"),
-      );
+      for (const entry of [
+        "169.254.169.254:80",
+        "[64:ff9b::a9fe:a9fe]:80",
+        "[2002:a9fe:a9fe::]:80",
+      ]) {
+        expect(warn).toHaveBeenCalledWith(
+          expect.objectContaining({ pack: "demo", entry }),
+          expect.stringContaining("localNetwork entry ignored"),
+        );
+      }
       await scoped.dispose();
     });
 
@@ -357,10 +373,27 @@ describe("pack context", () => {
         "fd00:ec2::254",
         "metadata.google.internal",
         "Metadata.Google.Internal.",
+        // IPv6 forms that carry 169.254.169.254 (NAT64, 6to4, Teredo).
+        "64:ff9b::a9fe:a9fe",
+        "64:ff9b::169.254.169.254",
+        "[64:ff9b:1::a9fe:a9fe]",
+        "2002:a9fe:a9fe::",
+        "2002:a9fe:a9fe:1::1",
+        "2001:0:a9fe:a9fe::1",
+        "2001:0:4136:e378:8000:63bf:5601:5601",
       ]) {
         expect(isLinkLocalOrMetadataHost(h), h).toBe(true);
       }
-      for (const h of ["127.0.0.1", "10.0.0.1", "example.com", "::1", "192.168.1.1"]) {
+      for (const h of [
+        "127.0.0.1",
+        "10.0.0.1",
+        "example.com",
+        "::1",
+        "192.168.1.1",
+        "64:ff9b::808:808",
+        "2002:808:808::",
+        "2001:0:4136:e378:8000:63bf:3fff:fdd2",
+      ]) {
         expect(isLinkLocalOrMetadataHost(h), h).toBe(false);
       }
     });
@@ -375,7 +408,11 @@ describe("pack context", () => {
       const scoped = ctxFor(
         manifest({ permissions: { localNetwork: [`127.0.0.1:${port}`, `localhost:${port}`] } }),
       );
-      for (const url of [`http://127.0.0.1:${port}/api/profiles`, `http://localhost:${port}/mcp`]) {
+      for (const url of [
+        `http://127.0.0.1:${port}/api/profiles`,
+        `http://localhost:${port}/mcp`,
+        `http://localhost.:${port}/mcp`,
+      ]) {
         const err = await scoped.base.fetch(url).catch((e: unknown) => e);
         expect(err, url).toBeInstanceOf(PackPermissionError);
         expect(err, url).toMatchObject({ reason: "denied" });

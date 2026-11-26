@@ -46,12 +46,27 @@ function refuse(socket: Socket, status: string, reason: string): void {
   );
 }
 
-function forwardHeaders(req: IncomingMessage, host: string): Record<string, string | string[]> {
+/**
+ * The end-to-end headers of a message: without the standard hop-by-hop ones
+ * and without the ones its Connection header names (they are for this hop only).
+ */
+function endToEnd(headers: IncomingMessage["headers"]): Record<string, string | string[]> {
+  const listed = new Set(
+    String(headers.connection ?? "")
+      .split(",")
+      .map((n) => n.trim().toLowerCase())
+      .filter(Boolean),
+  );
   const out: Record<string, string | string[]> = {};
-  for (const [name, value] of Object.entries(req.headers)) {
-    if (value === undefined || HOP_HEADERS.has(name)) continue;
+  for (const [name, value] of Object.entries(headers)) {
+    if (value === undefined || HOP_HEADERS.has(name) || listed.has(name)) continue;
     out[name] = value;
   }
+  return out;
+}
+
+function forwardHeaders(req: IncomingMessage, host: string): Record<string, string | string[]> {
+  const out = endToEnd(req.headers);
   out.host = host;
   out.connection = "close";
   return out;
@@ -96,11 +111,7 @@ export async function startPinProxy(decide: PinDecide): Promise<PinProxy> {
       upstream.on("socket", track);
       upstream.on("timeout", () => upstream.destroy(new Error("upstream timed out")));
       upstream.on("response", (up) => {
-        const headers: Record<string, string | string[]> = {};
-        for (const [name, value] of Object.entries(up.headers)) {
-          if (value !== undefined && !HOP_HEADERS.has(name)) headers[name] = value;
-        }
-        res.writeHead(up.statusCode ?? 502, headers);
+        res.writeHead(up.statusCode ?? 502, endToEnd(up.headers));
         up.pipe(res);
         up.on("error", () => res.destroy());
       });

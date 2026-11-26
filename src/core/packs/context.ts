@@ -592,6 +592,17 @@ export function isLinkLocalOrMetadataHost(host: string): boolean {
   const mapped = v6.subarray(0, 10).every((x) => x === 0) && v6[10] === 0xff && v6[11] === 0xff;
   const compat = v6.subarray(0, 12).every((x) => x === 0);
   if (mapped || compat) return blockedV4(v6.subarray(12));
+  // Forms that carry an IPv4 address and reach it through a gateway: NAT64
+  // (64:ff9b::/96, 64:ff9b:1::/48), 6to4 (2002::/16) and Teredo (2001::/32,
+  // server and XOR-ed client address).
+  const word = (i: number) => ((v6[i] ?? 0) << 8) | (v6[i + 1] ?? 0);
+  if (word(0) === 0x64 && word(2) === 0xff9b && (word(4) === 0 || word(4) === 1)) {
+    return blockedV4(v6.subarray(12));
+  }
+  if (word(0) === 0x2002) return blockedV4(v6.subarray(2, 6));
+  if (word(0) === 0x2001 && word(2) === 0) {
+    return blockedV4(v6.subarray(4, 8)) || blockedV4(v6.subarray(12).map((x) => x ^ 0xff));
+  }
   return false;
 }
 
@@ -603,7 +614,10 @@ function splitHostPort(entry: string): { host: string; port: number | null } {
 }
 
 function isLocalName(host: string): boolean {
-  const h = host.toLowerCase().replace(/^\[|\]$/g, "");
+  const h = host
+    .toLowerCase()
+    .replace(/^\[|\]$/g, "")
+    .replace(/\.$/, "");
   if (h === "localhost" || h.endsWith(".localhost")) return true;
   return (parseIPv4(h) !== null || parseIPv6(h) !== null) && isPrivateAddress(h);
 }

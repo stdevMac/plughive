@@ -1,0 +1,258 @@
+name: Release
+
+# Pushing a tag vX.Y.Z (matching package.json "version") publishes:
+#   - the npm package plughive@X.Y.Z (with provenance)
+#   - the Docker image ghcr.io/stdevmac/plughive:X.Y.Z and
+#     docker.io/marcosmaceo97/plughive:X.Y.Z for linux/amd64 and linux/arm64
+#     (plus :X.Y and :latest for a stable release)
+#   - a GitHub Release whose notes are the CHANGELOG.md section "## X.Y.Z"
+# A version with a pre-release part (1.2.0-rc.1) goes to the npm "next" tag
+# and never moves :latest. See RELEASING.md.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/stdevmac/plughive
+  DOCKERHUB_IMAGE: docker.io/marcosmaceo97/plughive
+  DOCKERHUB_USERNAME: marcosmaceo97
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PLUGHIVE_NO_DOTENV: "1"
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Tag matches package.json
+        id: version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p 'require("./package.json").version')"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $pkg"
+            exit 1
+          fi
+          echo "version=$pkg" >> "$GITHUB_OUTPUT"
+          case "$pkg" in *-*) echo "prerelease=true" ;; *) echo "prerelease=false" ;; esac >> "$GITHUB_OUTPUT"
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm test:web
+      - run: pnpm build
+      - run: pnpm smoke:ci
+      - run: pnpm check:pack
+
+  npm:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: release
+    permissions:
+      contents: read
+      id-token: write # npm trusted publishing and provenance
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+      VERSION: ${{ needs.verify.outputs.version }}
+      DIST_TAG: ${{ needs.verify.outputs.prerelease == 'true' && 'next' || 'latest' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing (OIDC) needs npm 11.5.1 or later; Node 22 ships npm 10.
+      - run: npm install -g npm@11
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Publish
+        env:
+          # Only for the very first publish, before the trusted publisher is
+          # set up on npmjs.com. Leave the secret unset afterwards.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if npm view "plughive@$VERSION" version >/dev/null 2>&1; then
+            echo "plughive@$VERSION is already on npm; skipping."
+            exit 0
+          fi
+          # prepack cleans, builds and checks the package contents.
+          npm publish --access public --provenance --tag "$DIST_TAG"
+
+  docker:
+    needs: verify
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Log in to ghcr.io
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Build and push linux/${{ matrix.arch }}
+        # Native runner per architecture: no emulation for the native modules.
+        run: |
+          docker buildx create --use --driver docker-container
+          docker buildx build . \
+            --platform "linux/${{ matrix.arch }}" \
+            --build-arg "VERSION=$VERSION" \
+            --cache-from "type=registry,ref=$IMAGE:buildcache-${{ matrix.arch }}" \
+            --cache-to "type=registry,ref=$IMAGE:buildcache-${{ matrix.arch }},mode=max" \
+            --sbom=true \
+            --provenance=mode=max \
+            --tag "$IMAGE:$VERSION-${{ matrix.arch }}" \
+            --push
+
+      - name: Smoke test the pushed image
+        # The image must start, pass its own healthcheck and answer /health.
+        run: |
+          docker run -d --name plughive -p 127.0.0.1:7777:7777 \
+            --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges \
+            -e PLUGHIVE_ACCESS_KEY="$(openssl rand -hex 32)" \
+            -e PLUGHIVE_SECRETS_PASSPHRASE="$(openssl rand -hex 32)" \
+            "$IMAGE:$VERSION-${{ matrix.arch }}"
+          for _ in $(seq 1 30); do
+            status="$(docker inspect -f '{{.State.Health.Status}}' plughive)"
+            [ "$status" = "healthy" ] && break
+            sleep 2
+          done
+          docker logs plughive | tail -20
+          [ "$status" = "healthy" ] || { echo "::error::container is $status"; exit 1; }
+          curl -fsS http://127.0.0.1:7777/health
+          docker exec plughive sh -c 'ffmpeg -version | head -1 && pandoc --version | head -1'
+
+  docker-manifest:
+    needs: [verify, docker]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+      PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+    steps:
+      - name: Log in to ghcr.io
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Log in to Docker Hub
+        id: dockerhub
+        env:
+          TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::warning::DOCKERHUB_TOKEN is not set; publishing to ghcr.io only."
+            exit 0
+          fi
+          echo "$TOKEN" | docker login docker.io -u "$DOCKERHUB_USERNAME" --password-stdin
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+
+      - name: Multi-arch tags
+        env:
+          DOCKERHUB: ${{ steps.dockerhub.outputs.enabled }}
+        run: |
+          images=("$IMAGE")
+          [ "$DOCKERHUB" = "true" ] && images+=("$DOCKERHUB_IMAGE")
+          tags=()
+          for img in "${images[@]}"; do
+            tags+=(--tag "$img:$VERSION")
+            if [ "$PRERELEASE" != "true" ]; then
+              tags+=(--tag "$img:${VERSION%.*}" --tag "$img:latest")
+            fi
+          done
+          docker buildx imagetools create "${tags[@]}" \
+            "$IMAGE:$VERSION-amd64" "$IMAGE:$VERSION-arm64"
+          docker buildx imagetools inspect "$IMAGE:$VERSION"
+
+  github-release:
+    needs: [verify, npm, docker-manifest]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+      PRERELEASE: ${{ needs.verify.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          awk -v v="## $VERSION" '
+            $0 == v { on = 1; next }
+            on && /^## / { exit }
+            on { print }
+          ' CHANGELOG.md > notes.md
+          {
+            echo
+            echo "---"
+            echo
+            echo "npm: \`npx plughive@$VERSION\`"
+            echo
+            echo "Docker: \`docker pull $IMAGE:$VERSION\`"
+          } >> notes.md
+          flags=(--title "v$VERSION" --notes-file notes.md --verify-tag)
+          [ "$PRERELEASE" = "true" ] && flags+=(--prerelease)
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release edit "$GITHUB_REF_NAME" "${flags[@]}"
+          else
+            gh release create "$GITHUB_REF_NAME" "${flags[@]}"
+          fi

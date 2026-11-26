@@ -4,6 +4,10 @@ All notable changes are listed here. Versions follow semantic versioning.
 
 ## Unreleased
 
+## 0.1.0
+
+The first public release.
+
 ### Security
 
 Some of these close access that was open before. If a tool now refuses, its
@@ -163,17 +167,12 @@ error names the setting to change.
   writes the same LaunchAgent (`dev.plughive.daemon`) on macOS, a systemd
   user unit on Linux, and a logon task on Windows.
 
-## 0.1.0
-
-The first public release.
-
 ### What is in it
 
 - One daemon that serves MCP over Streamable HTTP at `/mcp`, bound to
   `127.0.0.1:7777` by default.
-- 16 bundled packs with 111 tools (OpenRouter, fal, Replicate, Gemini,
-  ElevenLabs, local media tools, web, SEO, PDF, Telegram, Dub, growth,
-  machines, mounts, media and workflows). See [docs/packs.md](docs/packs.md).
+- 36 bundled packs with 173 tools on by default (193 with the off-by-default
+  machines, sandbox and cli-bridge packs). See [docs/packs.md](docs/packs.md).
 - Five protocol tools that let a client find and call any tool without
   listing all of them: `search_tools`, `describe_tool`, `execute_tool`,
   `wait_for_job` and `cancel_job`.

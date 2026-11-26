@@ -5,7 +5,11 @@ import { checkPack, targetsOf } from "../../scripts/check-pack.mjs";
 const pkg = {
   bin: { plughive: "dist/src/cli.js" },
   exports: {
-    "./pack": { types: "./src/core/pack-api.ts", default: "./dist/src/core/pack-api.js" },
+    "./pack": {
+      types: "./dist/types/src/core/pack-api.d.ts",
+      "plughive-source": "./src/core/pack-api.ts",
+      default: "./dist/src/core/pack-api.js",
+    },
   },
 };
 const good = [
@@ -15,7 +19,7 @@ const good = [
   "dist/src/core/pack-api.js",
   "dist/packs/web/pack.json",
   "dist/web/dist/index.html",
-  "src/core/pack-api.ts",
+  "dist/types/src/core/pack-api.d.ts",
 ];
 const packed = (extra: string[] = [], drop: string[] = []) => ({
   files: [...good.filter((p) => !drop.includes(p)), ...extra].map((path) => ({ path })),
@@ -26,10 +30,11 @@ describe("check-pack (M3)", () => {
     expect(checkPack(pkg, packed())).toEqual([]);
   });
 
-  it("collects bin and every export condition as targets", () => {
+  it("collects bin and every published export condition as targets", () => {
+    // plughive-source only resolves inside the repository and is not published.
     expect(targetsOf(pkg).map((t) => t.path)).toEqual([
       "dist/src/cli.js",
-      "src/core/pack-api.ts",
+      "dist/types/src/core/pack-api.d.ts",
       "dist/src/core/pack-api.js",
     ]);
   });
@@ -57,6 +62,9 @@ describe("check-pack (M3)", () => {
         "dist/packs/x/server.pem",
         "dist/packs/x/id.KEY",
         "dist/packs/x/cert.p12",
+        "dist/src/cli.js.map",
+        "dist/packs/x/tool.ts",
+        "src/core/pack-api.ts",
       ]),
     ).join("\n");
     for (const needle of [
@@ -73,6 +81,9 @@ describe("check-pack (M3)", () => {
       "dist/packs/x/server.pem is a private key or certificate bundle",
       "dist/packs/x/id.KEY is a private key or certificate bundle",
       "dist/packs/x/cert.p12 is a private key or certificate bundle",
+      "dist/src/cli.js.map is a source map",
+      "dist/packs/x/tool.ts is TypeScript source (publish the compiled .js and .d.ts)",
+      "unexpected top-level entry: src/core/pack-api.ts",
     ])
       expect(problems).toContain(needle);
   });
@@ -82,6 +93,7 @@ describe("check-pack (M3)", () => {
     const real = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8"));
     const paths = targetsOf(real).map((t) => t.path);
     expect(paths).toContain("dist/src/cli.js");
+    expect(paths).toContain("dist/types/src/core/pack-api.d.ts");
     expect(real.scripts.prepack).toMatch(/clean.*build/);
   });
 });

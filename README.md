@@ -12,10 +12,22 @@ off-by-default machines, sandbox and cli-bridge packs) over MCP Streamable HTTP 
 
 You need Node.js 22 or later. Pick one way to run it.
 
-**npx** (after the package is published to npm):
+**npx**:
 
 ```sh
 npx plughive
+```
+
+**Docker image** (linux/amd64 and linux/arm64). On a network bind the daemon
+needs an access key and a secrets passphrase; see `docker-compose.yml` for a
+hardened setup that reads them from files:
+
+```sh
+docker run -d --name plughive -p 127.0.0.1:7777:7777 -v plughive-data:/data \
+  -e PLUGHIVE_ACCESS_KEY="$(openssl rand -hex 32)" \
+  -e PLUGHIVE_SECRETS_PASSPHRASE="$(openssl rand -hex 32)" \
+  ghcr.io/stdevmac/plughive:latest
+docker exec plughive plughive dashboard --print
 ```
 
 **Docker**, in a checkout of this repository (state in a volume, access key

@@ -18,7 +18,6 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 /** Top-level entries the package may contain (npm always adds package.json). */
 export const ALLOWED_TOP = new Set([
   "dist",
-  "src",
   "package.json",
   "README.md",
   "LICENSE",
@@ -27,8 +26,18 @@ export const ALLOWED_TOP = new Set([
   "SECURITY.md",
 ]);
 
-/** What the build writes under dist/: tsc output for src and packs, and the dashboard. */
-export const ALLOWED_DIST = new Set(["src", "packs", "web"]);
+/**
+ * What the build writes under dist/: tsc output for src and packs, the
+ * declarations of the public pack API (tsconfig.types.json), and the dashboard.
+ */
+export const ALLOWED_DIST = new Set(["src", "packs", "types", "web"]);
+
+/**
+ * Export conditions that only resolve inside this repository (tsx runs the
+ * TypeScript sources with --conditions=plughive-source); their targets are not
+ * published.
+ */
+export const REPO_ONLY_CONDITIONS = new Set(["plughive-source"]);
 
 const FORBIDDEN = [
   { test: (base) => /^\.env(\..*)?$/.test(base) && base !== ".env.example", why: "an .env file" },
@@ -36,6 +45,13 @@ const FORBIDDEN = [
   { test: (base) => base === "secrets.json" || /^\.secrets\./.test(base), why: "a secrets file" },
   { test: (base) => /\.(test|spec)\.[cm]?[jt]sx?(\.map)?$/.test(base), why: "a test file" },
   { test: (base) => base === ".npmrc", why: "an npm config file (it can hold a token)" },
+  // Nothing runs with --enable-source-maps; maps only add weight and reveal
+  // the sources.
+  { test: (base) => base.endsWith(".map"), why: "a source map" },
+  {
+    test: (base) => /\.[cm]?tsx?$/.test(base) && !/\.d\.[cm]?ts$/.test(base),
+    why: "TypeScript source (publish the compiled .js and .d.ts)",
+  },
   {
     test: (base) => /\.(pem|key|p12|pfx)$/i.test(base),
     why: "a private key or certificate bundle",
@@ -64,7 +80,8 @@ export function targetsOf(pkg) {
   const walk = (where, node) => {
     if (typeof node === "string") add(where, node);
     else if (node && typeof node === "object")
-      for (const [k, v] of Object.entries(node)) walk(`${where}[${JSON.stringify(k)}]`, v);
+      for (const [k, v] of Object.entries(node))
+        if (!REPO_ONLY_CONDITIONS.has(k)) walk(`${where}[${JSON.stringify(k)}]`, v);
   };
   walk("exports", pkg.exports);
   return out;

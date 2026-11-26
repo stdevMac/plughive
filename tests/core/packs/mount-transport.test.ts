@@ -256,7 +256,9 @@ describe("PackMounts result size", () => {
       ).rejects.toThrow(/too large/);
       // D-M2: a result nested too deep is refused like a too large one.
       await expect(mounts.call("user/big", "blob", { depth: 10 })).resolves.toBeTruthy();
-      await expect(mounts.call("user/big", "blob", { depth: 5000 })).rejects.toThrow(/too large/);
+      // 200 is well past the limit (64) yet shallow enough for the fake
+      // server's own JSON.stringify on Linux's smaller default stack.
+      await expect(mounts.call("user/big", "blob", { depth: 200 })).rejects.toThrow(/too large/);
       // D-M2: a huge upstream error message is cut.
       const err = await mounts.call("user/big", "blob", { fail: 100_000 }).catch((e) => e);
       expect(err).toBeInstanceOf(Error);

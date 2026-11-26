@@ -52,6 +52,11 @@ export const RulesSchema = z
     /** Ask before tools tagged "sends" (email, SMS, calls, posts, bookings: they reach other people). On by default. */
     ask_before_sending: z.boolean().default(true),
     /**
+     * At most this many calls to tools tagged "sends" per profile in any
+     * hour, asked or not; later ones are refused. Null: no ceiling (default).
+     */
+    max_sends_per_hour: z.number().int().min(1).max(100_000).nullable().default(null),
+    /**
      * Let MCP clients that support form elicitation show approve/deny in the
      * chat. Off by default: the answer then comes from the client, not from
      * the dashboard, Telegram or the tray, so only turn it on for clients you trust.
@@ -68,6 +73,7 @@ const PartialRulesSchema = z
     always_ask_providers: idList.optional(),
     ask_before_destructive: z.boolean().optional(),
     ask_before_sending: z.boolean().optional(),
+    max_sends_per_hour: z.number().int().min(1).max(100_000).nullable().optional(),
     approve_in_chat: z.boolean().optional(),
   })
   .strict();
@@ -219,6 +225,10 @@ export function rulesFor(policy: Policy, profile: string | undefined): Rules {
     always_ask_providers: own.always_ask_providers ?? policy.rules.always_ask_providers,
     ask_before_destructive: own.ask_before_destructive ?? policy.rules.ask_before_destructive,
     ask_before_sending: own.ask_before_sending ?? policy.rules.ask_before_sending,
+    max_sends_per_hour:
+      own.max_sends_per_hour !== undefined
+        ? own.max_sends_per_hour
+        : policy.rules.max_sends_per_hour,
     approve_in_chat: own.approve_in_chat ?? policy.rules.approve_in_chat,
   };
 }

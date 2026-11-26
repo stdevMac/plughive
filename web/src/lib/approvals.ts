@@ -59,6 +59,7 @@ export interface Policy {
     always_ask_providers: string[];
     ask_before_destructive: boolean;
     ask_before_sending: boolean;
+    max_sends_per_hour?: number | null;
     approve_in_chat: boolean;
   };
   profiles: Record<string, unknown>;

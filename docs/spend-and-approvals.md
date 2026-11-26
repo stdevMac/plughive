@@ -24,6 +24,7 @@ Set it up on the dashboard (**Usage > Spend caps**) or write
     "always_ask_providers": [],
     "ask_before_destructive": false,
     "ask_before_sending": true,
+    "max_sends_per_hour": null,
     "approve_in_chat": false
   },
   "profiles": {
@@ -81,6 +82,11 @@ ledger cannot be read, every cap counts as used up.
   covers the run's cost, not its messages), so a scheduled workflow that
   sends needs this off for its profile. Turn it off only for a profile you
   trust to send on its own.
+- `max_sends_per_hour` (off by default): at most this many calls to `sends`
+  tools per profile in any hour, asked or not. Later calls fail with
+  `SPEND_BLOCKED` until older ones leave the hour. Useful with
+  `ask_before_sending` off, so a runaway agent cannot send without end. The
+  count is kept in memory and starts again when the daemon restarts.
 
 - `approve_in_chat` (off by default): a client that supports MCP form
   elicitation shows an approve/deny form in the chat instead of the

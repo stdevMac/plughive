@@ -91,6 +91,8 @@ export const SENDS_TAG = "sends";
 const ESTIMATE_TIMEOUT_MS = 5000;
 /** Approve/deny forms remembered at once; the oldest is forgotten first. */
 const MAX_CHAT_FORMS = 1000;
+/** The window of the max_sends_per_hour ceiling. */
+const SEND_WINDOW_MS = 60 * 60_000;
 
 function money(usd: number | null): string {
   if (usd === null) return "an unknown amount";
@@ -148,6 +150,8 @@ export class PolicyGate {
   private readonly reservations = new Set<Reservation>();
   /** Approval id -> token of the in-chat form shown for it. */
   private readonly chatForms = new Map<string, string>();
+  /** Profile -> start times of its recent sending calls (max_sends_per_hour). */
+  private readonly sendTimes = new Map<string, number[]>();
 
   constructor(private readonly opts: PolicyGateOptions) {
     this.cache = new PolicyCache(opts.home);
@@ -460,12 +464,28 @@ export class PolicyGate {
   // Tool calls (registry)
 
   /** Run a tool through the policy: maybe refuse, maybe ask first. */
+  /** Refuse a sending call over the profile's max_sends_per_hour; `count` records this one. */
+  private checkSendCeiling(tool: string, profile: string, limit: number, count: boolean): void {
+    const now = this.now();
+    const recent = (this.sendTimes.get(profile) ?? []).filter((t) => now - t < SEND_WINDOW_MS);
+    if (recent.length >= limit) {
+      this.sendTimes.set(profile, recent);
+      throw new PolicyError(
+        `${tool} not run: this profile already made ${recent.length} sending calls in the last hour (max_sends_per_hour is ${limit})`,
+        "SPEND_BLOCKED",
+      );
+    }
+    if (count) recent.push(now);
+    this.sendTimes.set(profile, recent);
+  }
+
   async runTool<T>(
     tool: GatedTool,
     args: unknown,
     signal: AbortSignal | undefined,
-    run: () => Promise<T>,
+    body: () => Promise<T>,
   ): Promise<T> {
+    let run = body;
     const paid = tool.tags?.includes(PAID_TAG) === true;
     const sends = tool.tags?.includes(SENDS_TAG) === true;
     const destructive = sends || tool.annotations?.destructiveHint === true;
@@ -480,6 +500,16 @@ export class PolicyGate {
         `${tool.name} not run: policy.json is invalid, so paid and destructive tools are refused until it is fixed or deleted`,
         "SPEND_BLOCKED",
       );
+    }
+    if (sends && rules.max_sends_per_hour !== null) {
+      // Checked before asking (no request for a call that cannot run) and
+      // again, with the call counted, right before it runs.
+      const limit = rules.max_sends_per_hour;
+      this.checkSendCeiling(tool.name, profile, limit, false);
+      run = () => {
+        this.checkSendCeiling(tool.name, profile, limit, true);
+        return body();
+      };
     }
     const runCtx = currentPolicyRun();
     const preApproved = runCtx.preApproved === true;

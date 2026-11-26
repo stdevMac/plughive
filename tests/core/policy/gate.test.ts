@@ -694,6 +694,51 @@ describe("spend policy gate", () => {
       expect(asBot.ok).toBe(true);
     });
 
+    it("H-7: max_sends_per_hour caps sending calls per profile, asked or not", async () => {
+      const code = (out: Awaited<ReturnType<typeof registry.call>>) =>
+        out.ok ? "ok" : out.error.code;
+      policy({ rules: { ask_before_sending: false, max_sends_per_hour: 2 } });
+      expect(code(await registry.call("send_email", {}))).toBe("ok");
+      expect(code(await registry.call("send_email", {}))).toBe("ok");
+      const third = await registry.call("send_email", {});
+      expect(code(third)).toBe("SPEND_BLOCKED");
+      expect(third.ok ? "" : third.error.message).toMatch(/max_sends_per_hour/);
+      // Tools that do not send are not counted or limited.
+      expect(code(await registry.call("read", {}))).toBe("ok");
+      // Each profile has its own count.
+      const asBot = await requestScope.run({ profileId: "bot" }, () =>
+        registry.call("send_email", {}),
+      );
+      expect(code(asBot)).toBe("ok");
+      // A refused call opens no approval request, and an approved run does not lift it.
+      policy({ rules: { max_sends_per_hour: 2 } });
+      expect(code(await runPreApproved(() => registry.call("send_email", {})))).toBe(
+        "SPEND_BLOCKED",
+      );
+      expect(approvals.list({ status: "pending" })).toHaveLength(0);
+      // The window slides.
+      now += 60 * 60_000;
+      policy({ rules: { ask_before_sending: false, max_sends_per_hour: 2 } });
+      expect(code(await registry.call("send_email", {}))).toBe("ok");
+    });
+
+    it("H-7: a profile can set its own max_sends_per_hour", async () => {
+      policy({
+        rules: { ask_before_sending: false },
+        profiles: { bot: { max_sends_per_hour: 1 } },
+      });
+      const asBot = () =>
+        requestScope.run({ profileId: "bot" }, () => registry.call("send_email", {}));
+      expect((await asBot()).ok).toBe(true);
+      expect((await asBot()).ok).toBe(false);
+      expect((await registry.call("send_email", {})).ok).toBe(true);
+    });
+
+    it("H-7: with no max_sends_per_hour (the default) sending calls are not counted", async () => {
+      policy({ rules: { ask_before_sending: false } });
+      for (let i = 0; i < 50; i++) expect((await registry.call("send_email", {})).ok).toBe(true);
+    });
+
     it("decideInChat: only when approve_in_chat is on, only for the caller's own profile", async () => {
       const opened = await registry.call("send_email", {});
       const id = opened.ok ? "" : (opened.error.approval?.id ?? "");

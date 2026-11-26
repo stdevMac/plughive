@@ -9,10 +9,10 @@
 //
 // Add a field here (schema + default) to share another preference. Unknown
 // or invalid fields in the file are dropped on read, never fatal.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import { atomicReplaceSync } from "../lib/platform.js";
+import { writeFileAtomicSync } from "../lib/platform.js";
 
 export const PREFERENCES_FILE = "preferences.json";
 
@@ -58,10 +58,8 @@ export function readPreferences(home: string): Preferences {
 export function writePreferences(home: string, patch: PreferencesPatch): Preferences {
   const next: Preferences = { ...readPreferences(home) };
   if (patch.locale !== undefined) next.locale = patch.locale;
-  mkdirSync(home, { recursive: true });
-  const path = preferencesPath(home);
-  const tmp = `${path}.${process.pid}.tmp`;
-  writeFileSync(tmp, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 });
-  atomicReplaceSync(tmp, path);
+  mkdirSync(home, { recursive: true, mode: 0o700 });
+  // A fresh, unguessable temp file that never follows a planted symlink.
+  writeFileAtomicSync(preferencesPath(home), `${JSON.stringify(next, null, 2)}\n`);
   return next;
 }

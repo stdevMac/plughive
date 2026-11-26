@@ -129,4 +129,22 @@ describe("assertEncryptedSecretsOnNetwork", () => {
     ).not.toThrow();
     expect(() => assertEncryptedSecretsOnNetwork("0.0.0.0", {})).not.toThrow();
   });
+  it("judges the resolved backend, not only PLUGHIVE_SECRETS", () => {
+    // No keychain on a headless box: the store fell back to a plain file.
+    expect(() => assertEncryptedSecretsOnNetwork("0.0.0.0", {}, "file-plain")).toThrow(
+      /plain file/,
+    );
+    expect(() =>
+      assertEncryptedSecretsOnNetwork(
+        "0.0.0.0",
+        { PLUGHIVE_ALLOW_PLAIN_SECRETS: "1" },
+        "file-plain",
+      ),
+    ).not.toThrow();
+    expect(() =>
+      assertEncryptedSecretsOnNetwork("0.0.0.0", { PLUGHIVE_SECRETS: "file" }, "file-encrypted"),
+    ).not.toThrow();
+    expect(() => assertEncryptedSecretsOnNetwork("0.0.0.0", {}, "keychain")).not.toThrow();
+    expect(() => assertEncryptedSecretsOnNetwork("127.0.0.1", {}, "file-plain")).not.toThrow();
+  });
 });

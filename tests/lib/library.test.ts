@@ -119,6 +119,30 @@ describe("library", () => {
     },
   );
 
+  it("D-M7: a failed database insert leaves no orphan file behind", async () => {
+    const other = new Database(join(dir, "library.db"));
+    other.exec(
+      "CREATE TRIGGER refuse BEFORE INSERT ON artifacts BEGIN SELECT RAISE(ABORT, 'disk full'); END",
+    );
+    other.close();
+    const files = (): string[] =>
+      (readdirSync(join(dir, "artifacts"), { recursive: true }) as string[]).filter((p) =>
+        statSync(join(dir, "artifacts", p)).isFile(),
+      );
+    const meta = { kind: "image" as const, mime: "image/png", tool: "t" };
+    expect(() => lib.save({ ...meta, bytes: Buffer.from("png") })).toThrow(/disk full/);
+    const src = join(dir, "src.png");
+    writeFileSync(src, "png");
+    expect(() => lib.importFile({ ...meta, sourcePath: src })).toThrow(/disk full/);
+    const handle = await open(src, "r");
+    try {
+      await expect(lib.importHandle(meta, handle, 1024)).rejects.toThrow(/disk full/);
+    } finally {
+      await handle.close();
+    }
+    expect(files()).toEqual([]);
+  });
+
   it("importHandle copies from an open descriptor and returns", async () => {
     const bytes = Buffer.alloc(3 * 1024 * 1024 + 17, 7);
     writeFileSync(join(dir, "source.bin"), bytes);

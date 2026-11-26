@@ -171,6 +171,15 @@ describe("createSecretStore.list", () => {
     expect((await store.list()).map((e) => e.name)).toContain("UNDECLARED_ENV");
   });
 
+  it("redacts a declared environment value before anything reads it", () => {
+    const env = { LATE_ENV: ENV_VALUE, NOT_OURS: "other-tool-credential-xyz" };
+    const store = createSecretStore({ home: newHome(), env, backend: new MemoryBackend() });
+    store.declareNames(["LATE_ENV"]);
+    expect(store.redactor.redact(`echo ${ENV_VALUE}`)).toBe(`echo ${REDACTED}`);
+    // Undeclared variables are not ours to register.
+    expect(store.redactor.redact("other-tool-credential-xyz")).toBe("other-tool-credential-xyz");
+  });
+
   it("drops invalid names a backend might return", async () => {
     const backend: SecretBackend = {
       kind: "memory",
@@ -351,8 +360,10 @@ describe("redactor integration", () => {
       knownNames: ["ENV_KEY"],
     });
     expect(store.redactor).toBe(shared);
-    // Not yet read: unknown to the redactor.
-    expect(shared.redact(`a ${ENV_VALUE} pre-existing-value-55`)).toContain(ENV_VALUE);
+    // A declared environment value is known at once; a stored one once read.
+    expect(shared.redact(`a ${ENV_VALUE} pre-existing-value-55`)).toBe(
+      `a ${REDACTED} pre-existing-value-55`,
+    );
 
     await store.get("ENV_KEY");
     await store.get("OLD_KEY");

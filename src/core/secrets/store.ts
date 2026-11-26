@@ -366,6 +366,10 @@ export function createSecretStore(options: CreateSecretStoreOptions): LayeredSec
         owners.set(owner, mine);
       }
       mine.add(name);
+      // Register an environment value now, not on first get(): a pack or a
+      // child process can see the variable without ever asking the store.
+      const value = fromEnv(name);
+      if (value !== undefined) redactor.register(value);
     }
   };
   if (options.knownNames !== undefined) declareNames(options.knownNames);

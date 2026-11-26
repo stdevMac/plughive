@@ -441,8 +441,16 @@ export class FileBackend implements SecretBackend {
           "SECRET_FILE_INSECURE",
         );
       }
+      if (POSIX && (st.mode & 0o022) !== 0) {
+        // Group/world writable: someone else may have planted keys or endpoints
+        // in it. Tightening the mode would bless that, so refuse instead.
+        throw new SecretStoreError(
+          "The secrets file is writable by other users. Check its contents, then run: chmod 600 on the file.",
+          "SECRET_FILE_INSECURE",
+        );
+      }
       if (POSIX && (st.mode & 0o077) !== 0) {
-        // Group/world accessible. Tighten it on the open descriptor, or refuse.
+        // Group/world readable. Tighten it on the open descriptor, or refuse.
         try {
           await handle.chmod(0o600);
           const after = await handle.stat();

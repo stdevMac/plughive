@@ -54,10 +54,16 @@ export function assertSafeBind(bindHost: string, accessKey: string | null): void
 export function assertEncryptedSecretsOnNetwork(
   bindHost: string,
   env: Record<string, string | undefined>,
+  storage?: string,
 ): void {
   if (isLoopbackHost(bindHost)) return;
-  if (env.PLUGHIVE_SECRETS?.trim().toLowerCase() !== "file") return;
-  if (env.PLUGHIVE_SECRETS_PASSPHRASE) return;
+  // The resolved backend when known: a headless machine with no keychain falls
+  // back to a plain file without PLUGHIVE_SECRETS=file ever being set.
+  const plain =
+    storage !== undefined
+      ? storage === "file-plain"
+      : env.PLUGHIVE_SECRETS?.trim().toLowerCase() === "file" && !env.PLUGHIVE_SECRETS_PASSPHRASE;
+  if (!plain) return;
   if (env.PLUGHIVE_ALLOW_PLAIN_SECRETS === "1") return;
   throw new Error(
     `Refusing to keep provider keys in a plain file while bound to ${bindHost}. Set PLUGHIVE_SECRETS_PASSPHRASE (or PLUGHIVE_SECRETS_PASSPHRASE_FILE) to encrypt them, or PLUGHIVE_ALLOW_PLAIN_SECRETS=1 to accept a plain file.`,

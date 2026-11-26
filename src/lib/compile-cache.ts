@@ -7,10 +7,10 @@
 // it and nobody else can write to it.
 //
 // No imports beyond node: built-ins, so it is cheap to load before the daemon.
-import { mkdirSync, statSync } from "node:fs";
+import { lstatSync, mkdirSync, realpathSync, statSync } from "node:fs";
 import * as nodeModule from "node:module";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 /** The per-user directory for the cache (not created here). */
 export function compileCacheDir(
@@ -25,12 +25,24 @@ export function compileCacheDir(
   return join(base, "plughive", "node-compile-cache");
 }
 
-/** True when `dir` is a directory this user owns and only this user can write. */
+/**
+ * True when `dir` is a directory this user owns and only this user can write,
+ * and no folder above it lets another user swap it out: each parent is owned
+ * by this user or root and is not writable by others (unless sticky, like
+ * /tmp). Checked on the resolved path, so a symlink cannot point it elsewhere.
+ */
 export function isPrivateDir(dir: string): boolean {
-  const st = statSync(dir);
-  if (!st.isDirectory()) return false;
-  if (typeof process.getuid !== "function") return true; // Windows: per-user profile ACLs
-  return st.uid === process.getuid() && (st.mode & 0o022) === 0;
+  if (typeof process.getuid !== "function") return statSync(dir).isDirectory(); // Windows: per-user profile ACLs
+  const uid = process.getuid();
+  const real = realpathSync(dir);
+  const st = lstatSync(real);
+  if (!st.isDirectory() || st.uid !== uid || (st.mode & 0o022) !== 0) return false;
+  for (let p = dirname(real); ; p = dirname(p)) {
+    const parent = lstatSync(p);
+    if (parent.uid !== uid && parent.uid !== 0) return false;
+    if ((parent.mode & 0o022) !== 0 && (parent.mode & 0o1000) === 0) return false;
+    if (dirname(p) === p) return true;
+  }
 }
 
 /**
@@ -49,8 +61,9 @@ export function enablePrivateCompileCache(env: NodeJS.ProcessEnv = process.env):
     }
     const dir = compileCacheDir(env);
     mkdirSync(dir, { recursive: true, mode: 0o700 });
-    if (!isPrivateDir(dir)) return;
-    enable(dir);
+    const real = realpathSync(dir);
+    if (!isPrivateDir(real)) return;
+    enable(real);
   } catch {
     /* an unusable cache directory only costs speed */
   }

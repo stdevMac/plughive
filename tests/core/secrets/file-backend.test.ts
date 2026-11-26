@@ -151,10 +151,23 @@ describe("FileBackend (plaintext)", () => {
   it.runIf(POSIX)("fixes a group/world readable file before using it", async () => {
     const backend = new FileBackend({ home });
     await backend.set("API_KEY", VALUE);
-    for (const loose of [0o644, 0o640, 0o604, 0o666, 0o660]) {
+    for (const loose of [0o644, 0o640, 0o604]) {
       chmodSync(file(), loose);
       expect(await backend.get("API_KEY")).toBe(VALUE);
       expectMode(file(), 0o600, loose.toString(8));
+    }
+  });
+
+  it.runIf(POSIX)("refuses a group/world writable file instead of trusting it", async () => {
+    const backend = new FileBackend({ home });
+    await backend.set("API_KEY", VALUE);
+    for (const loose of [0o666, 0o660, 0o620, 0o602]) {
+      chmodSync(file(), loose);
+      await expect(backend.get("API_KEY"), loose.toString(8)).rejects.toMatchObject({
+        code: "SECRET_FILE_INSECURE",
+      });
+      // Left as found: the user checks the contents first.
+      expectMode(file(), loose, loose.toString(8));
     }
   });
 

@@ -1,5 +1,5 @@
 // The compile cache lives in a private per-user directory, never the shared /tmp.
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -48,5 +48,28 @@ describe.skipIf(process.platform === "win32")("isPrivateDir", () => {
     const f = join(tmp, "file");
     writeFileSync(f, "");
     expect(isPrivateDir(f)).toBe(false);
+  });
+
+  it("rejects a private directory inside a folder others can write to", () => {
+    const open = join(tmp, "open");
+    mkdirSync(open);
+    chmodSync(open, 0o777);
+    const d = join(open, "private");
+    mkdirSync(d, { mode: 0o700 });
+    expect(isPrivateDir(d)).toBe(false);
+    // A sticky shared folder (like /tmp) is fine: others cannot rename our entry.
+    chmodSync(open, 0o1777);
+    expect(isPrivateDir(d)).toBe(true);
+  });
+
+  it("judges where a symlink points, not the link", () => {
+    const open = join(tmp, "open2");
+    mkdirSync(open);
+    chmodSync(open, 0o777);
+    const target = join(open, "private");
+    mkdirSync(target, { mode: 0o700 });
+    const link = join(tmp, "link");
+    symlinkSync(target, link);
+    expect(isPrivateDir(link)).toBe(false);
   });
 });

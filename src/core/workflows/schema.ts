@@ -40,6 +40,8 @@ export const WORKFLOW_LIMITS = Object.freeze({
   maxArgsBytes: 256 * 1024,
   /** Largest output kept for one step (JSON); a larger one keeps its artifact ids only. */
   maxStepOutputBytes: 256 * 1024,
+  /** Largest output of a whole run (JSON); a larger one keeps its artifact ids only. */
+  maxOutputBytes: 1024 * 1024,
   /** Largest recipe file. */
   maxRecipeBytes: 256 * 1024,
   /** A workflow may run another workflow, this deep. */

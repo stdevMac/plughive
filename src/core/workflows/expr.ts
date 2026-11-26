@@ -366,11 +366,59 @@ function same(a: unknown, b: unknown): boolean {
 }
 
 const MAX_HELPER_CHARS = 256 * 1024;
+/** Longest list concat() builds. */
+const MAX_HELPER_ITEMS = 10_000;
+
+/**
+ * At least how long `v` is as JSON, counting no further than just past
+ * `limit`. A value that shares one object in many places (a list holding the
+ * same step output a thousand times) is counted at its full written size, but
+ * the count stops early instead of building the text first. A cycle counts as
+ * endless.
+ */
+export function jsonLength(v: unknown, limit: number): number {
+  let n = 0;
+  const stack: unknown[] = [v];
+  const open = new Set<object>();
+  while (stack.length > 0 && n <= limit) {
+    const x = stack.pop();
+    if (x instanceof Close) {
+      open.delete(x.of);
+    } else if (typeof x === "string") {
+      n += x.length + 2;
+    } else if (typeof x === "number" || typeof x === "boolean" || x === null) {
+      n += String(x).length;
+    } else if (typeof x === "object") {
+      if (open.has(x)) return Number.POSITIVE_INFINITY;
+      open.add(x);
+      stack.push(new Close(x));
+      if (Array.isArray(x)) {
+        n += 1 + Math.max(1, x.length);
+        for (let i = x.length - 1; i >= 0; i--) stack.push(x[i]);
+      } else {
+        n += 1;
+        for (const [k, val] of Object.entries(x)) {
+          if (val === undefined || typeof val === "function" || typeof val === "symbol") continue;
+          n += k.length + 4;
+          stack.push(val);
+        }
+      }
+    }
+  }
+  return n;
+}
+
+class Close {
+  constructor(readonly of: object) {}
+}
 
 export function stringify(v: unknown): string {
   if (v === null || v === undefined) return "";
   if (typeof v === "string") return v;
   if (typeof v === "number" || typeof v === "boolean") return String(v);
+  if (jsonLength(v, MAX_HELPER_CHARS) > MAX_HELPER_CHARS) {
+    throw new ExprError("value too large to turn into text");
+  }
   const s = JSON.stringify(v);
   if (s === undefined) return "";
   if (s.length > MAX_HELPER_CHARS) throw new ExprError("value too large to turn into text");
@@ -394,8 +442,11 @@ function helper(fn: string, args: unknown[], raw: Expr[]): unknown {
       if (a === undefined || a === null) return "";
       if (!Array.isArray(a)) throw new ExprError("join() needs a list");
       const sep = b === undefined ? ", " : stringify(b);
-      const out = a.map((x) => stringify(x)).join(sep);
-      if (out.length > MAX_HELPER_CHARS) throw new ExprError("join() result too large");
+      let out = "";
+      for (const [i, x] of a.entries()) {
+        out += i === 0 ? stringify(x) : sep + stringify(x);
+        if (out.length > MAX_HELPER_CHARS) throw new ExprError("join() result too large");
+      }
       return out;
     }
     case "length":
@@ -433,8 +484,12 @@ function helper(fn: string, args: unknown[], raw: Expr[]): unknown {
       const out: unknown[] = [];
       for (const x of args) {
         if (x === undefined || x === null) continue;
-        if (Array.isArray(x)) out.push(...x);
-        else out.push(x);
+        if (Array.isArray(x)) {
+          if (out.length + x.length > MAX_HELPER_ITEMS) {
+            throw new ExprError(`concat() result longer than ${MAX_HELPER_ITEMS} items`);
+          }
+          out.push(...x);
+        } else out.push(x);
       }
       return out;
     }

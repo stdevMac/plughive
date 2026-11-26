@@ -5,7 +5,7 @@
 // permission checks, no retries, and the recursion limit.
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { evaluate, parseCondition, parseOperand } from "../../../src/core/workflows/expr.js";
 import {
   RecipeError,
@@ -14,6 +14,7 @@ import {
   parseRecipe,
   runRecipe,
 } from "../../../src/core/workflows/index.js";
+import { capOutput, collectArtifacts } from "../../../src/core/workflows/runner.js";
 import { recipeInputZod } from "../../../src/core/workflows/schema.js";
 import { TemplateError, compileValue, resolveValue } from "../../../src/core/workflows/template.js";
 import {
@@ -255,6 +256,64 @@ describe("templates", () => {
   });
 });
 
+describe("size limits on shared values (D-H3)", () => {
+  // One 1 KB object held 2000 times: small in memory, 2 MB once written out.
+  const shared = () => Array.from({ length: 2000 }, () => SHARED);
+  const SHARED = { s: "x".repeat(1000) };
+
+  it("json() and embedded templates refuse a large value before writing it out", () => {
+    const spy = vi.spyOn(JSON, "stringify");
+    try {
+      expect(() => resolve("${json(input.many)}", { many: shared() })).toThrow(/too large/);
+      expect(() => resolve("many: ${input.many}", { many: shared() })).toThrow(/too large/);
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("join() stops as soon as its text passes the limit", () => {
+    // 600 million characters joined: past the longest string V8 can hold.
+    const many = new Array<string>(600_000).fill("y".repeat(1000));
+    expect(() => resolve("${join(input.many, '')}", { many })).toThrow(/join\(\) result too large/);
+  });
+
+  it("concat() refuses a list longer than 10000 items", () => {
+    const a = Array.from({ length: 6000 }, (_, i) => i);
+    expect(() => resolve("${concat(input.a, input.a)}", { a })).toThrow(/longer than 10000 items/);
+    expect(resolve("${concat(input.a, input.b)}", { a, b: [1] })).toHaveLength(6001);
+  });
+
+  it("a step output is measured without writing it out, and a cycle counts as too large", () => {
+    const spy = vi.spyOn(JSON, "stringify");
+    try {
+      expect(capOutput(shared())).toMatchObject({ truncated: true, artifacts: [] });
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+    const loop: Obj = { a: 1 };
+    loop.self = loop;
+    expect(capOutput(loop)).toMatchObject({ truncated: true, bytes: null });
+    expect(capOutput({ a: [1, 2] })).toEqual({ a: [1, 2] });
+  });
+
+  it("collectArtifacts walks an object held in many places once", () => {
+    let reads = 0;
+    const art = {
+      get id() {
+        reads++;
+        return "img_abcdef";
+      },
+      mime: "image/png",
+    };
+    let v: unknown = art;
+    for (let i = 0; i < 6; i++) v = Array.from({ length: 6 }, () => v);
+    expect([...collectArtifacts(v).keys()]).toEqual(["img_abcdef"]);
+    expect(reads).toBeLessThanOrEqual(2);
+  });
+});
+
 describe("conditions", () => {
   const cond = (src: string, input: Obj, available: (t: string) => boolean = () => false) =>
     evaluate(parseCondition(src, ROOTS), { roots: { input, steps: {} }, available });
@@ -368,6 +427,9 @@ const FLOWS = [
       output: "${steps.after}",
     },
   ),
+  recipe("r_big_out", [{ id: "a", tool: "echo", args: {} }], {
+    output: Array.from({ length: 8 }, () => "${steps.a}"),
+  }),
   recipe("r_self", [{ id: "again", tool: "wf_r_self", args: {} }]),
   recipe("r_outer", [{ id: "down", tool: "wf_r_middle", args: {} }]),
   recipe("r_middle", [{ id: "down", tool: "wf_r_inner", args: {} }], {
@@ -490,6 +552,15 @@ describe("forEach and parallel", () => {
     expect(mock.maxInFlight).toBe(2);
     expect(mock.calls).toHaveLength(3);
     expect(r.output).toEqual({ a: 1, c: { n: 3 } });
+  });
+});
+
+describe("run output limit (D-H3)", () => {
+  it("a run output over 1 MB keeps its artifact ids only", async () => {
+    mock.handlers.echo = () => ({ text: "z".repeat(200_000) });
+    const r = await runOk(h, "wf_r_big_out", {});
+    expect(r.output).toMatchObject({ truncated: true });
+    expect(WORKFLOW_LIMITS.maxOutputBytes).toBe(1024 * 1024);
   });
 });
 

@@ -25,11 +25,12 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ManifestError, parseManifestText } from "../core/packs/manifest.js";
 import { apiClient, connect, daemonTarget, daemonUp, readAdminToken } from "./api.js";
-import { CliError, type CliIo, EXIT_OK, EXIT_USAGE, parse } from "./args.js";
+import { CliError, type CliIo, EXIT_OK, EXIT_USAGE, cleanLine, jsonText, parse } from "./args.js";
 import {
   COMMON_HELP,
   COMMON_OPTIONS,
   type Ctx,
+  assertSafeKey,
   confirm,
   enc,
   homeEnv,
@@ -73,16 +74,45 @@ export function isGitUrl(spec: string): boolean {
   return /^(https:\/\/|ssh:\/\/|git@)[^\s]+$/.test(spec);
 }
 
+/** The URL without a user name or token in it, for messages. */
+export function redactUrl(spec: string): string {
+  try {
+    const url = new URL(spec);
+    if (!url.username && !url.password) return spec;
+    url.username = "***";
+    url.password = "";
+    return url.toString();
+  } catch {
+    return spec;
+  }
+}
+
 function gitClone(url: string, into: string): Promise<void> {
   return new Promise((done, fail) => {
     execFile(
       "git",
-      ["clone", "--depth", "1", "--quiet", "--", url, into],
+      // No submodules over file://, and links checked out as plain files: a
+      // cloned pack cannot point into the rest of this computer.
+      [
+        "-c",
+        "protocol.file.allow=never",
+        "-c",
+        "core.symlinks=false",
+        "clone",
+        "--depth",
+        "1",
+        "--quiet",
+        "--",
+        url,
+        into,
+      ],
       { timeout: 120_000, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } },
       (err) => {
         if (!err) return done();
         const missing = (err as NodeJS.ErrnoException).code === "ENOENT";
-        fail(new CliError(missing ? "git is not installed" : `git clone of ${url} failed`));
+        fail(
+          new CliError(missing ? "git is not installed" : `git clone of ${redactUrl(url)} failed`),
+        );
       },
     );
   });
@@ -92,6 +122,8 @@ function gitClone(url: string, into: string): Promise<void> {
 export function readUserManifest(dir: string, folderName?: string) {
   const path = join(dir, "pack.json");
   if (!existsSync(path)) throw new CliError(`${dir} has no pack.json`);
+  // A linked pack.json would make the pack's words come from another file.
+  if (!lstatSync(path).isFile()) throw new CliError(`${path} is not a regular file`);
   try {
     return parseManifestText(readFileSync(path, "utf8"), {
       source: "pack.json",
@@ -104,18 +136,46 @@ export function readUserManifest(dir: string, folderName?: string) {
   }
 }
 
-/** Copies a pack folder without .git, node_modules or symbolic links. */
-function copyPack(from: string, to: string, skipped: string[]): void {
+/** How much a pack may hold: the limits the daemon checks when it hashes a pack. */
+interface PackLimits {
+  files: number;
+  fileBytes: number;
+  totalBytes: number;
+}
+
+/**
+ * Copies a pack folder without .git, node_modules or symbolic links. A pipe,
+ * a device or a pack larger than the daemon accepts is refused before it
+ * fills the disk.
+ */
+function copyPack(from: string, to: string, skipped: string[], limits: PackLimits): void {
+  let files = 0;
+  let total = 0;
   cpSync(from, to, {
     recursive: true,
     errorOnExist: true,
     force: false,
     filter: (src) => {
       const name = basename(src);
+      const rel = src.slice(from.length + 1);
       if (src !== from && (name === ".git" || name === "node_modules")) return false;
-      if (lstatSync(src).isSymbolicLink()) {
-        skipped.push(src.slice(from.length + 1));
+      const st = lstatSync(src);
+      if (st.isSymbolicLink()) {
+        skipped.push(rel);
         return false;
+      }
+      if (st.isDirectory()) return true;
+      if (!st.isFile()) throw new CliError(`${rel} is not a regular file; remove it from the pack`);
+      files += 1;
+      total += st.size;
+      if (files > limits.files) {
+        throw new CliError(`the pack has more than ${limits.files} files`);
+      }
+      if (st.size > limits.fileBytes) {
+        throw new CliError(`${rel} is larger than ${limits.fileBytes} bytes`);
+      }
+      if (total > limits.totalBytes) {
+        throw new CliError(`the pack is larger than ${limits.totalBytes} bytes`);
       }
       return true;
     },
@@ -143,7 +203,7 @@ async function list(env: NodeJS.ProcessEnv, io: CliIo, json: boolean): Promise<n
     }[];
   }>("/api/packs");
   if (json) {
-    io.out(JSON.stringify(body.packs, null, 2));
+    io.out(jsonText(body.packs, 2));
     return EXIT_OK;
   }
   const rows = body.packs.map((p) => [
@@ -153,15 +213,7 @@ async function list(env: NodeJS.ProcessEnv, io: CliIo, json: boolean): Promise<n
     p.state,
     String(p.tools.length),
   ]);
-  const head = ["ID", "VERSION", "SOURCE", "STATE", "TOOLS"];
-  const widths = head.map((h, i) => Math.max(h.length, ...rows.map((r) => (r[i] ?? "").length)));
-  const line = (r: string[]) =>
-    r
-      .map((c, i) => c.padEnd(widths[i] ?? 0))
-      .join("  ")
-      .trimEnd();
-  io.out(line(head));
-  for (const r of rows) io.out(line(r));
+  printTable(io, ["ID", "VERSION", "SOURCE", "STATE", "TOOLS"], rows);
   return EXIT_OK;
 }
 
@@ -173,7 +225,7 @@ async function add(spec: string, env: NodeJS.ProcessEnv, io: CliIo): Promise<num
     if (isGitUrl(spec)) {
       cleanup = mkdtempSync(join(tmpdir(), "plughive-pack-"));
       source = join(cleanup, "pack");
-      io.out(`Cloning ${spec}`);
+      io.out(`Cloning ${redactUrl(spec)}`);
       await gitClone(spec, source);
     } else if (spec.startsWith("-") || !existsSync(source) || !lstatSync(source).isDirectory()) {
       throw new CliError(`${spec} is not a folder or an https/ssh git URL`, EXIT_USAGE);
@@ -191,9 +243,21 @@ async function add(spec: string, env: NodeJS.ProcessEnv, io: CliIo): Promise<num
     }
     mkdirSync(packsDir, { recursive: true, mode: 0o700 });
     const skipped: string[] = [];
-    copyPack(source, dest, skipped);
-    // Validate again where the loader will read it (folder name = id).
-    readUserManifest(dest, manifest.id);
+    const { PACK_HASH_MAX_FILES, PACK_HASH_MAX_FILE_BYTES, PACK_HASH_MAX_TOTAL_BYTES } =
+      await import("../core/packs/loader.js");
+    try {
+      copyPack(source, dest, skipped, {
+        files: PACK_HASH_MAX_FILES,
+        fileBytes: PACK_HASH_MAX_FILE_BYTES,
+        totalBytes: PACK_HASH_MAX_TOTAL_BYTES,
+      });
+      // Validate again where the loader will read it (folder name = id).
+      readUserManifest(dest, manifest.id);
+    } catch (e) {
+      // Leave no half-copied pack for the daemon to find.
+      rmSync(dest, { recursive: true, force: true });
+      throw e;
+    }
     io.out(`Added pack "${manifest.id}" ${manifest.version} in ${dest}`);
     if (skipped.length) io.out(`Skipped symbolic links: ${skipped.join(", ")}`);
 
@@ -286,10 +350,15 @@ async function findPack(ctx: Ctx, id: string): Promise<PackView> {
   return pack;
 }
 
+/**
+ * What a pack asks for. The words come from the pack's manifest: each one is
+ * kept on its own line, so a name or label cannot forge another item.
+ */
 function printConsent(io: CliIo, c: ConsentView): void {
-  io.out(`${c.name} ${c.version} (${c.id}, ${c.source} pack) asks for:`);
+  const one = (v: unknown) => cleanLine(String(v ?? ""));
+  io.out(`${one(c.name)} ${one(c.version)} (${one(c.id)}, ${one(c.source)} pack) asks for:`);
   for (const item of c.items) {
-    io.out(`  ${item.risk === "high" ? "[high-risk] " : ""}${item.text}`);
+    io.out(`  ${item.risk === "high" ? "[high-risk] " : ""}${one(item.text)}`);
   }
   if (!c.items.length) io.out("  nothing");
   if (c.runsCode) {
@@ -305,7 +374,7 @@ function printConsent(io: CliIo, c: ConsentView): void {
         s.stored ? "a value is stored" : null,
         s.grantable ? null : "cannot be granted to this pack",
       ].filter(Boolean);
-      io.out(`  ${s.name}${s.label ? ` (${s.label})` : ""}: ${notes.join(", ")}`);
+      io.out(`  ${one(s.name)}${s.label ? ` (${one(s.label)})` : ""}: ${notes.join(", ")}`);
     }
   }
   if (c.review) io.out("\nThe pack changed since you last enabled it; review it again.");
@@ -350,7 +419,8 @@ async function packSub(
             null,
         ],
       ]);
-      for (const w of p.workflowErrors) io.out(`workflow ${w.name} did not load: ${w.error}`);
+      for (const w of p.workflowErrors)
+        io.out(`workflow ${cleanLine(w.name)} did not load: ${cleanLine(w.error)}`);
       return EXIT_OK;
     }
     case "consent": {
@@ -440,7 +510,10 @@ async function packSub(
       let body: Record<string, unknown>;
       if (pairs.length || values.unset?.length) {
         const patch: Record<string, unknown> = parseAssignments(pairs);
-        for (const k of values.unset ?? []) patch[k] = null;
+        for (const k of values.unset ?? []) {
+          assertSafeKey(k);
+          patch[k] = null;
+        }
         body = await ctx.api().put(path, { values: patch });
       } else {
         body = await ctx.api().get(path);

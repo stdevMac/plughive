@@ -8,10 +8,19 @@
 // Every management command talks to the running daemon through /api with the
 // admin token, exactly as the dashboard does, so the CLI and the dashboard
 // always see and change the same state.
-import { readFileSync } from "node:fs";
+import { constants, closeSync, fstatSync, openSync, readSync } from "node:fs";
 import { resolve } from "node:path";
 import { type ApiClient, connect } from "./api.js";
-import { CliError, type CliIo, EXIT_OK, EXIT_USAGE, type Options, parse } from "./args.js";
+import {
+  CliError,
+  type CliIo,
+  EXIT_OK,
+  EXIT_USAGE,
+  type Options,
+  cleanLine,
+  jsonText,
+  parse,
+} from "./args.js";
 
 /** The flags every management sub-command accepts. */
 export const COMMON_OPTIONS = {
@@ -120,16 +129,22 @@ export function sub<O extends Options>(
       client ??= connect(env).api;
       return client;
     },
-    printJson: (value) => io.out(JSON.stringify(value, null, 2)),
+    printJson: (value) => io.out(jsonText(value, 2)),
   };
   return { values: parsed.values, positionals: parsed.positionals, ctx };
 }
 
 // ---- output ----------------------------------------------------------------
 
-/** A left-aligned table with a header row; empty cells for null/undefined. */
+/**
+ * A left-aligned table with a header row; empty cells for null/undefined.
+ * Cells are cleaned to one line first, so a value cannot break the layout or
+ * add rows of its own.
+ */
 export function printTable(io: CliIo, head: string[], rows: unknown[][]): void {
-  const cells = rows.map((r) => r.map((c) => (c === null || c === undefined ? "" : String(c))));
+  const cells = rows.map((r) =>
+    r.map((c) => (c === null || c === undefined ? "" : cleanLine(String(c)))),
+  );
   const widths = head.map((h, i) => Math.max(h.length, ...cells.map((r) => (r[i] ?? "").length)));
   const line = (r: string[]) =>
     r
@@ -140,19 +155,20 @@ export function printTable(io: CliIo, head: string[], rows: unknown[][]): void {
   for (const r of cells) io.out(line(r));
 }
 
-/** `key: value` lines, aligned; null/undefined values are skipped. */
+/** `key: value` lines, aligned; null/undefined values are skipped. Each value stays on its line. */
 export function printFields(io: CliIo, fields: [string, unknown][]): void {
   const shown = fields.filter(([, v]) => v !== null && v !== undefined && v !== "");
-  const width = Math.max(0, ...shown.map(([k]) => k.length));
+  const width = Math.max(0, ...shown.map(([k]) => cleanLine(k).length));
   for (const [k, v] of shown) {
     const text = typeof v === "object" ? JSON.stringify(v) : String(v);
-    io.out(`${`${k}:`.padEnd(width + 2)}${text}`);
+    io.out(`${`${cleanLine(k)}:`.padEnd(width + 2)}${cleanLine(text)}`);
   }
 }
 
 export function truncate(text: string | null | undefined, max: number): string {
   if (!text) return "";
-  const one = text.replace(/\s+/g, " ").trim();
+  // Clean before cutting, so the length counts what is shown.
+  const one = cleanLine(text).replace(/\s+/g, " ").trim();
   return one.length > max ? `${one.slice(0, max - 1)}…` : one;
 }
 
@@ -181,24 +197,71 @@ export function usd(value: number | null | undefined): string {
 
 // ---- input -----------------------------------------------------------------
 
+/** The most the CLI reads from a file or stdin for one input (JSON, a secret, a body). */
+export const MAX_INPUT_BYTES = 10 * 1024 * 1024;
+
+/**
+ * Reads a file descriptor as UTF-8, up to MAX_INPUT_BYTES. Anything longer is
+ * refused rather than cut.
+ */
+function readCapped(fd: number, what: string): string {
+  const chunks: Buffer[] = [];
+  let total = 0;
+  const buf = Buffer.alloc(64 * 1024);
+  for (;;) {
+    const n = readSync(fd, buf, 0, buf.length, null);
+    if (n === 0) break;
+    total += n;
+    if (total > MAX_INPUT_BYTES) {
+      throw new CliError(`${what} is larger than ${MAX_INPUT_BYTES / 1024 / 1024} MiB`, EXIT_USAGE);
+    }
+    chunks.push(Buffer.from(buf.subarray(0, n)));
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+/** A regular file, up to MAX_INPUT_BYTES. */
+function readInputFile(path: string): string {
+  let fd: number;
+  try {
+    // O_NONBLOCK: opening a FIFO must not wait for a writer.
+    fd = openSync(path, constants.O_RDONLY | constants.O_NONBLOCK);
+  } catch {
+    throw new CliError(`could not read ${path}`);
+  }
+  try {
+    // A FIFO or a device (/dev/zero) would never end; only files are read.
+    if (!fstatSync(fd).isFile()) throw new CliError(`${path} is not a regular file`, EXIT_USAGE);
+    try {
+      return readCapped(fd, path);
+    } catch (e) {
+      if (e instanceof CliError) throw e;
+      throw new CliError(`could not read ${path}`);
+    }
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/** All of stdin, up to MAX_INPUT_BYTES. */
+function readStdinCapped(what: string): string {
+  try {
+    return readCapped(0, what);
+  } catch (e) {
+    if (e instanceof CliError) throw e;
+    throw new CliError(`could not read ${what}`);
+  }
+}
+
 /**
  * JSON from a flag value: inline JSON, `@path` for a file, or `-` for stdin.
  */
 export function readJsonInput(spec: string, what = "input"): unknown {
   let text: string;
   if (spec === "-") {
-    try {
-      text = readFileSync(0, "utf8");
-    } catch {
-      throw new CliError(`could not read ${what} from stdin`);
-    }
+    text = readStdinCapped(`${what} from stdin`);
   } else if (spec.startsWith("@")) {
-    const path = resolve(spec.slice(1));
-    try {
-      text = readFileSync(path, "utf8");
-    } catch {
-      throw new CliError(`could not read ${path}`);
-    }
+    text = readInputFile(resolve(spec.slice(1)));
   } else {
     text = spec;
   }
@@ -215,6 +278,18 @@ export function readJsonObject(spec: string, what = "input"): Record<string, unk
     throw new CliError(`the ${what} must be a JSON object`, EXIT_USAGE);
   }
   return value as Record<string, unknown>;
+}
+
+/** Keys that would reach Object.prototype instead of setting a value. */
+const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+/** Refuses a key (or a dotted part of one) that is __proto__, constructor or prototype. */
+export function assertSafeKey(key: string): void {
+  for (const part of key.split(".")) {
+    if (UNSAFE_KEYS.has(part)) {
+      throw new CliError(`"${key}": ${part} cannot be used as a key`, EXIT_USAGE);
+    }
+  }
 }
 
 /**
@@ -238,10 +313,11 @@ export function parseAssignments(pairs: string[]): Record<string, unknown> {
         throw new CliError(`the value of ${key} is not valid JSON`, EXIT_USAGE);
       }
     }
+    assertSafeKey(key);
     const path = key.split(".");
     let node = out;
     for (const part of path.slice(0, -1)) {
-      const next = node[part];
+      const next = Object.hasOwn(node, part) ? node[part] : undefined;
       if (next === undefined || next === null || typeof next !== "object" || Array.isArray(next)) {
         node[part] = {};
       }
@@ -254,11 +330,7 @@ export function parseAssignments(pairs: string[]): Record<string, unknown> {
 
 /** Reads all of stdin as text (for piped secrets and bodies). */
 export function readStdin(): string {
-  try {
-    return readFileSync(0, "utf8");
-  } catch {
-    throw new CliError("could not read stdin");
-  }
+  return readStdinCapped("stdin");
 }
 
 /**

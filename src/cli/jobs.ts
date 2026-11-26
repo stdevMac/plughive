@@ -5,11 +5,12 @@
 //   plughive usage [--since DATE]
 //
 // The Jobs, Library and Usage pages of the dashboard, through the same /api.
-import { createWriteStream, existsSync } from "node:fs";
+import { constants, closeSync, createWriteStream, openSync } from "node:fs";
 import { basename, resolve } from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { CliError, type CliIo, EXIT_FAIL, EXIT_OK, EXIT_USAGE } from "./args.js";
+import { daemonTarget } from "./api.js";
+import { CliError, type CliIo, EXIT_FAIL, EXIT_OK, EXIT_USAGE, jsonText } from "./args.js";
 import {
   COMMON_HELP,
   type Ctx,
@@ -79,7 +80,7 @@ function printJob(ctx: Ctx, job: JobView): void {
   ]);
   if (job.result !== null && job.result !== undefined) {
     ctx.io.out("result:");
-    ctx.io.out(JSON.stringify(job.result, null, 2));
+    ctx.io.out(jsonText(job.result, 2));
   }
 }
 
@@ -253,6 +254,28 @@ Commands:
 
 ${COMMON_HELP}`;
 
+/**
+ * Where to download an artifact from. Its url comes from the daemon; it must
+ * point at the daemon's own /artifacts/ path, so a daemon answer cannot make
+ * the CLI fetch from (or report to) another host. It is fetched through the
+ * local address, as every other call is.
+ */
+function artifactUrl(ctx: Ctx, a: ArtifactView): string {
+  const target = daemonTarget(ctx.env);
+  let url: URL;
+  try {
+    url = new URL(a.url);
+  } catch {
+    throw new CliError(`artifact ${a.id} has no usable url`);
+  }
+  const ours = [new URL(target.baseUrl).origin, new URL(target.localUrl).origin];
+  if (!ours.includes(url.origin) || !url.pathname.startsWith("/artifacts/"))
+    throw new CliError(
+      `artifact ${a.id} points at ${url.origin}, not this daemon; not downloading`,
+    );
+  return new URL(`${url.pathname}${url.search}`, target.localUrl).toString();
+}
+
 async function findArtifact(ctx: Ctx, id: string): Promise<ArtifactView> {
   // There is no GET /api/artifacts/:id; page through the library.
   for (let offset = 0; ; offset += 200) {
@@ -357,17 +380,36 @@ export async function runArtifacts(argv: string[], io: CliIo): Promise<number> {
         if (!values.output && (!safeName || safeName === "." || safeName === ".."))
           throw new CliError(`artifact ${a.id} has no usable file name; pass -o FILE`, EXIT_USAGE);
         const dest = resolve(values.output ?? safeName);
-        if (existsSync(dest) && !values.force) {
-          throw new CliError(`${dest} exists; pass --force to overwrite it`);
-        }
-        const res = await fetch(a.url).catch(() => null);
+        const res = await fetch(artifactUrl(ctx, a), { redirect: "error" }).catch(() => null);
         if (!res?.ok || !res.body) {
           throw new CliError(`could not download ${a.id}${res ? ` (HTTP ${res.status})` : ""}`);
         }
-        await pipeline(
-          Readable.fromWeb(res.body as import("node:stream/web").ReadableStream),
-          createWriteStream(dest, { flags: values.force ? "w" : "wx" }),
-        );
+        // O_NOFOLLOW: a symlink planted at the destination is refused, not
+        // followed, even with --force.
+        const { O_WRONLY, O_CREAT, O_EXCL, O_TRUNC, O_NOFOLLOW } = constants;
+        let fd: number;
+        try {
+          fd = openSync(
+            dest,
+            O_WRONLY | O_CREAT | O_NOFOLLOW | (values.force ? O_TRUNC : O_EXCL),
+            0o644,
+          );
+        } catch (e) {
+          await res.body.cancel().catch(() => {});
+          const code = (e as NodeJS.ErrnoException).code;
+          if (code === "EEXIST") throw new CliError(`${dest} exists; pass --force to overwrite it`);
+          if (code === "ELOOP") throw new CliError(`${dest} is a symlink; not writing through it`);
+          throw new CliError(`could not write ${dest}: ${(e as Error).message}`);
+        }
+        try {
+          await pipeline(
+            Readable.fromWeb(res.body as import("node:stream/web").ReadableStream),
+            createWriteStream(dest, { fd }),
+          );
+        } catch (e) {
+          closeSync(fd);
+          throw e;
+        }
         if (ctx.json) ctx.printJson({ id: a.id, path: dest, bytes: a.bytes });
         else io.out(`Saved ${a.id} to ${dest}`);
         return EXIT_OK;
@@ -496,7 +538,7 @@ export async function runUsage(argv: string[], io: CliIo): Promise<number> {
   );
   if (s.rate_limits.length) {
     io.out("\nRate limits");
-    io.out(JSON.stringify(s.rate_limits, null, 2));
+    io.out(jsonText(s.rate_limits, 2));
   }
   return EXIT_OK;
 }

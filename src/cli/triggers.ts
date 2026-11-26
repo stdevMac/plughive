@@ -5,7 +5,15 @@
 // The Triggers page: workflows that run on a schedule (cron) or when a URL
 // is called (webhook). A webhook's secret is printed once, when it is made
 // or rotated, exactly as the dashboard shows it once.
-import { CliError, type CliIo, EXIT_FAIL, EXIT_OK, EXIT_USAGE } from "./args.js";
+import {
+  CliError,
+  type CliIo,
+  EXIT_FAIL,
+  EXIT_OK,
+  EXIT_USAGE,
+  cleanLine,
+  jsonText,
+} from "./args.js";
 import {
   COMMON_HELP,
   type Ctx,
@@ -377,7 +385,11 @@ export async function runTriggers(argv: string[], io: CliIo): Promise<number> {
         );
         const id = positionals[0] ?? "";
         const { trigger } = await getTrigger(ctx, id);
-        await confirm(io, `Delete trigger "${trigger.name}" (${trigger.id})?`, values.yes === true);
+        await confirm(
+          io,
+          `Delete trigger "${cleanLine(trigger.name)}" (${trigger.id})?`,
+          values.yes === true,
+        );
         await ctx.api().delete(`/api/triggers/${enc(id)}`);
         if (ctx.json) ctx.printJson({ deleted: id });
         else io.out(`Deleted ${id}.`);
@@ -399,7 +411,7 @@ export async function runTriggers(argv: string[], io: CliIo): Promise<number> {
         if (values.wait && body.job_id) {
           const job = await waitForJob(ctx, body.job_id, { quiet: ctx.json });
           if (ctx.json) ctx.printJson(job);
-          else if (job.status === "succeeded") io.out(JSON.stringify(job.result, null, 2));
+          else if (job.status === "succeeded") io.out(jsonText(job.result, 2));
           else io.err(`Job ${job.job_id} ${job.status}`);
           return job.status === "succeeded" ? EXIT_OK : EXIT_FAIL;
         }

@@ -6,7 +6,7 @@
 // version, endpoint and pack and tool counts.
 import { resolve } from "node:path";
 import { connect, daemonTarget, daemonUp } from "./api.js";
-import { type CliIo, EXIT_FAIL, EXIT_OK, parse } from "./args.js";
+import { type CliIo, EXIT_FAIL, EXIT_OK, jsonText, parse } from "./args.js";
 
 export const STATUS_HELP = `Usage: plughive status [options]
 
@@ -80,7 +80,7 @@ export async function runStatus(argv: string[], io: CliIo): Promise<number> {
     tools: Array.isArray(tools.tools) ? tools.tools.length : null,
   };
   if (values.json) {
-    io.out(JSON.stringify(summary, null, 2));
+    io.out(jsonText(summary, 2));
     return EXIT_OK;
   }
   io.out(`plughive ${summary.version ?? "(unknown version)"} on ${baseUrl}`);

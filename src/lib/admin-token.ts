@@ -31,6 +31,7 @@ import {
   writeSync,
 } from "node:fs";
 import { join } from "node:path";
+import { openSyncNoFollow } from "./platform.js";
 
 export const ADMIN_TOKEN_FILE = "admin-token";
 export const ADMIN_TOKEN_ENV = "PLUGHIVE_ADMIN_TOKEN";
@@ -70,7 +71,7 @@ function assertUsable(token: string, where: string): string {
 function readTokenFile(path: string): string | null {
   let fd: number;
   try {
-    fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+    fd = openSyncNoFollow(path, constants.O_RDONLY);
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code;
     if (code === "ENOENT") return null;

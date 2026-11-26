@@ -112,7 +112,7 @@ describe("PackLoader", () => {
     new PackLoader({ home, registry, host, builtinDir, userDir, ...extra });
 
   beforeEach(() => {
-    tmp = realpathSync(mkdtempSync(join(tmpdir(), "plughive-loader-")));
+    tmp = realpathSync.native(mkdtempSync(join(tmpdir(), "plughive-loader-")));
     home = join(tmp, "home");
     builtinDir = join(tmp, "builtin");
     userDir = join(home, "packs");

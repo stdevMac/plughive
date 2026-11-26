@@ -10,6 +10,8 @@ import {
   constants,
   closeSync,
   fchmodSync,
+  fstatSync,
+  lstatSync,
   openSync,
   renameSync,
   rmSync,
@@ -189,6 +191,47 @@ export function atomicReplaceSync(
       }
     }
   }
+}
+
+function symlinkRefused(path: string): NodeJS.ErrnoException {
+  return Object.assign(new Error(`ELOOP: the final component is a symbolic link, open '${path}'`), {
+    code: "ELOOP",
+    syscall: "open",
+    path,
+  });
+}
+
+/**
+ * openSync that never opens a symlink in the final component. POSIX adds
+ * O_NOFOLLOW (the open fails with ELOOP). Windows has no O_NOFOLLOW, so the
+ * name is lstat-ed before the open and again after it, and must be the very
+ * file the descriptor refers to and not a link; otherwise the descriptor is
+ * closed and the same ELOOP error is thrown.
+ */
+export function openSyncNoFollow(
+  path: string,
+  flags: number,
+  mode?: number,
+  platform: Platform = process.platform,
+): number {
+  if (!isWindows(platform)) return openSync(path, flags | (constants.O_NOFOLLOW ?? 0), mode);
+  try {
+    if (lstatSync(path).isSymbolicLink()) throw symlinkRefused(path);
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+  }
+  const fd = openSync(path, flags, mode);
+  try {
+    const named = lstatSync(path, { bigint: true });
+    const opened = fstatSync(fd, { bigint: true });
+    if (named.isSymbolicLink() || named.ino !== opened.ino || named.dev !== opened.dev) {
+      throw symlinkRefused(path);
+    }
+  } catch (e) {
+    closeSync(fd);
+    throw e;
+  }
+  return fd;
 }
 
 /**

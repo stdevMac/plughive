@@ -1,6 +1,6 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 // tests/lib/config.test.ts
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { daemonOrigin, loadConfig, parseOrigin } from "../../src/lib/config.js";
@@ -29,7 +29,7 @@ describe("config", () => {
     });
     expect(cfg.importRoots).toEqual([
       join(process.env.HOME!, "videos"),
-      "/srv/media",
+      resolve("/srv/media"),
       join(process.env.HOME!, "photos"),
     ]);
     expect(cfg.jobConcurrency).toBe(2);

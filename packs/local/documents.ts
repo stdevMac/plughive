@@ -11,7 +11,7 @@
 //            network through a dead proxy) for PDF output, spreadsheets,
 //            presentations and anything pandoc cannot do; HTML references
 //            are sanitised before LibreOffice sees them.
-import { mkdir, readFile, readdir, rename, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
 import { type ArtifactKind, CapabilityError, type PackContext } from "plughive/pack";
@@ -160,10 +160,20 @@ export async function stageDocument(ctx: PackContext, work: string, id: string) 
   }
   const path = join(work, `in.${type}`);
   const copy = await ctx.library.materialize(id, { dir: relative(ctx.pack.dataDir, work) });
+  // The copy is read-only, and Windows will not rename over a read-only
+  // file: clear an earlier staging of the same name first.
+  await rm(path, { force: true });
   await rename(copy.path, path);
   // Office/epub containers are ZIPs whose entries pandoc/LibreOffice open
   // one by one: refuse bombs and external file references before that.
-  if (ZIP_TYPES.has(type)) scanZipDocument(path);
+  if (ZIP_TYPES.has(type)) {
+    try {
+      scanZipDocument(path);
+    } catch (e) {
+      await rm(path, { force: true });
+      throw e;
+    }
+  }
   return { path, type, record };
 }
 

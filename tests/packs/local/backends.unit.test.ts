@@ -1,7 +1,7 @@
 // Ollama, Kokoro, ComfyUI, whisper.cpp and local_status with fetch/spawn mocked,
 // plus URL validation, the capability functions and the real loader path.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { capabilities } from "../../../packs/local/capabilities.js";
 import {
@@ -211,7 +211,10 @@ describe("Ollama", () => {
     const err = await call("local_ollama_models", {}, env).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(LocalBackendError);
     expect((err as Error).message).toMatch(/ECONNREFUSED/);
-    expect((err as Error).message).toMatch(/ollama serve/);
+    // How to start it is per OS: on Windows the installer runs it in the background.
+    expect((err as Error).message).toMatch(
+      process.platform === "win32" ? /starts in the background/ : /ollama serve/,
+    );
     env.cleanup();
     env = makeEnv({
       settings: { ollamaModel: "nope" },
@@ -408,7 +411,7 @@ describe("whisper.cpp", () => {
     );
     const w = m.calls.find((c) => c.binary === "whisper-cli") as SpawnCall;
     expect(w.args.slice(0, 2)).toEqual(["-m", join(e.dir, "ggml-base.en.bin")]);
-    expect(w.opts?.cwd?.startsWith(`${e.dataDir}/work/`)).toBe(true);
+    expect(w.opts?.cwd?.startsWith(join(e.dataDir, "work") + sep)).toBe(true);
   });
 
   it("falls back to whisper-cpp, and explains a missing install", async () => {

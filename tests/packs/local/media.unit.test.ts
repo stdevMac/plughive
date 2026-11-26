@@ -1,6 +1,7 @@
 // ffmpeg tools with ffmpeg/ffprobe mocked: argv construction, filter escaping,
 // option-injection attempts, cancellation and the missing-binary path.
 import { existsSync, writeFileSync } from "node:fs";
+import { join, sep } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import pack from "../../../packs/local/index.js";
 import {
@@ -94,7 +95,7 @@ function expectLockedInputs(args: readonly string[], dataDir: string) {
   for (const i of idx) {
     expect(args.slice(i - 2, i)).toEqual(["-protocol_whitelist", "file,pipe"]);
     const p = args[i + 1] as string;
-    expect(p.startsWith(`${dataDir}/work/`)).toBe(true);
+    expect(p.startsWith(join(dataDir, "work") + sep)).toBe(true);
     expect(p.startsWith("-")).toBe(false);
   }
 }
@@ -347,7 +348,7 @@ describe("argv construction", () => {
     const vf = args[args.indexOf("-vf") + 1] as string;
     expect(vf).toContain("1080:1920");
     expect(args[args.indexOf("-crf") + 1]).toBe("25");
-    expect((call as SpawnCall).opts?.cwd?.startsWith(`${env.dataDir}/work/`)).toBe(true);
+    expect((call as SpawnCall).opts?.cwd?.startsWith(join(env.dataDir, "work") + sep)).toBe(true);
     // every argument is a string with no NUL/newline, nothing is a shell string
     for (const a of args) expect(a).not.toMatch(/[\0\n]/);
   });
@@ -357,7 +358,7 @@ describe("argv construction", () => {
     const id = ok.env.add("v.mp4", "x", "video/mp4", "video");
     await tool("local_media_convert").run({ artifact_id: id, operation: "transcode" }, ok.env.ctx);
     expect(
-      existsSync(`${ok.env.dataDir}/work`) ? require_ls(`${ok.env.dataDir}/work`) : [],
+      existsSync(join(ok.env.dataDir, "work")) ? require_ls(join(ok.env.dataDir, "work")) : [],
     ).toEqual([]);
     ok.env.cleanup();
     const bad = setup(probeAv, { exit: 1 });
@@ -366,7 +367,7 @@ describe("argv construction", () => {
       tool("local_media_convert").run({ artifact_id: id2, operation: "transcode" }, bad.env.ctx),
     ).rejects.toThrow(/ffmpeg failed.*boom/s);
     expect(
-      existsSync(`${bad.env.dataDir}/work`) ? require_ls(`${bad.env.dataDir}/work`) : [],
+      existsSync(join(bad.env.dataDir, "work")) ? require_ls(join(bad.env.dataDir, "work")) : [],
     ).toEqual([]);
   });
 
@@ -576,7 +577,9 @@ describe("failure modes", () => {
     await expect(
       tool("local_media_convert").run({ artifact_id: id, operation: "transcode" }, env.ctx),
     ).rejects.toThrow(/cancelled/);
-    expect(existsSync(`${env.dataDir}/work`) ? require_ls(`${env.dataDir}/work`) : []).toEqual([]);
+    expect(
+      existsSync(join(env.dataDir, "work")) ? require_ls(join(env.dataDir, "work")) : [],
+    ).toEqual([]);
   });
 
   it("reports progress through ctx.progress", async () => {

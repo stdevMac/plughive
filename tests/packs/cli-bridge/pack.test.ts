@@ -75,7 +75,7 @@ let open: TestContext[];
 
 beforeEach(() => {
   bin = mkdtempSync(join(tmpdir(), "cli-bridge-bin-"));
-  project = realpathSync(mkdtempSync(join(tmpdir(), "cli-bridge-project-")));
+  project = realpathSync.native(mkdtempSync(join(tmpdir(), "cli-bridge-project-")));
   open = [];
 });
 afterEach(async () => {
@@ -201,7 +201,7 @@ describePosix("ask_agent_cli with fake CLIs", () => {
     const t = harness();
     await callTool(t, "ask_agent_cli", { cli: "codex", prompt: "hi" });
     const { cwd } = lastCall("codex");
-    expect(cwd.startsWith(join(realpathSync(t.dataDir), "work"))).toBe(true);
+    expect(cwd.startsWith(join(realpathSync.native(t.dataDir), "work"))).toBe(true);
     expect(existsSync(cwd)).toBe(false);
   });
 });
@@ -380,7 +380,7 @@ describePosix("generate_image_via_agy", () => {
     // The prompt text is interpolated into the agy prompt: it must never
     // expand as a /slash-command in print mode.
     expect(call.args).toContain("--disable-slash-commands");
-    expect(call.cwd.startsWith(join(realpathSync(t.dataDir), "agy-images"))).toBe(true);
+    expect(call.cwd.startsWith(join(realpathSync.native(t.dataDir), "agy-images"))).toBe(true);
     expect(existsSync(call.cwd)).toBe(false);
   });
 

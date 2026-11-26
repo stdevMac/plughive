@@ -38,7 +38,7 @@ const harnesses: TestContext[] = [];
 const tmps: string[] = [];
 
 function tmp(prefix = "plughive-roots-"): string {
-  const d = realpathSync(mkdtempSync(join(tmpdir(), prefix)));
+  const d = realpathSync.native(mkdtempSync(join(tmpdir(), prefix)));
   tmps.push(d);
   return d;
 }
@@ -117,7 +117,7 @@ describe('format: "folder-list" settings', () => {
     await ctx.spawn("tool", [], { cwd: join(project, "sub") });
     expect(seen[0]?.cwd).toBe(join(project, "sub"));
     await ctx.spawn("tool", [], { cwd: "." });
-    expect(seen[1]?.cwd).toBe(realpathSync(t.dataDir));
+    expect(seen[1]?.cwd).toBe(realpathSync.native(t.dataDir));
     await expect(ctx.spawn("tool", [], { cwd: other })).rejects.toThrow();
     await expect(ctx.spawn("tool", [], { cwd: join(project, "..", "x") })).rejects.toThrow();
     expect(seen).toHaveLength(2);
@@ -346,16 +346,19 @@ describe("opt-in providers", () => {
 });
 
 describe("programDir", () => {
-  it("is the real folder of a declared program, null when missing, refused when undeclared", () => {
-    const real = tmp("plughive-prog-");
-    fakeBinary(real, "tool", "process.exit(0)");
-    const t = harness({
-      manifest: { ...base, permissions: { spawn: ["tool", "absent"] } },
-      spawnPath: real,
-    });
-    const ctx = t.forTool("t");
-    expect(ctx.programDir("tool")).toBe(real);
-    expect(ctx.programDir("absent")).toBeNull();
-    expect(() => ctx.programDir("other")).toThrow(/not declared in permissions.spawn/);
-  });
+  itPosix(
+    "is the real folder of a declared program, null when missing, refused when undeclared",
+    () => {
+      const real = tmp("plughive-prog-");
+      fakeBinary(real, "tool", "process.exit(0)");
+      const t = harness({
+        manifest: { ...base, permissions: { spawn: ["tool", "absent"] } },
+        spawnPath: real,
+      });
+      const ctx = t.forTool("t");
+      expect(ctx.programDir("tool")).toBe(real);
+      expect(ctx.programDir("absent")).toBeNull();
+      expect(() => ctx.programDir("other")).toThrow(/not declared in permissions.spawn/);
+    },
+  );
 });

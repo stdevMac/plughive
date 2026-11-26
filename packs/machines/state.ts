@@ -11,6 +11,7 @@ import {
   closeSync,
   fchmodSync,
   fstatSync,
+  lstatSync,
   openSync,
   readFileSync,
   renameSync,
@@ -104,6 +105,29 @@ export const STATE_FILE = "machines.json";
 /** The state file is small; anything bigger is refused instead of parsed. */
 const MAX_STATE_BYTES = 4 * 1024 * 1024;
 
+/**
+ * Open for reading without following a symlink in the final component.
+ * Windows has no O_NOFOLLOW: there the name is lstat-ed before and after the
+ * open and must be the opened file itself, not a link (ELOOP otherwise).
+ */
+function openNoFollow(path: string): number {
+  if (process.platform !== "win32")
+    return openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW);
+  const loop = () => Object.assign(new Error(`ELOOP: ${path} is a symlink`), { code: "ELOOP" });
+  if (lstatSync(path, { throwIfNoEntry: false })?.isSymbolicLink()) throw loop();
+  const fd = openSync(path, constants.O_RDONLY);
+  try {
+    const named = lstatSync(path, { bigint: true });
+    const opened = fstatSync(fd, { bigint: true });
+    if (named.isSymbolicLink() || named.ino !== opened.ino || named.dev !== opened.dev)
+      throw loop();
+  } catch (e) {
+    closeSync(fd);
+    throw e;
+  }
+  return fd;
+}
+
 export class MachineStore {
   readonly path: string;
 
@@ -116,7 +140,7 @@ export class MachineStore {
     // state file is refused, never read (or chmodded) through.
     let fd: number;
     try {
-      fd = openSync(this.path, constants.O_RDONLY | constants.O_NOFOLLOW);
+      fd = openNoFollow(this.path);
     } catch (e) {
       const code = (e as NodeJS.ErrnoException).code;
       if (code === "ENOENT") return { version: 1, machines: [], repos: [] };

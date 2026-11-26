@@ -14,6 +14,7 @@ import {
   shellQuote,
 } from "../../../packs/machines/shell.js";
 import type { MachineRecord, RepoRecord } from "../../../packs/machines/state.js";
+import { itPosix } from "../../support/platform.js";
 
 const HOSTILE = [
   "",
@@ -55,7 +56,9 @@ describe("shellQuote", () => {
   });
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-  it.each(HOSTILE.map((s) => [JSON.stringify(s), s]))(
+  // The quoting targets the remote POSIX shell; these run it locally as /bin/sh,
+  // which a Windows runner does not have.
+  itPosix.each(HOSTILE.map((s) => [JSON.stringify(s), s]))(
     "round-trips %s through /bin/sh as one literal word",
     (_label, value) => {
       const r = spawnSync("/bin/sh", ["-c", `printf '%s|' ${shellQuote(value)}`], {
@@ -68,7 +71,7 @@ describe("shellQuote", () => {
     },
   );
 
-  it("quotes several values into separate words", () => {
+  itPosix("quotes several values into separate words", () => {
     const r = spawnSync("/bin/sh", ["-c", `printf '[%s]' ${HOSTILE.map(shellQuote).join(" ")}`], {
       cwd: dir,
       encoding: "utf8",
@@ -82,7 +85,7 @@ describe("shellQuote", () => {
     expect(() => shellQuote(1 as unknown as string)).toThrow(TypeError);
   });
 
-  it("composeRemoteCommand quotes cwd and env values and leaves the command verbatim", () => {
+  itPosix("composeRemoteCommand quotes cwd and env values and leaves the command verbatim", () => {
     const script = composeRemoteCommand('printf "%s|%s" "$(pwd)" "$V"', {
       cwd: dir,
       env: { V: "'; touch pwned; echo '$(touch pwned)`touch pwned`" },
@@ -90,6 +93,9 @@ describe("shellQuote", () => {
     const r = spawnSync("/bin/sh", ["-c", script], { cwd: "/", encoding: "utf8" });
     expect(r.stdout.endsWith("|'; touch pwned; echo '$(touch pwned)`touch pwned`")).toBe(true);
     expect(existsSync(join(dir, "pwned"))).toBe(false);
+  });
+
+  it("composeRemoteCommand refuses bad env names and leaves a bare command alone", () => {
     expect(() => composeRemoteCommand("x", { env: { "A;B": "1" } })).toThrow("invalid env name");
     expect(composeRemoteCommand("uptime")).toBe("uptime");
   });
@@ -205,8 +211,8 @@ describe("buildSshArgs", () => {
       expect.arrayContaining([
         "BatchMode=yes",
         "StrictHostKeyChecking=accept-new",
-        'UserKnownHostsFile="/data/m/known_hosts"',
-        "GlobalKnownHostsFile=/dev/null",
+        `UserKnownHostsFile="${join("/data/m", "known_hosts")}"`,
+        `GlobalKnownHostsFile=${process.platform === "win32" ? "NUL" : "/dev/null"}`,
         "UpdateHostKeys=no",
         "ConnectTimeout=7",
         "ServerAliveInterval=15",

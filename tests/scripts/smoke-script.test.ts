@@ -10,7 +10,8 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
-const tsx = join(root, "node_modules", ".bin", "tsx");
+// tsx's own CLI under this node: .bin/tsx is a shell script, which Windows cannot spawn.
+const tsxCli = join(root, "node_modules", "tsx", "dist", "cli.mjs");
 const script = join(root, "scripts", "smoke.ts");
 
 let server: Server | null = null;
@@ -75,7 +76,7 @@ function runSmoke(url: string, args: string[]): Promise<{ code: number | null; o
   const dir = mkdtempSync(join(tmpdir(), "plughive-smoke-"));
   cwd = dir;
   return new Promise((resolve, reject) => {
-    const child = spawn(tsx, [script, ...args], {
+    const child = spawn(process.execPath, [tsxCli, script, ...args], {
       cwd: dir,
       env: { ...process.env, PLUGHIVE_URL: url },
       stdio: ["ignore", "pipe", "pipe"],

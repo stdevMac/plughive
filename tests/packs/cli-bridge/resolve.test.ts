@@ -17,7 +17,7 @@ import { canSymlink } from "../../support/platform.js";
 let prefix: string;
 
 beforeEach(() => {
-  prefix = realpathSync(mkdtempSync(join(tmpdir(), "cli-bridge-npm-")));
+  prefix = realpathSync.native(mkdtempSync(join(tmpdir(), "cli-bridge-npm-")));
 });
 afterEach(() => rmSync(prefix, { recursive: true, force: true }));
 
@@ -191,7 +191,7 @@ describe("invocationFor", () => {
   });
 
   it("on Windows uses %APPDATA%\\npm under home when no prefix is set", () => {
-    const home = realpathSync(mkdtempSync(join(tmpdir(), "cli-bridge-home-")));
+    const home = realpathSync.native(mkdtempSync(join(tmpdir(), "cli-bridge-home-")));
     try {
       const saved = prefix;
       prefix = defaultWindowsNpmPrefix(home);

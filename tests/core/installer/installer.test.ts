@@ -290,7 +290,7 @@ describe.skipIf(!posix)("installer", () => {
   };
 
   beforeEach(() => {
-    home = realpathSync(mkdtempSync(join(tmpdir(), "plughive-inst-")));
+    home = realpathSync.native(mkdtempSync(join(tmpdir(), "plughive-inst-")));
     db = new Database(join(home, "jobs.db"));
     jobs = new JobQueue({ db, concurrency: 1 });
     served.body = PROGRAM;
@@ -724,7 +724,7 @@ describe("model files", () => {
   const target = () => join(home, "pack-data", "local", "models", "ggml-tiny.bin");
 
   beforeEach(() => {
-    home = realpathSync(mkdtempSync(join(tmpdir(), "plughive-model-")));
+    home = realpathSync.native(mkdtempSync(join(tmpdir(), "plughive-model-")));
     db = new Database(join(home, "jobs.db"));
     jobs = new JobQueue({ db, concurrency: 1 });
     served.body = MODEL;
@@ -751,7 +751,7 @@ describe("model files", () => {
       version: "5359861",
       source_sha256: sha256(MODEL),
       bins: {},
-      file: join("pack-data", "local", "models", "ggml-tiny.bin"),
+      file: "pack-data/local/models/ggml-tiny.bin",
     });
     expect(await installer.statusOf("whisper-model-tiny")).toMatchObject({
       installed: true,
@@ -803,7 +803,7 @@ describe("model files", () => {
 
 describe("lock file updates", () => {
   it("serializes concurrent read-modify-write cycles in this process", async () => {
-    const root = realpathSync(mkdtempSync(join(tmpdir(), "plughive-lockfile-")));
+    const root = realpathSync.native(mkdtempSync(join(tmpdir(), "plughive-lockfile-")));
     try {
       await Promise.all(
         Array.from({ length: 20 }, (_, i) =>

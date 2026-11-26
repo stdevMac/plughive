@@ -5,6 +5,7 @@ import { request as httpRequest } from "node:http";
 // the Ollama text helpers, the capability guards and the local_status shape.
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { providers } from "../../../packs/local/capabilities.js";
 import {
@@ -767,7 +768,9 @@ describe("LibreOffice hardening and HTML sanitising", () => {
     const convertCall = m.calls.find((c) =>
       c.args.some((a) => a.startsWith("-env:UserInstallation=")),
     );
-    expect(convertCall?.args).toContain(`-env:UserInstallation=file://${join(work, "lo-profile")}`);
+    expect(convertCall?.args).toContain(
+      `-env:UserInstallation=${pathToFileURL(join(work, "lo-profile")).href}`,
+    );
   });
 
   it("strips remote, file and path references from HTML but keeps fragments and data ones", () => {

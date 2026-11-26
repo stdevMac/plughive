@@ -331,7 +331,7 @@ export class CapabilityRouter implements HostCapabilities {
   private readonly entries = new Map<CapabilityName, Entry[]>();
   private readonly cooldown = new Map<string, number>();
   private order = 0;
-  private prefsCache: { mtimeMs: number; prefs: CapabilityPreferences } | null = null;
+  private prefsCache: { stamp: string; prefs: CapabilityPreferences } | null = null;
   private readonly now: () => number;
 
   constructor(private readonly opts: CapabilityRouterOptions) {
@@ -738,16 +738,19 @@ export class CapabilityRouter implements HostCapabilities {
 
   private preferences(): CapabilityPreferences {
     const path = prefsPath(this.opts.home);
-    let mtimeMs = -1;
+    // mtime alone misses two rewrites in the same clock tick (coarse on
+    // Windows); the file is replaced atomically, so its identity and size change too.
+    let stamp = "";
     try {
-      mtimeMs = statSync(path).mtimeMs;
+      const st = statSync(path, { bigint: true });
+      stamp = `${st.mtimeNs}:${st.ctimeNs}:${st.size}:${st.dev}:${st.ino}`;
     } catch {
-      mtimeMs = -1;
+      stamp = "";
     }
-    if (this.prefsCache && this.prefsCache.mtimeMs === mtimeMs) return this.prefsCache.prefs;
+    if (this.prefsCache && this.prefsCache.stamp === stamp) return this.prefsCache.prefs;
     const prefs =
-      mtimeMs < 0 ? { version: 1 as const, order: {} } : getCapabilityPreferences(this.opts.home);
-    this.prefsCache = { mtimeMs, prefs };
+      stamp === "" ? { version: 1 as const, order: {} } : getCapabilityPreferences(this.opts.home);
+    this.prefsCache = { stamp, prefs };
     return prefs;
   }
 

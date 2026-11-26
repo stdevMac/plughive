@@ -10,7 +10,7 @@
 import { lstatSync, mkdirSync, realpathSync, statSync } from "node:fs";
 import * as nodeModule from "node:module";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, posix, win32 } from "node:path";
 
 /** The per-user directory for the cache (not created here). */
 export function compileCacheDir(
@@ -18,6 +18,8 @@ export function compileCacheDir(
   platform: NodeJS.Platform = process.platform,
   home: string = homedir(),
 ): string {
+  // Joined with the target platform's separator, not the host's.
+  const { join } = platform === "win32" ? win32 : posix;
   let base: string;
   if (platform === "darwin") base = join(home, "Library", "Caches");
   else if (platform === "win32") base = env.LOCALAPPDATA || join(home, "AppData", "Local");

@@ -23,14 +23,14 @@ import {
   resolveInside,
   safeFilename,
 } from "../../../src/core/fs/safe-path.js";
-import { canSymlink, itSymlink } from "../../support/platform.js";
+import { canSymlink, itPosix, itSymlink } from "../../support/platform.js";
 
 let base: string; // canonical temp dir
 let root: string;
 let outside: string;
 
 beforeAll(() => {
-  base = realpathSync(mkdtempSync(join(tmpdir(), "plughive-safe-path-")));
+  base = realpathSync.native(mkdtempSync(join(tmpdir(), "plughive-safe-path-")));
   root = join(base, "root");
   outside = join(base, "outside");
   mkdirSync(join(root, "sub", "deep"), { recursive: true });
@@ -227,10 +227,13 @@ describe("assertReadableUserFile", () => {
     );
   });
 
-  it("rejects directories and special files", async () => {
+  it("rejects directories", async () => {
     expect(await asyncReason(assertReadableUserFile(join(root, "sub"), opts()))).toBe(
       "not_regular_file",
     );
+  });
+
+  itPosix("rejects special files", async () => {
     expect(
       await asyncReason(
         assertReadableUserFile("/dev/null", { allowedRoots: ["/dev"], maxBytes: 1024 }),
@@ -238,16 +241,21 @@ describe("assertReadableUserFile", () => {
     ).toBe("not_regular_file");
   });
 
-  it("rejects a FIFO without blocking", async (ctx) => {
-    const fifo = join(root, "pipe.txt");
-    try {
-      execFileSync("mkfifo", [fifo], { stdio: "ignore" });
-    } catch {
-      ctx.skip();
-      return;
-    }
-    expect(await asyncReason(assertReadableUserFile(fifo, opts()))).toBe("not_regular_file");
-  }, 30_000);
+  // Git for Windows ships a mkfifo that makes no real FIFO.
+  itPosix(
+    "rejects a FIFO without blocking",
+    async (ctx) => {
+      const fifo = join(root, "pipe.txt");
+      try {
+        execFileSync("mkfifo", [fifo], { stdio: "ignore" });
+      } catch {
+        ctx.skip();
+        return;
+      }
+      expect(await asyncReason(assertReadableUserFile(fifo, opts()))).toBe("not_regular_file");
+    },
+    30_000,
+  );
 
   it("enforces the size cap at the boundary", async () => {
     const big = join(root, "big.bin");
@@ -401,7 +409,7 @@ describe("review regressions", () => {
   let routside: string;
 
   beforeAll(() => {
-    rbase = realpathSync(mkdtempSync(join(tmpdir(), "plughive-safe-path-review-")));
+    rbase = realpathSync.native(mkdtempSync(join(tmpdir(), "plughive-safe-path-review-")));
     rroot = join(rbase, "root");
     routside = join(rbase, "outside");
     mkdirSync(rroot);

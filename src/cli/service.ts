@@ -13,7 +13,7 @@
 // PLUGHIVE_SECRETS and (macOS, Linux) PATH are carried over.
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, posix, resolve, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { atomicReplaceSync, userHome, writeFileAtomicSync } from "../lib/platform.js";
 import { connect, daemonTarget, daemonUp } from "./api.js";
@@ -110,8 +110,8 @@ ${env}
   <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
   <key>ThrottleInterval</key><integer>10</integer>
   <key>Umask</key><integer>63</integer>
-  <key>StandardOutPath</key><string>${xml(join(spec.logs, "stdout.log"))}</string>
-  <key>StandardErrorPath</key><string>${xml(join(spec.logs, "stderr.log"))}</string>
+  <key>StandardOutPath</key><string>${xml(posix.join(spec.logs, "stdout.log"))}</string>
+  <key>StandardErrorPath</key><string>${xml(posix.join(spec.logs, "stderr.log"))}</string>
 </dict></plist>
 `;
 }
@@ -180,7 +180,7 @@ export function planService(
   opts: { home: string; uid?: number; userId?: string },
 ): ServicePlan {
   if (platform === "darwin") {
-    const file = join(opts.home, "Library", "LaunchAgents", `${SERVICE_LABEL}.plist`);
+    const file = posix.join(opts.home, "Library", "LaunchAgents", `${SERVICE_LABEL}.plist`);
     const domain = `gui/${opts.uid ?? 501}`;
     return {
       file,
@@ -192,7 +192,7 @@ export function planService(
   }
   if (platform === "win32") {
     return {
-      file: join(spec.logs, "..", "plughive-task.xml"),
+      file: win32.join(spec.logs, "..", "plughive-task.xml"),
       content: windowsTaskXml(spec, opts.userId ?? ""),
       stop: [["schtasks", ["/End", "/TN", WINDOWS_TASK]]],
       start: [
@@ -203,7 +203,7 @@ export function planService(
             "/TN",
             WINDOWS_TASK,
             "/XML",
-            join(spec.logs, "..", "plughive-task.xml"),
+            win32.join(spec.logs, "..", "plughive-task.xml"),
             "/F",
           ],
         ],
@@ -212,7 +212,7 @@ export function planService(
       query: ["schtasks", ["/Query", "/TN", WINDOWS_TASK]],
     };
   }
-  const file = join(opts.home, ".config", "systemd", "user", SYSTEMD_UNIT);
+  const file = posix.join(opts.home, ".config", "systemd", "user", SYSTEMD_UNIT);
   return {
     file,
     content: systemdUnit(spec),

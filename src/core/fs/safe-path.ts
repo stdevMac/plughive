@@ -99,15 +99,34 @@ export function resolveInside(root: string, userPath: string): string {
 
   // Lexical containment, against the root as given or its canonical form.
   const lexical = resolve(rootAbs, userPath);
-  let suffix: string;
-  if (isWithin(rootAbs, lexical)) suffix = relative(rootAbs, lexical);
-  else if (isWithin(rootReal, lexical)) suffix = relative(rootReal, lexical);
-  else throw new UnsafePathError("outside_root");
-  const candidate = join(rootReal, suffix);
+  if (isWithin(rootAbs, lexical) || isWithin(rootReal, lexical)) {
+    const suffix = isWithin(rootAbs, lexical)
+      ? relative(rootAbs, lexical)
+      : relative(rootReal, lexical);
+    const finalPath = canonicalTail(join(rootReal, suffix));
+    if (!isWithin(rootReal, finalPath)) throw new UnsafePathError("symlink_escape");
+    return finalPath;
+  }
+  // Another spelling of a path inside the root: a Windows 8.3 short name
+  // (C:\Users\RUNNER~1\...) or a symlinked prefix (/var -> /private/var).
+  // Accepted only when its canonical form is inside the canonical root.
+  let canonical: string;
+  try {
+    canonical = canonicalTail(lexical);
+  } catch {
+    throw new UnsafePathError("outside_root");
+  }
+  if (!isWithin(rootReal, canonical)) throw new UnsafePathError("outside_root");
+  return canonical;
+}
 
-  // Walk up to the deepest path component that exists (lstat, so a dangling
-  // symlink counts as existing), canonicalise it, and re-attach the rest.
-  let existing = candidate;
+/**
+ * The canonical form of `path`: the deepest component that exists (lstat, so
+ * a dangling symlink counts as existing) realpath-ed, plus the rest. Throws
+ * symlink_escape when that component is a dangling or looping symlink.
+ */
+function canonicalTail(path: string): string {
+  let existing = path;
   const missing: string[] = [];
   for (;;) {
     try {
@@ -128,9 +147,7 @@ export function resolveInside(root: string, userPath: string): string {
     // Dangling or looping symlink: its eventual target is not provably inside.
     throw new UnsafePathError("symlink_escape");
   }
-  const finalPath = missing.length > 0 ? join(existingReal, ...missing) : existingReal;
-  if (!isWithin(rootReal, finalPath)) throw new UnsafePathError("symlink_escape");
-  return finalPath;
+  return missing.length > 0 ? join(existingReal, ...missing) : existingReal;
 }
 
 export interface ReadableUserFileOptions {

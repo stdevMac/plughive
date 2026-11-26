@@ -12,7 +12,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type TestContext, createTestContext } from "plughive/pack/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -34,7 +34,7 @@ const harnesses: TestContext[] = [];
 const tmps: string[] = [];
 
 function tmp(): string {
-  const d = realpathSync(mkdtempSync(join(tmpdir(), "plughive-kx-")));
+  const d = realpathSync.native(mkdtempSync(join(tmpdir(), "plughive-kx-")));
   tmps.push(d);
   return d;
 }
@@ -134,7 +134,7 @@ describe("library.materialize", () => {
     const dataDir = join(tmp(), "data"); // does not exist yet
     const ctx = seeded(dataDir);
     const copy = await ctx.library.materialize("a1");
-    expect(copy.path.startsWith(`${dataDir}/`)).toBe(true);
+    expect(copy.path.startsWith(dataDir + sep)).toBe(true);
     expect(copy.bytes).toBe(3);
     expect(copy.mime).toBe("image/png");
     expect([...readFileSync(copy.path)]).toEqual([1, 2, 3]);

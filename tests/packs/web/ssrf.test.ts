@@ -352,6 +352,36 @@ describe("installGuards", () => {
     ).toHaveBeenCalled();
   });
 
+  it("with allowLocalUrls, a public frame inside a local page cannot send the top frame or a popup to a local address", async () => {
+    const h = fakeContext();
+    const gate = makeGate({ allowLocal: true, resolve }, true);
+    await installGuards(h.ctx as never, gate);
+    const main = frame("about:blank");
+    // The caller's own page load is still allowed.
+    expect(
+      (await h.request("http://app.local.example/", { navigation: true, frame: main })).continue,
+    ).toHaveBeenCalled();
+    const doc = frame("http://app.local.example/");
+    await h.request("https://public.example/ad", {
+      navigation: true,
+      frame: frame("about:blank", doc),
+    });
+    expect(gate.publicFrame).toBe(true);
+    // The ad sets top.location, or calls window.open: either way a main frame
+    // navigates, and nothing says which frame asked for it.
+    expect(
+      (await h.request("http://127.0.0.1:5173/secret", { navigation: true, frame: doc })).abort,
+    ).toHaveBeenCalledWith("blockedbyclient");
+    expect(
+      (
+        await h.request("http://other.local.example/admin", {
+          navigation: true,
+          frame: frame("about:blank"),
+        })
+      ).abort,
+    ).toHaveBeenCalledWith("blockedbyclient");
+  });
+
   it("with allowLocalUrls, a local frame that redirected to a public page also ends the allowance", async () => {
     // The route handler saw only the first hop (local); the frame committed a public URL.
     const committed: unknown[] = [];

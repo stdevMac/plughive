@@ -139,8 +139,13 @@ async function issuerIsLocal(gate: Gate, req: PwRequest): Promise<boolean> {
   let frame = frameOf(req);
   // A request with no frame (a worker, a service worker) cannot be traced.
   if (!frame) return untracedMayBeLocal(gate);
-  // A frame being navigated is issued by its parent; the main frame by the caller.
-  if (navigation) frame = frame.parentFrame();
+  // A frame being navigated is issued by its parent. The main frame can be
+  // navigated (or a popup opened) by any frame in the page, so like a worker
+  // it cannot be traced.
+  if (navigation) {
+    frame = frame.parentFrame();
+    if (!frame) return untracedMayBeLocal(gate);
+  }
   for (let hops = 0; frame && hops < 32; hops++) {
     const url = frame.url();
     if (/^https?:/i.test(url)) {

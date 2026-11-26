@@ -46,9 +46,26 @@ export function isCapabilityName(name: unknown): name is CapabilityName {
 }
 
 const artifactId = z.string().min(1).max(128);
+// Model ids start with a letter or digit, so a value like "-x" can never be
+// read as an option by a tool that passes the id on a command line.
 const modelId = z
   .string()
-  .regex(/^[A-Za-z0-9._:/@-]{1,120}$/, "model ids use letters, digits and . _ : / @ -");
+  .regex(
+    /^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,119}$/,
+    "model ids use letters, digits and . _ : / @ - and must not start with a dash",
+  );
+
+/**
+ * A language hint for transcription: "auto" or a 2-3 letter code with
+ * optional region tails (pt-BR, zh-Hans). Local engines take this on their
+ * command line, so no leading "-", separators or spaces.
+ */
+const transcriptLanguage = z
+  .string()
+  .regex(
+    /^(auto|[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})?)$/,
+    "a language code such as en, pt-BR or auto",
+  );
 
 // --- outputs ----------------------------------------------------------------
 
@@ -139,7 +156,7 @@ export const TranscriptSegmentSchema = z.looseObject({
 
 export const AudioTranscribeInputSchema = z.object({
   artifact_id: artifactId.describe("Library audio or video artifact id."),
-  language: z.string().min(2).max(40).optional(),
+  language: transcriptLanguage.optional().describe("Language code, such as en or pt-BR."),
   model: modelId.optional(),
   timestamps: z.boolean().optional().describe("Return segments with timestamps."),
   speakers: z.boolean().optional().describe("Label speakers (providers that support it)."),
@@ -446,7 +463,7 @@ export const MediaTranscriptInputSchema = z.object({
     .url({ protocol: /^https?$/ })
     .max(8192)
     .describe("Video or podcast page URL (YouTube, Vimeo, ...)."),
-  language: z.string().min(2).max(16).optional().describe("Preferred transcript language."),
+  language: transcriptLanguage.optional().describe("Preferred transcript language."),
   timestamps: z.boolean().optional().describe("Return segments with timestamps."),
   model: modelId.optional(),
 });

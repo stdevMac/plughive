@@ -36,6 +36,20 @@ export const DEFAULT_PARAKEET_MODEL = "mlx-community/parakeet-tdt-0.6b-v3";
 const ENGINE_TIMEOUT_MS = 30 * 60_000;
 const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:/@-]{0,159}$/;
 
+/**
+ * A spoken-language code exactly as it may reach an engine's command line:
+ * "auto" or a 2-3 letter code with optional region/script tails (pt-BR,
+ * zh-Hans). The capability schema accepts looser strings, so this is the hard
+ * gate before any argv is built — no leading "-", no separators, no spaces.
+ */
+export const SPEECH_LANGUAGE = /^(auto|[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})?)$/;
+
+export function speechLanguageProblem(language: string): string | null {
+  return SPEECH_LANGUAGE.test(language)
+    ? null
+    : `"${language.slice(0, 40)}" is not a language code such as en, pt-BR or auto`;
+}
+
 export interface TranscriptSegment {
   start_s: number;
   end_s: number;

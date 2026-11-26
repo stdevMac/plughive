@@ -4,6 +4,7 @@
 // Nothing here builds a LOCAL shell string: ssh is spawned with an argv array.
 // The remote side, however, always runs a shell, so every value the pack
 // interpolates into a remote command goes through shellQuote().
+import { isIPv6 } from "node:net";
 import { win32 } from "node:path";
 import { z } from "plughive/pack";
 
@@ -33,9 +34,9 @@ export const NAME_PATTERN = /^[a-z0-9][a-z0-9_.-]{0,63}$/;
 const HOSTNAME =
   /^(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\.?$/;
 /** Bare IPv6 (optionally with an embedded IPv4 tail). No brackets, no zone id. */
-const IPV6 = /^(?=.{2,45}$)(?=.*:)[0-9A-Fa-f:.]+$/;
 export function isValidHost(host: string): boolean {
-  return HOSTNAME.test(host) || IPV6.test(host);
+  // isIPv6 accepts zone ids ("fe80::1%eth0") on current Node, so refuse "%" here.
+  return HOSTNAME.test(host) || (isIPv6(host) && !host.includes("%"));
 }
 
 /** Login names: POSIX-portable, no leading "-", no "%" (ssh token expansion), no "@". */

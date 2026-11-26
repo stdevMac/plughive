@@ -13,9 +13,11 @@
 //   - host keys live in the pack's own known_hosts; a changed key fails. A
 //     machine registered with host_key pins that one key instead, and even
 //     the first connection must present it;
-//   - a repo's post_update command runs only for a caller that may also use
-//     machine_run, so machine_update_repo cannot escalate a caller that was
-//     denied machine_run;
+//   - a repo update runs only for a caller that may also use machine_run,
+//     because both the stored post_update command and `git pull` itself (the
+//     repo's hooks and git config) execute remote code, so
+//     machine_update_repo cannot escalate a caller that was denied
+//     machine_run;
 //   - ssh is spawned with an argv array (never a local shell string), every
 //     connection field is validated, options are fixed with -o, "--" precedes
 //     the destination, and ~/.ssh/config is not read;
@@ -565,12 +567,16 @@ const machineUpdateRepo = defineTool({
     if (input.dry_run) {
       return { ...base, dry_run: true, ok: true, exit_code: null, stdout: "", stderr: "" };
     }
-    // A stored post_update command is remote code execution on the machine.
-    // A caller that may not use machine_run itself must not be able to run
-    // one through the back door of a repo update.
-    if (repo.postUpdate && !(ctx.tools.allowedForCaller?.("machine_run") ?? true)) {
+    // A stored post_update command is remote code execution on the machine,
+    // and so is `git pull` itself (the repo's own .git/hooks, core.fsmonitor
+    // and core.sshCommand run during it). A caller that may not use
+    // machine_run must not reach either through the back door of a repo
+    // update, so machine_update_repo requires machine_run for every run.
+    if (!(ctx.tools.allowedForCaller?.("machine_run") ?? true)) {
       throw new Error(
-        `repo "${repo.name}" has a post_update command, and this caller is not allowed to use machine_run, so machine_update_repo refuses to run it on the machine. Expose machine_run for this caller's profile, or re-register the repo without post_update (machine_add_repo).`,
+        "this caller is not allowed to use machine_run, so machine_update_repo refuses to run on the machine: " +
+          `both the repo's post_update command and git pull itself (its hooks and git config) execute remote code. ` +
+          `Expose machine_run for this caller's profile, or remove the repo (machine_remove_repo).`,
       );
     }
     const { provider, id } = providerOf(ctx, machine.name);

@@ -4,7 +4,18 @@
 // (`machines.json`, mode 0600, written atomically). Every read is validated
 // against the schema; a corrupt file is an error, never silently reset, so a
 // bad edit cannot wipe the user's registrations.
-import { chmodSync, existsSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import {
+  constants,
+  chmodSync,
+  closeSync,
+  fchmodSync,
+  fstatSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from "node:fs";
 import { join } from "node:path";
 import { z } from "plughive/pack";
 import {
@@ -90,6 +101,9 @@ export type MachinesState = z.output<typeof StateSchema>;
 
 export const STATE_FILE = "machines.json";
 
+/** The state file is small; anything bigger is refused instead of parsed. */
+const MAX_STATE_BYTES = 4 * 1024 * 1024;
+
 export class MachineStore {
   readonly path: string;
 
@@ -98,16 +112,39 @@ export class MachineStore {
   }
 
   read(): MachinesState {
-    if (!existsSync(this.path)) return { version: 1, machines: [], repos: [] };
-    // Tighten permissions left loose by hand edits.
-    if ((statSync(this.path).mode & 0o077) !== 0) chmodSync(this.path, 0o600);
+    // Opened with O_NOFOLLOW and checked on the descriptor, so a symlinked
+    // state file is refused, never read (or chmodded) through.
+    let fd: number;
+    try {
+      fd = openSync(this.path, constants.O_RDONLY | constants.O_NOFOLLOW);
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      if (code === "ENOENT") return { version: 1, machines: [], repos: [] };
+      if (code === "ELOOP") {
+        throw new Error(
+          `${STATE_FILE} is a symlink; remove it (a symlinked state file is never read)`,
+        );
+      }
+      throw e;
+    }
     let raw: unknown;
     try {
-      raw = JSON.parse(readFileSync(this.path, "utf8"));
+      const st = fstatSync(fd);
+      if (!st.isFile()) throw new Error(`${STATE_FILE} is not a regular file; remove it`);
+      if (st.size > MAX_STATE_BYTES) {
+        throw new Error(`${STATE_FILE} is over ${MAX_STATE_BYTES} bytes; fix or remove it`);
+      }
+      // Tighten permissions left loose by hand edits — on the opened file,
+      // so a path swapped for a symlink in the meantime is not chmodded.
+      if ((st.mode & 0o077) !== 0) fchmodSync(fd, 0o600);
+      raw = JSON.parse(readFileSync(fd, "utf8"));
     } catch (e) {
-      throw new Error(
-        `${STATE_FILE} is not valid JSON (${(e as Error).message}); fix or remove it`,
-      );
+      if (e instanceof SyntaxError) {
+        throw new Error(`${STATE_FILE} is not valid JSON (${e.message}); fix or remove it`);
+      }
+      throw e;
+    } finally {
+      closeSync(fd);
     }
     const parsed = StateSchema.safeParse(raw);
     if (!parsed.success) {
@@ -121,8 +158,10 @@ export class MachineStore {
 
   write(state: MachinesState): void {
     const valid = StateSchema.parse(state);
-    const tmp = `${this.path}.${process.pid}.${Date.now()}.tmp`;
-    writeFileSync(tmp, `${JSON.stringify(valid, null, 2)}\n`, { mode: 0o600 });
+    // O_EXCL ("wx") with a random name: a pre-planted or colliding temp file
+    // is refused instead of being written through.
+    const tmp = `${this.path}.${process.pid}.${randomUUID()}.tmp`;
+    writeFileSync(tmp, `${JSON.stringify(valid, null, 2)}\n`, { flag: "wx", mode: 0o600 });
     chmodSync(tmp, 0o600);
     renameSync(tmp, this.path);
   }

@@ -6,6 +6,7 @@
 // The payload is not signed (UNSIGNED-PAYLOAD), as S3 allows for presigned
 // URLs. Cloudflare R2 accepts the same signatures with region "auto".
 import { createHash, createHmac } from "node:crypto";
+import { noControl } from "./http.js";
 
 /** S3's hard ceiling for a presigned URL's lifetime: 7 days. */
 export const MAX_PRESIGN_SECONDS = 604_800;
@@ -67,6 +68,10 @@ export function presignUrl(input: PresignInput): string {
 
   const headers: Record<string, string> = { host: u.host };
   for (const [k, v] of Object.entries(input.headers ?? {})) {
+    // A name or value that could split the canonical request is refused.
+    if (!/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(k) || !noControl(v)) {
+      throw new Error(`presignUrl: header ${JSON.stringify(k)} is not a valid header`);
+    }
     headers[k.toLowerCase()] = v.trim().replace(/\s+/g, " ");
   }
   const names = Object.keys(headers).sort();

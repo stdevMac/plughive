@@ -168,6 +168,94 @@ describe("share pack", () => {
     expect(err.message).toBe("S3: request failed (network error)");
   });
 
+  it("uploads active web types as octet-stream, never inline", async () => {
+    for (const mime of [
+      "text/html",
+      "image/svg+xml",
+      "application/xhtml+xml",
+      "text/xml",
+      "text/javascript",
+      "TEXT/HTML; charset=utf-8",
+      "text/plain, text/html",
+    ]) {
+      const fetch = routerFetch([
+        { method: "PUT", match: /\/media-links\/plughive\/p1\?/, reply: () => new Response(null) },
+      ]);
+      const h = harness(sharePack, "share", "share_artifact", {
+        secrets: SECRETS,
+        fetch,
+        settings: SETTINGS,
+      });
+      h.t.library!.seed({ id: "p1", kind: "file", mime, bytes: "<script>1</script>" });
+      const out = (await h.call({ artifact_id: "p1" })) as { mime: string };
+      expect(out.mime, mime).toBe("application/octet-stream");
+      expect(fetch.calls[0]!.headers["content-type"], mime).toBe("application/octet-stream");
+    }
+    const fetch = routerFetch([
+      { method: "PUT", match: /\/plughive\/t1\.txt\?/, reply: () => new Response(null) },
+    ]);
+    const h = harness(sharePack, "share", "share_artifact", {
+      secrets: SECRETS,
+      fetch,
+      settings: SETTINGS,
+    });
+    h.t.library!.seed({ id: "t1", kind: "file", mime: "text/plain; charset=UTF-8", bytes: "hi" });
+    expect(((await h.call({ artifact_id: "t1" })) as { mime: string }).mime).toBe(
+      "text/plain; charset=utf-8",
+    );
+  });
+
+  it("refuses . and .. segments in keyPrefix", async () => {
+    const fetch = routerFetch([]);
+    for (const keyPrefix of ["./x/", "a/./", ".", "a/../b/"]) {
+      const h = seeded("share_artifact", fetch, { ...SETTINGS, keyPrefix } as never);
+      expect((await failure(h.call({ artifact_id: "a1" }))).message, keyPrefix).toMatch(
+        /keyPrefix/,
+      );
+    }
+    expect(fetch.calls).toHaveLength(0);
+  });
+
+  it("refuses header names or values that could split the canonical request", () => {
+    const base = {
+      method: "PUT" as const,
+      url: "https://x.s3.amazonaws.com/k",
+      region: "us-east-1",
+      accessKeyId: "a",
+      secretAccessKey: "b",
+      expiresIn: 60,
+    };
+    expect(() => presignUrl({ ...base, headers: { "x-a:b": "v" } })).toThrow(/not a valid header/);
+    expect(() => presignUrl({ ...base, headers: { "x-a\nhost": "v" } })).toThrow(
+      /not a valid header/,
+    );
+    expect(() => presignUrl({ ...base, headers: { "x-a": "v\r\nhost: evil" } })).toThrow(
+      /not a valid header/,
+    );
+    expect(presignUrl({ ...base, headers: { "content-type": "image/png" } })).toMatch(
+      /X-Amz-SignedHeaders=content-type%3Bhost/,
+    );
+  });
+
+  it("strips the presigned query from a timeout or abort error that quotes it", async () => {
+    const fetch = routerFetch([
+      {
+        method: "PUT",
+        match: HOST,
+        reply: ({ url }) => {
+          const e = new Error(`Request to ${url} timed out after 5 ms`);
+          e.name = "TimeoutError";
+          throw e;
+        },
+      },
+    ]);
+    const h = seeded("share_artifact", fetch);
+    const err = await failure(h.call({ artifact_id: "a1" }));
+    expect(err.name).toBe("TimeoutError");
+    expect(err.message).toMatch(/timed out after 5 ms/);
+    expect(`${err.message} ${err.stack}`).not.toMatch(/X-Amz-|Signature/);
+  });
+
   it("can reach only the declared hosts", async () => {
     const h = seeded("share_artifact", routerFetch([]));
     await expectHostDenied(h.ctx);

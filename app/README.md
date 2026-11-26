@@ -203,10 +203,13 @@ are filtered before they are written: the admin token and anything after
   or its parent changes, so a crashed or force-quit app does not leave a
   daemon behind.
 - **One instance.** Opening the app again shows the dashboard of the copy
-  that is already running (`tauri-plugin-single-instance`: a socket in `/tmp`
-  on macOS, a named mutex on Windows, D-Bus on Linux). On macOS an exclusive
-  lock on `app.lock` in the data directory, taken before anything starts,
-  also covers two copies started a few milliseconds apart.
+  that is already running. On macOS an exclusive lock on `app.lock` in the
+  private data directory, taken before anything starts, decides which copy
+  runs (also for two copies started a few milliseconds apart), and a later
+  copy asks the running one to show its dashboard over `app.sock` in the
+  same directory, so nothing is shared with other accounts through `/tmp`.
+  On Windows (named mutex) and Linux (D-Bus) `tauri-plugin-single-instance`
+  does it.
 
 ## Dashboard window
 

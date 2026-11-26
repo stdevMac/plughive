@@ -19,8 +19,6 @@ mod i18n;
 mod logs;
 mod supervisor;
 
-#[cfg(target_os = "macos")]
-use std::io::Write;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -104,7 +102,8 @@ struct Shared {
     items: Items,
     /// Origin the dashboard window may navigate within.
     origin: Arc<Mutex<Option<Url>>>,
-    open_when_ready: Mutex<bool>,
+    /// Dashboard page to open once the daemon is healthy.
+    open_when_ready: Mutex<Option<String>>,
     last_client_refresh: Mutex<Option<Instant>>,
     last_status: Mutex<Option<Status>>,
     /// Approvals waiting, as of the last poll (shown in the menu and tooltip).
@@ -196,8 +195,23 @@ fn dashboard_url_at(app: &AppHandle, path: &str) -> Option<(Url, Url)> {
     let base = st.sup.base_url()?;
     let token = st.sup.token()?;
     let origin: Url = format!("{base}/").parse().ok()?;
-    let full: Url = format!("{base}{path}#token={token}").parse().ok()?;
+    let full: Url = format!("{base}{path}#token={}", encode_component(&token)).parse().ok()?;
     Some((origin, full))
+}
+
+/// Percent-encodes everything but unreserved characters, so a token holding
+/// `&`, `#`, `+` or `%` reaches the dashboard unchanged (it reads the
+/// fragment with URLSearchParams).
+fn encode_component(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for b in s.bytes() {
+        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') {
+            out.push(b as char);
+        } else {
+            out.push_str(&format!("%{b:02X}"));
+        }
+    }
+    out
 }
 
 fn geometry_visible(app: &AppHandle, g: &Geometry) -> bool {
@@ -216,8 +230,8 @@ fn open_dashboard(app: &AppHandle) {
 
 fn open_dashboard_at(app: &AppHandle, path: &str) {
     let Some((origin, full)) = dashboard_url_at(app, path) else {
-        // Not running yet: open as soon as the daemon is healthy.
-        *shared(app).open_when_ready.lock().unwrap() = true;
+        // Not running yet: open (at this page) as soon as the daemon is healthy.
+        *shared(app).open_when_ready.lock().unwrap() = Some(path.to_string());
         return;
     };
     let st = shared(app);
@@ -333,8 +347,8 @@ fn on_status(app: &AppHandle, snap: Snapshot) {
         }
         let first_run = !st.config.lock().unwrap().first_run_done;
         let pending = std::mem::take(&mut *st.open_when_ready.lock().unwrap());
-        if first_run || pending {
-            open_dashboard(&h);
+        if first_run || pending.is_some() {
+            open_dashboard_at(&h, pending.as_deref().unwrap_or("/"));
             if first_run {
                 st.config.lock().unwrap().first_run_done = true;
                 st.save_config();
@@ -379,8 +393,7 @@ fn watch_approvals(app: &AppHandle) {
                 _ => None,
             };
             let Some((count, list)) = polled else { continue };
-            for p in tracker.new_ones(&list) {
-                let (title, body) = approvals::notification_text(&p);
+            for (title, body) in approvals::notifications(&tracker.new_ones(&list, count)) {
                 if let Err(e) = h.notification().builder().title(title).body(body).show() {
                     st.log(&format!("could not show a notification: {e}"));
                 }
@@ -653,14 +666,7 @@ fn pick_locale(app: &AppHandle) {
 
 #[cfg(target_os = "macos")]
 const BUNDLE_ID: &str = "dev.plughive.desktop";
-/// Socket path used by tauri-plugin-single-instance 2.5.5 on macOS for this identifier.
-#[cfg(target_os = "macos")]
-const SINGLE_INSTANCE_SOCKET: &str = "/tmp/dev_plughive_desktop_si.sock";
 
-/// The plugin's socket handshake races when two copies start within a few
-/// milliseconds of each other (both see no socket and both carry on). An
-/// exclusive flock on the data directory closes that gap: the loser asks the
-/// winner to show its dashboard and exits before starting anything.
 /// Creates `dir` and makes it owner-only (0700 on Unix), whatever the umask:
 /// it holds the daemon's data, the admin token and logs with prompts in them.
 fn private_dir(dir: &std::path::Path) -> std::io::Result<()> {
@@ -673,43 +679,110 @@ fn private_dir(dir: &std::path::Path) -> std::io::Result<()> {
     Ok(())
 }
 
-/// On Windows (named mutex) and Linux (D-Bus name) the plugin's own claim is
-/// atomic, so this is macOS only.
+/// One copy per user on macOS. tauri-plugin-single-instance would put its
+/// socket in the shared /tmp, where another account can take the name first
+/// (and so stop the app from starting) or listen in, so macOS uses its own:
+/// an exclusive flock on `app.lock` in the private data directory, taken
+/// before anything starts (atomic, so two copies started a few milliseconds
+/// apart cannot both win), and `app.sock` next to it, on which a second copy
+/// asks the running one to show its dashboard. On Windows (named mutex) and
+/// Linux (D-Bus name) the plugin's own claim is atomic and per user.
 #[cfg(target_os = "macos")]
-fn claim_instance() -> Option<std::fs::File> {
+mod instance {
+    use std::fs::File;
+    use std::io::Write;
+    use std::os::unix::net::{UnixListener, UnixStream};
+    use std::path::Path;
+    use std::time::{Duration, Instant};
+
+    pub enum Claim {
+        /// This copy runs. The lock is held for the life of the process (the
+        /// kernel releases it on exit or crash); the listener hears later copies.
+        Won(File, std::io::Result<UnixListener>),
+        /// Another copy holds the lock.
+        Lost,
+        /// No lock could be taken (the app starts anyway, as before).
+        Failed,
+    }
+
+    pub fn claim(dir: &Path) -> Claim {
+        use std::os::unix::fs::OpenOptionsExt;
+        if super::private_dir(dir).is_err() {
+            return Claim::Failed;
+        }
+        let Ok(file) = std::fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .mode(0o600)
+            .custom_flags(libc::O_NOFOLLOW)
+            .open(dir.join("app.lock"))
+        else {
+            return Claim::Failed;
+        };
+        match file.try_lock() {
+            Ok(()) => {
+                // Ours now: a socket left by a crashed copy is stale.
+                let sock = dir.join("app.sock");
+                let _ = std::fs::remove_file(&sock);
+                Claim::Won(file, UnixListener::bind(&sock))
+            }
+            Err(std::fs::TryLockError::WouldBlock) => Claim::Lost,
+            Err(_) => Claim::Failed,
+        }
+    }
+
+    /// Ask the running copy to show its dashboard. It may still be binding
+    /// its socket; give it a few seconds.
+    pub fn notify(dir: &Path) {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while Instant::now() < deadline {
+            if let Ok(mut s) = UnixStream::connect(dir.join("app.sock")) {
+                let _ = s.write_all(b"open\n");
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    }
+
+    /// Calls `on_open` once per connection from a later copy. Only this user
+    /// can reach the socket (the directory is 0700); what is sent is ignored.
+    pub fn listen(listener: UnixListener, on_open: impl Fn() + Send + 'static) {
+        let _ = std::thread::Builder::new().name("single-instance".into()).spawn(move || {
+            for conn in listener.incoming() {
+                if conn.is_ok() {
+                    on_open();
+                }
+            }
+        });
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn claim_instance() -> Option<(std::fs::File, std::io::Result<std::os::unix::net::UnixListener>)> {
     let home = std::env::var("HOME").map(PathBuf::from).unwrap_or_else(|_| PathBuf::from("/"));
     let paths = AppPaths::resolve(home.join("Library/Application Support").join(BUNDLE_ID), PathBuf::new());
-    std::fs::create_dir_all(&paths.data_dir).ok()?;
-    let file = std::fs::OpenOptions::new()
-        .create(true)
-        .truncate(false)
-        .write(true)
-        .open(paths.data_dir.join("app.lock"))
-        .ok()?;
-    match file.try_lock() {
-        Ok(()) => Some(file),
-        Err(std::fs::TryLockError::WouldBlock) => {
-            // The running copy may still be binding its socket; give it a few seconds.
-            let deadline = Instant::now() + Duration::from_secs(5);
-            while Instant::now() < deadline {
-                if let Ok(mut s) = std::os::unix::net::UnixStream::connect(SINGLE_INSTANCE_SOCKET) {
-                    let _ = s.write_all(b"\0\0");
-                    break;
-                }
-                std::thread::sleep(Duration::from_millis(100));
-            }
+    match instance::claim(&paths.data_dir) {
+        instance::Claim::Won(lock, listener) => Some((lock, listener)),
+        instance::Claim::Lost => {
+            instance::notify(&paths.data_dir);
             std::process::exit(0);
         }
-        Err(_) => None,
+        instance::Claim::Failed => None,
     }
 }
 
 fn main() {
-    // Held for the life of the process; the kernel releases it on exit or crash.
+    // The lock is held for the life of the process; the kernel releases it on exit or crash.
     #[cfg(target_os = "macos")]
-    let _instance_lock = claim_instance();
-    let builder = tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| open_dashboard(app)))
+    let (_instance_lock, instance_listener) = match claim_instance() {
+        Some((lock, listener)) => (Some(lock), Some(listener)),
+        None => (None, None),
+    };
+    let builder = tauri::Builder::default();
+    #[cfg(not(target_os = "macos"))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| open_dashboard(app)));
+    let builder = builder
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -719,7 +792,7 @@ fn main() {
     let builder = builder.menu(app_menu);
     let app = builder
         .on_menu_event(on_menu)
-        .setup(|app| {
+        .setup(move |app| {
             set_dock_visible(app.handle(), false);
             let handle = app.handle().clone();
 
@@ -827,12 +900,24 @@ fn main() {
                     quit,
                 },
                 origin: Arc::new(Mutex::new(None)),
-                open_when_ready: Mutex::new(false),
+                open_when_ready: Mutex::new(None),
                 last_client_refresh: Mutex::new(None),
                 last_status: Mutex::new(None),
                 pending: Mutex::new(0),
             });
             app.manage(Arc::clone(&st));
+            #[cfg(target_os = "macos")]
+            match instance_listener {
+                Some(Ok(listener)) => {
+                    let h = handle.clone();
+                    instance::listen(listener, move || {
+                        let app = h.clone();
+                        let _ = h.run_on_main_thread(move || open_dashboard(&app));
+                    });
+                }
+                Some(Err(e)) => st.log(&format!("could not listen for a second copy of the app: {e}")),
+                None => st.log("could not take the single-instance lock"),
+            }
 
             TrayIconBuilder::with_id("main")
                 .icon(Image::from_bytes(ICON_STARTING)?)
@@ -885,5 +970,41 @@ mod tests {
         for bad in ["file:///etc/passwd", "javascript:alert(1)", "smb://host/share", "ms-settings:privacy"] {
             assert!(!is_external_link(&Url::parse(bad).unwrap()), "{bad}");
         }
+    }
+
+    #[test]
+    fn the_token_is_encoded_in_the_sign_in_fragment() {
+        assert_eq!(encode_component("Ab-_.~09"), "Ab-_.~09");
+        assert_eq!(encode_component("a&b=c#d+e%f g"), "a%26b%3Dc%23d%2Be%25f%20g");
+        let full: Url = format!("http://127.0.0.1:1/approvals#token={}", encode_component("x&admin=1")).parse().unwrap();
+        assert_eq!(full.fragment(), Some("token=x%26admin%3D1"));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn the_instance_lock_and_socket_live_in_a_private_dir() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("plughive-si-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        let instance::Claim::Won(_lock, listener) = instance::claim(&dir) else { panic!("first copy wins") };
+        assert_eq!(std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777, 0o700);
+        let (tx, rx) = std::sync::mpsc::channel();
+        instance::listen(listener.expect("socket bound"), move || {
+            let _ = tx.send(());
+        });
+        assert!(matches!(instance::claim(&dir), instance::Claim::Lost));
+        instance::notify(&dir);
+        rx.recv_timeout(Duration::from_secs(5)).expect("the running copy was asked to open");
+
+        // A symlink planted as the lock file is not followed.
+        let other = dir.join("other");
+        std::fs::create_dir_all(&other).unwrap();
+        std::os::unix::fs::symlink(dir.join("victim"), other.join("app.lock")).unwrap();
+        assert!(matches!(instance::claim(&other), instance::Claim::Failed));
+        assert!(!dir.join("victim").exists());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

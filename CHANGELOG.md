@@ -185,6 +185,20 @@ error names the setting to change.
   the app config are written 0600 without following symlinks, and
   notifications are cleaned and capped. The single-instance lock moved from
   `/tmp` to the app's private data folder.
+- local: the HTML sanitiser used before a conversion now fails closed. It
+  checks each `srcset` candidate, drops `srcdoc`, DOCTYPE and processing
+  instructions, and removes CSS that could load a URL. Office files that are
+  ZIP archives (docx, xlsx, pptx, odt, ods, odp, epub) are scanned before any
+  tool runs: ZIP64, entries outside the archive, too many entries, more than
+  256 MiB unpacked or a 200:1 ratio, external entities, `file:` and UNC
+  references, and external links that are not http(s), `mailto:` or `tel:`
+  are refused. Speech language codes, yt-dlp subtitle languages, ComfyUI
+  output paths and model ids are checked before they reach a program.
+- machines: the pack's state and pin files are read and written without
+  following symbolic links, and uploads land through a temporary file.
+  `machine_update_repo` now needs `machine_run` for every run that is not a
+  dry run, not only for `post_update`. IPv6 hosts are parsed strictly and a
+  zone id (`%`) is refused.
 
 ### Added
 

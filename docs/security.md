@@ -186,7 +186,9 @@ open it in the dashboard (Packs > <pack> > Settings):
   needs `allowDefaultKeys` on. A machine with none of these is refused. Upload
   and download refuse a remote symlink at the named path; anything further
   on the remote side is bounded by that account's own permissions. A repo's
-  `post_update` runs only for a caller that may also use `machine_run`. The
+  `machine_update_repo` (other than a dry run) needs a caller that may also
+  use `machine_run`. The pack's state files are never followed through a
+  symbolic link. The
   type of a downloaded file is taken from its content, not from the caller.
 - **sandbox** `docker_run` runs the container as the daemon's user with no
   capabilities, no new privileges and no network by default, with `HOME` set
@@ -202,7 +204,14 @@ open it in the dashboard (Packs > <pack> > Settings):
 - **local** document conversion runs LibreOffice with a fresh profile that
   turns off macros, OLE and link updates and points every web request at a
   dead proxy. HTML input keeps only `data:` and `#` references; every other
-  URL or path is removed before it is converted. OCR languages must be codes joined by `+`.
+  URL or path is removed before it is converted, and anything the sanitiser
+  cannot read safely (CSS escapes, `srcdoc`, processing instructions) is
+  dropped. ZIP-based office files (docx, xlsx, pptx, odt, ods, odp, epub) are
+  scanned first and refused if they hold ZIP64 records, entries outside the
+  archive, oversized or highly compressed content, external entities, `file:`
+  or UNC references, or external links other than http(s), `mailto:` and
+  `tel:`. OCR and speech languages must be plain codes (OCR codes joined by
+  `+`).
 - **telegram** sends only to the default chat (`defaultChatId`) and to the
   chats in `allowedChatIds`. With neither set it sends nothing. Message text
   is capped at 4096 characters and captions at 1024.
@@ -431,3 +440,5 @@ tools you call, mounts you enable and the dashboard loading its own files.
 - `web_screenshot` with `allowLocalUrls` follows a redirect to a local
   host and port the page already requested directly.
 - The Mac app does not use the hardened runtime.
+- Binary office formats (doc, xls, ppt, rtf) cannot be scanned like the ZIP
+  formats. They rely only on the locked-down LibreOffice profile.

@@ -89,6 +89,9 @@ const MUST_SEND = [
   "ayrshare_delete_post",
   "calcom_create_booking",
   "calcom_cancel_booking",
+  // share: a public link reaches whoever gets it (R2-M1)
+  "share_artifact",
+  "share_unshare",
 ];
 
 describe("pack tool tags", () => {

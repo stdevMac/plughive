@@ -1,6 +1,10 @@
 // run_tool_script (code mode): off by default, chains tool calls through the
 // scoped path, and enforces its limits (time, calls, output) with no require,
 // process, import() or eval inside the snippet.
+import { once } from "node:events";
+import { createServer } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { requestScope } from "../../../src/core/mcp/scope.js";
@@ -10,7 +14,10 @@ import {
   type ScriptArgs,
   ScriptError,
   runScript,
+  scriptChildArgs,
+  scriptChildPids,
   scriptTools,
+  spawnScriptChild,
 } from "../../../src/core/tools/builtin/script.js";
 import { type CallContext, ToolRegistry } from "../../../src/core/tools/registry.js";
 import { loadConfig } from "../../../src/lib/config.js";
@@ -124,9 +131,12 @@ describe("run_tool_script: running", () => {
     const { run } = setup();
     // Several at once, so the worker's sync limit and the host timer race.
     const runs = Array.from({ length: 4 }, () => run({ code: "while (true) {}", timeout_ms: 250 }));
-    for (const r of runs) {
-      await expect(r).rejects.toMatchObject({ code: "SCRIPT_TIMEOUT", message: /ran over 250 ms/ });
-    }
+    // Every promise gets its handler now: they settle in any order.
+    await Promise.all(
+      runs.map((r) =>
+        expect(r).rejects.toMatchObject({ code: "SCRIPT_TIMEOUT", message: /ran over 250 ms/ }),
+      ),
+    );
   }, 20_000);
 
   it("limits the number of tool calls", async () => {
@@ -189,4 +199,102 @@ describe("run_tool_script: running", () => {
     setTimeout(() => ac.abort(), 100);
     await expect(p).rejects.toMatchObject({ code: "SCRIPT_CANCELLED" });
   });
+});
+
+// What a vm escape would land in: the child process itself. The probe is
+// appended to the real child code and spawned exactly as run_tool_script
+// spawns it, so it runs with the same flags, env, cwd and hardening, and
+// reports what `process` and `require` can still do there.
+describe("run_tool_script: the child process", () => {
+  const probe = (target: string, port: number) => `
+;(async () => {
+  const out = {};
+  const t = (k, f) => { try { out[k] = f(); } catch (e) { out[k] = e.code || e.message; } };
+  t("read", () => (require("node:fs").readFileSync(${JSON.stringify(target)}, "utf8"), "READ"));
+  t("write", () => (require("node:fs").writeFileSync(${JSON.stringify(join(tmpdir(), `plughive-probe-${process.pid}`))}, "x"), "WROTE"));
+  t("spawn", () => (require("node:child_process").execFileSync(process.execPath, ["-v"]), "RAN"));
+  t("worker", () => (new (require("node:worker_threads").Worker)("1", { eval: true }), "STARTED"));
+  t("binding", () => typeof process.binding("fs"));
+  t("kill", () => (process.kill(process.ppid, 0), "SIGNALLED"));
+  t("priority", () => (require("node:os").setPriority(process.ppid, 0), "SET"));
+  t("codegen", () => Function("return 1")());
+  out.env = Object.keys(process.env);
+  out.cwd = process.cwd();
+  out.net = await new Promise((done) => {
+    try {
+      const s = require("node:net").connect(${port}, "127.0.0.1");
+      s.on("connect", () => { s.destroy(); done("CONNECTED"); });
+      s.on("error", (e) => done(e.code));
+    } catch (e) { done(e.code); }
+  });
+  process.send({ probe: out });
+})();
+`;
+
+  it("cannot read or write files, start programs or workers, signal processes, or see the env", async () => {
+    const server = createServer((s) => s.destroy()).listen(0, "127.0.0.1");
+    await once(server, "listening");
+    const port = (server.address() as { port: number }).port;
+    process.env.PLUGHIVE_PROBE_SECRET = "s3cret";
+    try {
+      const args = scriptChildArgs();
+      args[args.length - 1] += probe(join(process.cwd(), "package.json"), port);
+      const child = spawnScriptChild(args);
+      const [msg] = (await once(child, "message")) as [{ probe: Record<string, unknown> }];
+      child.kill("SIGKILL");
+      const out = msg.probe;
+      expect(out).toMatchObject({
+        read: "ERR_ACCESS_DENIED",
+        write: "ERR_ACCESS_DENIED",
+        spawn: "ERR_ACCESS_DENIED",
+        worker: "ERR_ACCESS_DENIED",
+        binding: "ERR_ACCESS_DENIED",
+        kill: "not available to a script",
+        priority: "not available to a script",
+        codegen: expect.stringMatching(/disallowed/),
+      });
+      // Nothing inherited (macOS adds its own __CF_USER_TEXT_ENCODING).
+      expect((out.env as string[]).filter((k) => !k.startsWith("__CF_"))).toEqual([]);
+      expect(out.cwd).not.toBe(process.cwd());
+      // The permission model covers the network only from Node 25 on.
+      if (Number(process.versions.node.split(".")[0]) >= 25) {
+        expect(out.net).toBe("ERR_ACCESS_DENIED");
+      }
+    } finally {
+      delete process.env.PLUGHIVE_PROBE_SECRET;
+      server.close();
+    }
+  }, 60_000);
+
+  it("leaves no process behind when a script times out, is cancelled or ends", async () => {
+    const { run } = setup();
+    const ac = new AbortController();
+    const p = run(
+      { code: "await new Promise(() => {})", timeout_ms: 60_000 },
+      { signal: ac.signal },
+    );
+    const t = run({ code: "while (true) {}", timeout_ms: 300 });
+    const q = run({ code: "return 1" });
+    let pids: number[] = [];
+    for (let i = 0; i < 200 && pids.length < 3; i++) {
+      pids = scriptChildPids();
+      await new Promise((r) => setTimeout(r, 10));
+    }
+    expect(pids.length).toBeGreaterThan(0);
+    ac.abort();
+    await expect(p).rejects.toMatchObject({ code: "SCRIPT_CANCELLED" });
+    await expect(t).rejects.toMatchObject({ code: "SCRIPT_TIMEOUT" });
+    await expect(q).resolves.toMatchObject({ result: 1 });
+    expect(scriptChildPids()).toEqual([]);
+    const alive = (pid: number) => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    for (let i = 0; i < 100 && pids.some(alive); i++) await new Promise((r) => setTimeout(r, 50));
+    expect(pids.filter(alive)).toEqual([]);
+  }, 60_000);
 });

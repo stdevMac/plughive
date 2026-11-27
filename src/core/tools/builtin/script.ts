@@ -4,7 +4,7 @@
 // tool calls, so a model can do in one call what would otherwise take many
 // round trips. Off by default: registered only when PLUGHIVE_CODE_MODE=1.
 //
-// The snippet runs in a fresh node:vm context inside a worker thread:
+// The snippet runs in a fresh node:vm context inside a separate Node process:
 //   - its only capability is `tools.call(name, args)`, which returns the same
 //     envelope as the registry ({ok, result} or {ok: false, error}) and goes
 //     through the scoped ctx.tools.call path, so the caller's profile applies;
@@ -13,15 +13,23 @@
 //     intrinsics are frozen before the snippet runs;
 //   - tool results cross into the context as JSON, never as host objects;
 //   - wall time, number of calls, code size, output size and heap are limited,
-//     and the worker is terminated when the time is up, so a busy loop cannot
+//     and the process is killed when the time is up, so a busy loop cannot
 //     hold the daemon.
 //
-// node:vm is NOT a security boundary (Node's own documentation says so). The
-// worker and the frozen, JSON-only context make accidents and casual escapes
-// unlikely; they do not make running hostile code safe. Code mode is meant for
-// a single user's own agent on their own machine, and every call it makes is
-// still limited to the tools the caller's profile exposes.
-import { Worker } from "node:worker_threads";
+// node:vm is NOT a security boundary (Node's own documentation says so), so
+// the context runs in a child process rather than in the daemon. The child
+// starts with Node's permission model and no fs, child_process, worker, addon
+// or WASI rights, with an empty environment, a neutral cwd, no stdio and no
+// string code generation even outside the context; it cannot signal other
+// processes. A vm escape therefore lands in a process that holds none of the
+// daemon's secrets and cannot read or write files or start programs. What it
+// still has: the IPC channel (the same tools.call the snippet already had,
+// counted and checked in the daemon), CPU and memory up to the limits, and,
+// on Node versions before 25, the network (the permission model only covers
+// the network from Node 25). Every call it makes is still limited to the
+// tools the caller's profile exposes.
+import { type ChildProcess, spawn } from "node:child_process";
+import { parse } from "node:path";
 import { z } from "zod";
 import { currentScope, requestScope } from "../../mcp/scope.js";
 import { runNotPreApproved } from "../../policy/run-context.js";
@@ -133,17 +141,14 @@ export class ScriptError extends Error {
   }
 }
 
-// The worker. Plain JavaScript (eval'd), so it runs the same from src/ and dist/.
-//
-// Realm rule: nothing created in the worker's own realm (a function, Error,
+// Realm rule: nothing created in the child's own realm (a function, Error,
 // Promise or object) may ever become reachable from the snippet, because
-// `x.constructor.constructor` on any of them is the worker's Function, which
-// ignores the context's code-generation ban and reaches `process`. So the two
-// realms only trade primitives: the context calls `send(kind, id, text, text)`
+// `x.constructor.constructor` on any of them leads to the child's own realm,
+// where `process` and `require` live. So the two realms only trade primitives: the context calls `send(kind, id, text, text)`
 // (which returns nothing, and whose own errors are swallowed in the context),
-// and the worker calls the context's `deliver(id, ok, text)`. Promises and
+// and the child calls the context's `deliver(id, ok, text)`. Promises and
 // Errors the snippet sees are made inside the context, and JSON is parsed
-// there. The worker also never calls `.then` on a context promise: the
+// there. The child also never calls `.then` on a context promise: the
 // context's `start` does that.
 //
 // BOOTSTRAP runs inside the context: it captures what it needs, freezes the
@@ -219,58 +224,137 @@ const BOOTSTRAP = String.raw`(function (send, maxOut) {
   return Object.freeze({ deliver, start });
 })`;
 
-const WORKER = String.raw`"use strict";
-const { parentPort, workerData } = require("node:worker_threads");
+// The child process. Plain JavaScript passed with `-e`, so there is no file to
+// ship or to let it read, and it runs the same from src/ and dist/. The snippet
+// and the bootstrap arrive over IPC in the "start" message.
+//
+// Before anything else it takes away what the permission model leaves a
+// process that has no fs, child_process or worker rights: signalling other
+// processes (process.kill, so an escape cannot kill the daemon or any other
+// process of this user) and changing their priority.
+const CHILD = String.raw`"use strict";
 const vm = require("node:vm");
+const deny = () => { throw new Error("not available to a script"); };
+for (const k of ["kill", "_kill"]) {
+  try { Object.defineProperty(process, k, { value: deny, writable: false, configurable: false }); } catch {}
+}
+try {
+  Object.defineProperty(require("node:os"), "setPriority", { value: deny, writable: false, configurable: false });
+} catch {}
+const post = (m) => { try { process.send(m); } catch {} };
+// The daemon went away: nothing is left to answer the script.
+process.on("disconnect", () => process.exit(0));
 let api = null;
+let started = false;
+let syncStarted = 0;
+let syncTimeout = 0;
 // Called from inside the context: takes primitives only and returns nothing.
 const send = (kind, id, a, b) => {
   const text = (v, d) => (typeof v === "string" ? v : d);
   if (kind === "call" && typeof id === "number") {
-    parentPort.postMessage({ type: "call", id, name: text(a, ""), args: text(b, "") });
+    post({ type: "call", id, name: text(a, ""), args: text(b, "") });
   } else if (kind === "done") {
-    parentPort.postMessage({ type: "done", out: text(a, "null"), logs: text(b, "") });
+    post({ type: "done", out: text(a, "null"), logs: text(b, "") });
   } else if (kind === "error") {
-    parentPort.postMessage({ type: "error", message: text(a, "the script failed") });
+    post({ type: "error", message: text(a, "the script failed") });
   }
 };
-parentPort.on("message", (m) => {
-  if (!api || m === null || typeof m !== "object" || typeof m.id !== "number") return;
-  const ok = typeof m.json === "string";
-  try { api.deliver(m.id, ok, ok ? m.json : String(m.error)); } catch {}
-});
 // Compile errors are this realm's own Errors. The time-limit error is not an
 // instance of this realm's Error, so it is told apart by the clock instead:
 // a value the snippet threw is never read here (it could be a Proxy).
-let syncStarted = 0;
 const fail = (e) => {
-  if (syncStarted && Date.now() - syncStarted >= workerData.syncTimeout) {
-    parentPort.postMessage({ type: "timeout" });
+  if (syncStarted && Date.now() - syncStarted >= syncTimeout) {
+    post({ type: "timeout" });
     return;
   }
-  parentPort.postMessage({
+  post({
     type: "error",
     message: e instanceof Error ? String(e.message) : "the script threw before it started",
   });
 };
-try {
-  const ctx = vm.createContext(Object.create(null), {
-    name: "run_tool_script",
-    codeGeneration: { strings: false, wasm: false },
-  });
-  const boot = vm.runInContext(workerData.bootstrap, ctx, { timeout: 10000 })(send, workerData.maxOut);
-  const start = boot.start;
-  api = { deliver: boot.deliver };
-  const script = new vm.Script(
-    "(async () => {\n" + workerData.code + "\n})()",
-    { filename: "script.js", lineOffset: -1 },
-  );
-  syncStarted = Date.now();
-  start(script.runInContext(ctx, { timeout: workerData.syncTimeout }));
-} catch (e) {
-  fail(e);
-}
+const run = (w) => {
+  syncTimeout = Number(w.syncTimeout) || 0;
+  try {
+    const ctx = vm.createContext(Object.create(null), {
+      name: "run_tool_script",
+      codeGeneration: { strings: false, wasm: false },
+    });
+    const boot = vm.runInContext(String(w.bootstrap), ctx, { timeout: 10000 })(send, Number(w.maxOut));
+    const start = boot.start;
+    api = { deliver: boot.deliver };
+    const script = new vm.Script(
+      "(async () => {\n" + String(w.code) + "\n})()",
+      { filename: "script.js", lineOffset: -1 },
+    );
+    post({ type: "ready" });
+    syncStarted = Date.now();
+    start(script.runInContext(ctx, { timeout: syncTimeout }));
+  } catch (e) {
+    fail(e);
+  }
+};
+process.on("message", (m) => {
+  if (m === null || typeof m !== "object") return;
+  if (m.type === "start") {
+    if (!started) { started = true; run(m); }
+    return;
+  }
+  if (!api || typeof m.id !== "number") return;
+  const ok = typeof m.json === "string";
+  try { api.deliver(m.id, ok, ok ? m.json : String(m.error)); } catch {}
+});
 `;
+
+/** How long the child process may take to start, apart from the script's own time limit. */
+export const SCRIPT_BOOT_TIMEOUT_MS = 30_000;
+
+/** Node 22.13+ calls it --permission; earlier 22.x only knows --experimental-permission. */
+const PERMISSION_FLAG = process.allowedNodeEnvironmentFlags.has("--permission")
+  ? "--permission"
+  : "--experimental-permission";
+
+/**
+ * The command line of the script's child process: the permission model with
+ * no fs, child_process, worker, addon or WASI rights, no string code
+ * generation even outside the context, and a small heap.
+ */
+export function scriptChildArgs(): string[] {
+  return [
+    PERMISSION_FLAG,
+    "--disallow-code-generation-from-strings",
+    `--max-old-space-size=${HEAP_MB}`,
+    "--max-semi-space-size=8",
+    "-e",
+    CHILD,
+  ];
+}
+
+/** Start a child the way run_tool_script does: no env, a neutral cwd, IPC only. */
+export function spawnScriptChild(args: readonly string[] = scriptChildArgs()): ChildProcess {
+  return spawn(process.execPath, [...args], {
+    env: {},
+    cwd: parse(process.execPath).root,
+    stdio: ["ignore", "ignore", "ignore", "ipc"],
+    serialization: "json",
+    windowsHide: true,
+  });
+}
+
+// Children still running when the daemon exits are killed with it.
+const liveChildren = new Set<ChildProcess>();
+/** Process ids of the script children still running (for tests). */
+export function scriptChildPids(): number[] {
+  return [...liveChildren].flatMap((c) => (c.pid === undefined ? [] : [c.pid]));
+}
+let exitHook = false;
+function track(child: ChildProcess): void {
+  liveChildren.add(child);
+  if (exitHook) return;
+  exitHook = true;
+  process.once("exit", () => {
+    for (const c of liveChildren) c.kill("SIGKILL");
+  });
+}
 
 /** Run a snippet. Resolves with its JSON result and console output, or throws a ScriptError. */
 export async function runScript(
@@ -288,43 +372,81 @@ export async function runScript(
   };
   let calls = 0;
   const slots = new CallSlots(MAX_SCRIPT_IN_FLIGHT, MAX_NESTED_LONG_RUNNING);
-  const worker = new Worker(WORKER, {
-    eval: true,
-    workerData: {
+  const child = spawnScriptChild();
+  track(child);
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let timer: NodeJS.Timeout | undefined;
+    const end = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(boot);
+      clearTimeout(timer);
+      callCtx.signal?.removeEventListener("abort", onAbort);
+      liveChildren.delete(child);
+      child.kill("SIGKILL");
+      fn();
+    };
+    const timedOut = () =>
+      end(() => reject(new ScriptError("SCRIPT_TIMEOUT", `script ran over ${timeoutMs} ms`)));
+    // The script's own clock starts once the child is up and has compiled it.
+    const boot = setTimeout(
+      () =>
+        end(() =>
+          reject(
+            new ScriptError(
+              "SCRIPT_ERROR",
+              `script failed: its process did not start within ${SCRIPT_BOOT_TIMEOUT_MS} ms`,
+            ),
+          ),
+        ),
+      SCRIPT_BOOT_TIMEOUT_MS,
+    );
+    const onAbort = () =>
+      end(() => reject(new ScriptError("SCRIPT_CANCELLED", "script cancelled")));
+    if (callCtx.signal?.aborted) {
+      onAbort();
+      return;
+    }
+    callCtx.signal?.addEventListener("abort", onAbort, { once: true });
+    child.on("error", (e) =>
+      end(() => reject(new ScriptError("SCRIPT_ERROR", `script failed: ${e.message}`))),
+    );
+    child.on("exit", () =>
+      end(() =>
+        reject(
+          new ScriptError(
+            "SCRIPT_ERROR",
+            "script stopped before it finished (it may have run out of memory)",
+          ),
+        ),
+      ),
+    );
+    const toChild = (msg: object) => {
+      if (settled || !child.connected) return;
+      try {
+        child.send(msg);
+      } catch {
+        // The child is gone; its exit settles the run.
+      }
+    };
+    toChild({
+      type: "start",
       code: input.code,
       bootstrap: BOOTSTRAP,
       maxOut: MAX_SCRIPT_OUTPUT_BYTES,
       syncTimeout: Math.min(timeoutMs, MAX_SCRIPT_TIMEOUT_MS),
-    },
-    resourceLimits: { maxOldGenerationSizeMb: HEAP_MB, maxYoungGenerationSizeMb: 16 },
-    env: {},
-    stdout: true,
-    stderr: true,
-  });
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const end = (fn: () => void) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      callCtx.signal?.removeEventListener("abort", onAbort);
-      void worker.terminate();
-      fn();
-    };
-    const timer = setTimeout(
-      () => end(() => reject(new ScriptError("SCRIPT_TIMEOUT", `script ran over ${timeoutMs} ms`))),
-      timeoutMs,
-    );
-    const onAbort = () =>
-      end(() => reject(new ScriptError("SCRIPT_CANCELLED", "script cancelled")));
-    callCtx.signal?.addEventListener("abort", onAbort, { once: true });
-    worker.on("error", (e) =>
-      end(() => reject(new ScriptError("SCRIPT_ERROR", `script failed: ${e.message}`))),
-    );
-    worker.on("exit", () =>
-      end(() => reject(new ScriptError("SCRIPT_ERROR", "script stopped before it finished"))),
-    );
-    worker.on("message", (m: Record<string, unknown>) => {
+    });
+    child.on("message", (raw: unknown) => {
+      if (raw === null || typeof raw !== "object") return;
+      const m = raw as Record<string, unknown>;
+      if (m.type === "ready") {
+        if (timer === undefined && !settled) {
+          clearTimeout(boot);
+          timer = setTimeout(timedOut, timeoutMs);
+        }
+        return;
+      }
       if (m.type === "done") {
         const out = String(m.out);
         const logs = String(m.logs);
@@ -352,7 +474,7 @@ export async function runScript(
         return;
       }
       if (m.type === "timeout") {
-        end(() => reject(new ScriptError("SCRIPT_TIMEOUT", `script ran over ${timeoutMs} ms`)));
+        timedOut();
         return;
       }
       if (m.type === "error") {
@@ -362,7 +484,7 @@ export async function runScript(
       if (m.type !== "call") return;
       const id = m.id;
       const reply = (msg: { json: string } | { error: string }) => {
-        if (!settled) worker.postMessage({ id, ...msg });
+        toChild({ id, ...msg });
       };
       const name = String(m.name);
       if (++calls > maxCalls) {

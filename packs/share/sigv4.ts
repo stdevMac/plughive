@@ -25,6 +25,8 @@ export interface PresignInput {
   now?: Date;
   /** Extra headers the request will send and that are signed (lowercase names). */
   headers?: Record<string, string>;
+  /** Extra query parameters, signed with the rest (e.g. response-content-disposition). */
+  query?: Record<string, string>;
 }
 
 /** RFC 3986 encoding as SigV4 wants it: everything but A-Z a-z 0-9 - _ . ~ */
@@ -84,6 +86,15 @@ export function presignUrl(input: PresignInput): string {
     ["X-Amz-Expires", String(expires)],
     ["X-Amz-SignedHeaders", signedHeaders],
   ];
+  for (const [k, v] of Object.entries(input.query ?? {})) {
+    if (/^x-amz-(algorithm|credential|date|expires|signedheaders|signature)$/i.test(k)) {
+      throw new Error(`presignUrl: query parameter ${JSON.stringify(k)} is set by the signer`);
+    }
+    if (!noControl(k) || !noControl(v)) {
+      throw new Error(`presignUrl: query parameter ${JSON.stringify(k)} has control characters`);
+    }
+    params.push([k, v]);
+  }
   const query = params
     .map(([k, v]) => [rfc3986(k), rfc3986(v)] as const)
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))

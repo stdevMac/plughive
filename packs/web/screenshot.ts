@@ -163,7 +163,9 @@ async function issuerIsLocal(gate: Gate, req: PwRequest): Promise<boolean> {
     }
     frame = frame.parentFrame(); // about:blank, srcdoc, data: inherit from the parent
   }
-  return gate.localTop;
+  // A top-level about:blank (a popup) inherits from whichever frame opened it,
+  // which cannot be traced: like a worker.
+  return untracedMayBeLocal(gate);
 }
 
 /**
@@ -412,6 +414,10 @@ export function makeScreenshotTool(deps: ScreenshotDeps = {}) {
         });
         await installGuards(browserCtx, gate);
         const page = await browserCtx.newPage();
+        // Only the caller's page is captured: any popup the page opens is closed.
+        browserCtx.on?.("page", (popup: { close(): Promise<void> }) => {
+          if (popup !== page) void popup.close().catch(() => {});
+        });
 
         try {
           await page.goto(input.url, { waitUntil: "networkidle", timeout: 30_000 });

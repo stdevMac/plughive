@@ -442,6 +442,7 @@ async function send(
   spec: RequestSpec,
   limits: Limits,
   extra: Record<string, string> = {},
+  final?: { url: string },
 ): Promise<Response> {
   const paying = Object.keys(extra).length > 0;
   let current = checkRequest(spec, limits);
@@ -478,6 +479,7 @@ async function send(
       }
       continue;
     }
+    if (final) final.url = current.href;
     return res;
   }
 }
@@ -760,9 +762,19 @@ const pay = defineTool({
     const limits = limitsFrom(ctx.settings);
     const url = checkRequest(input, limits);
     const key = await walletKey(ctx);
-    const first = await send(ctx, input, limits);
+    const landed = { url: url.href };
+    const first = await send(ctx, input, limits, {}, landed);
     if (first.status !== 402) {
       return { paid: false, cost_usd: 0, ...(await responseOut(ctx, first, input.url)) };
+    }
+    // The paid request goes to the URL asked for, never redirected, so a price
+    // quoted by a page it redirected to is not signed: that page did not get
+    // the payment, the first one would.
+    if (landed.url !== url.href) {
+      await first.body?.cancel().catch(() => undefined);
+      throw new Error(
+        `${url.hostname} redirected to ${logUrl(landed.url)}, which asked for payment; nothing was paid. Call x402_fetch with that URL directly to pay it.`,
+      );
     }
     const pr = await readOptions(first);
     if (!pr || pr.accepts.length === 0) {

@@ -87,10 +87,20 @@ export async function saveJson(
   });
 }
 
+/** Research briefs, ICPs and drafts are small text; anything bigger is not read. */
+export const MAX_ARTIFACT_TEXT_BYTES = 2 * 1024 * 1024;
+
 export async function readArtifactText(ctx: PackContext, id: string): Promise<string | null> {
   const rec = await ctx.library.get(id);
   if (!rec) return null;
-  return new TextDecoder().decode(await ctx.library.read(rec.id));
+  const tooBig = () =>
+    new Error(
+      `artifact ${rec.id} is larger than ${MAX_ARTIFACT_TEXT_BYTES / 1024 / 1024} MB, too big to use as text; it was not read`,
+    );
+  if (rec.bytes > MAX_ARTIFACT_TEXT_BYTES) throw tooBig();
+  const bytes = await ctx.library.read(rec.id);
+  if (bytes.byteLength > MAX_ARTIFACT_TEXT_BYTES) throw tooBig();
+  return new TextDecoder().decode(bytes);
 }
 
 const obj = (v: unknown): Record<string, unknown> | null =>

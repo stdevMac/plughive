@@ -26,6 +26,8 @@ export const POLL = { intervalMs: 3000, timeoutMs: 10 * 60 * 1000, maxTransientF
 // unknown", which a max_cost_usd limit refuses) rather than a guessed one.
 export const PRICE_PER_CREDIT_USD = 0.017;
 const MAX_ERROR_BYTES = 16 * 1024;
+/** Most of a successful JSON response that is read; a larger one is refused. */
+const MAX_JSON_BYTES = 8 * 1024 * 1024;
 const MAX_ERROR_CHARS = 200;
 
 interface Chunk {
@@ -63,7 +65,8 @@ export const provider = defineProvider({
     let j = await readJson(res);
     if (res.status === 202) {
       const jobId = j.jobId;
-      if (typeof jobId !== "string" || !jobId) {
+      // The id goes into a URL path and into error messages: printable ASCII only.
+      if (typeof jobId !== "string" || !/^[\x21-\x7e]{1,200}$/.test(jobId)) {
         throw new CapabilityError("Supadata accepted the request but returned no job id.", {
           code: "BAD_RESPONSE",
         });
@@ -213,14 +216,22 @@ async function apiKey(ctx: PackContext): Promise<string> {
 }
 
 async function readJson(res: Response): Promise<Record<string, unknown>> {
+  const { bytes, truncated } = await readCapped(res, MAX_JSON_BYTES);
+  if (truncated) {
+    throw new CapabilityError(
+      `Supadata sent a response larger than ${MAX_JSON_BYTES / 1024 / 1024} MB; it was not read.`,
+      { code: "BAD_RESPONSE" },
+    );
+  }
+  let j: unknown;
   try {
-    const j = await res.json();
-    return j && typeof j === "object" ? (j as Record<string, unknown>) : {};
+    j = JSON.parse(new TextDecoder().decode(bytes));
   } catch {
     throw new CapabilityError("Supadata returned a response that is not JSON.", {
       code: "BAD_RESPONSE",
     });
   }
+  return j && typeof j === "object" ? (j as Record<string, unknown>) : {};
 }
 
 /**
@@ -274,22 +285,34 @@ function redact(raw: string, key: string): string {
 }
 
 async function readCappedText(res: Response, maxBytes: number): Promise<string> {
-  if (!res.body) return "";
+  return new TextDecoder().decode((await readCapped(res, maxBytes)).bytes);
+}
+
+/** Up to `maxBytes` of a body; `truncated` when there was more (the rest is not read). */
+async function readCapped(
+  res: Response,
+  maxBytes: number,
+): Promise<{ bytes: Uint8Array; truncated: boolean }> {
+  if (!res.body) return { bytes: new Uint8Array(0), truncated: false };
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
+  let truncated = false;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
     const room = maxBytes - total;
-    chunks.push(value.byteLength > room ? value.subarray(0, room) : value);
-    total += Math.min(value.byteLength, room);
-    if (total >= maxBytes) {
+    if (value.byteLength > room) {
+      chunks.push(value.subarray(0, room));
+      total = maxBytes;
+      truncated = true;
       await reader.cancel().catch(() => {});
       break;
     }
+    chunks.push(value);
+    total += value.byteLength;
   }
-  return new TextDecoder().decode(Buffer.concat(chunks));
+  return { bytes: Buffer.concat(chunks), truncated };
 }
 
 export default definePack({ providers: [provider] });

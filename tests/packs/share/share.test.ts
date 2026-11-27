@@ -62,6 +62,31 @@ describe("share pack", () => {
     ).toThrow(RangeError);
   });
 
+  it("signs extra query parameters and refuses ones that would override the signer (D-M10)", () => {
+    const base = {
+      method: "GET" as const,
+      url: "https://x.s3.amazonaws.com/k",
+      region: "us-east-1",
+      accessKeyId: "a",
+      secretAccessKey: "b",
+      expiresIn: 60,
+      now: new Date("2013-05-24T00:00:00Z"),
+    };
+    const sig = (u: string) => new URL(u).searchParams.get("X-Amz-Signature");
+    const plain = presignUrl(base);
+    const attach = presignUrl({ ...base, query: { "response-content-disposition": "attachment" } });
+    const inline = presignUrl({ ...base, query: { "response-content-disposition": "inline" } });
+    expect(attach).toMatch(
+      /\?X-Amz-Algorithm=.*&response-content-disposition=attachment&X-Amz-Signature=/,
+    );
+    // The parameter is part of what is signed: changing it changes the signature.
+    expect(new Set([sig(plain), sig(attach), sig(inline)]).size).toBe(3);
+    expect(() => presignUrl({ ...base, query: { "X-Amz-Expires": "604800" } })).toThrow(
+      /set by the signer/,
+    );
+    expect(() => presignUrl({ ...base, query: { "x-a": "v\nhost" } })).toThrow(/control/);
+  });
+
   it("marks both tools destructive", () => {
     expect(toolNames(sharePack)).toEqual(["share_artifact", "share_unshare"]);
     for (const n of ["share_artifact", "share_unshare"]) {
@@ -95,6 +120,9 @@ describe("share pack", () => {
     expect(link.pathname).toBe("/media-links/plughive/a1.png");
     expect(link.searchParams.get("X-Amz-Expires")).toBe("600");
     expect(link.searchParams.get("X-Amz-Signature")).toMatch(/^[0-9a-f]{64}$/);
+    // D-M10: the link downloads instead of rendering, so an HTML or SVG
+    // artifact cannot run script on the bucket's origin.
+    expect(link.searchParams.get("response-content-disposition")).toBe("attachment");
     expect(out.key).toBe("plughive/a1.png");
     expectNoSecrets(out, [SECRETS.SHARE_S3_SECRET_ACCESS_KEY]);
     expectNoSecrets(fetch.calls, [SECRETS.SHARE_S3_SECRET_ACCESS_KEY]);

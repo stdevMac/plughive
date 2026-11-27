@@ -136,6 +136,17 @@ describe("deepl pack", () => {
     }
   });
 
+  it("redacts the trimmed key it sent, even when the stored key has a trailing newline", async () => {
+    const { ctx } = setup(
+      [{ match: /deepl/, reply: () => json({ message: `bad key ${PRO}` }, 403) }],
+      {
+        DEEPL_API_KEY: `${PRO}\n`,
+      },
+    );
+    const e = await failure(provider.run({ text: "x", target_language: "de" }, ctx));
+    expect(e.message).toBe("DeepL 403: bad key [key]");
+  });
+
   it("a reply without translations is a non-retryable BAD_RESPONSE", async () => {
     const { ctx } = setup([{ match: /deepl/, reply: () => json({ translations: [] }) }]);
     expect(await failure(provider.run({ text: "x", target_language: "de" }, ctx))).toMatchObject({

@@ -143,6 +143,23 @@ describe("screenshot_url (fake browser)", () => {
     expect(fake.launch).not.toHaveBeenCalled();
   });
 
+  it("closes any popup the page opens (R4-M7)", async () => {
+    const fake = fakePlaywright();
+    const listeners: ((p: unknown) => void)[] = [];
+    Object.assign(fake.context, {
+      on: vi.fn((event: string, cb: (p: unknown) => void) => {
+        if (event === "page") listeners.push(cb);
+      }),
+    });
+    const popup = { close: vi.fn(async () => {}), frames: () => [] };
+    fake.page.goto.mockImplementation(async () => {
+      for (const cb of listeners) cb(popup);
+    });
+    const { tool, ctx } = setup(fake);
+    await tool.run(tool.input.parse({ url: "https://example.com" }), ctx);
+    expect(popup.close).toHaveBeenCalled();
+  });
+
   it("fails closed when Playwright cannot intercept WebSockets", async () => {
     const fake = fakePlaywright({ noWebSockets: true });
     const { tool, ctx } = setup(fake);

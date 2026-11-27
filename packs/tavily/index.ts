@@ -29,6 +29,8 @@ const CREDITS: Record<(typeof DEPTHS)[number], number> = {
   "ultra-fast": 1,
 };
 const MAX_ERROR_BYTES = 16 * 1024;
+/** Most of a successful JSON response that is read; a larger one is refused. */
+const MAX_JSON_BYTES = 8 * 1024 * 1024;
 const MAX_ERROR_CHARS = 200;
 
 interface TavilyResult {
@@ -126,14 +128,22 @@ async function apiKey(ctx: PackContext): Promise<string> {
 }
 
 async function readJson(res: Response): Promise<Record<string, unknown>> {
+  const { bytes, truncated } = await readCapped(res, MAX_JSON_BYTES);
+  if (truncated) {
+    throw new CapabilityError(
+      `Tavily sent a response larger than ${MAX_JSON_BYTES / 1024 / 1024} MB; it was not read.`,
+      { code: "BAD_RESPONSE" },
+    );
+  }
+  let j: unknown;
   try {
-    const j = await res.json();
-    return j && typeof j === "object" ? (j as Record<string, unknown>) : {};
+    j = JSON.parse(new TextDecoder().decode(bytes));
   } catch {
     throw new CapabilityError("Tavily returned a response that is not JSON.", {
       code: "BAD_RESPONSE",
     });
   }
+  return j && typeof j === "object" ? (j as Record<string, unknown>) : {};
 }
 
 /**
@@ -182,22 +192,34 @@ async function errorMessage(res: Response, key: string): Promise<string> {
 }
 
 async function readCappedText(res: Response, maxBytes: number): Promise<string> {
-  if (!res.body) return "";
+  return new TextDecoder().decode((await readCapped(res, maxBytes)).bytes);
+}
+
+/** Up to `maxBytes` of a body; `truncated` when there was more (the rest is not read). */
+async function readCapped(
+  res: Response,
+  maxBytes: number,
+): Promise<{ bytes: Uint8Array; truncated: boolean }> {
+  if (!res.body) return { bytes: new Uint8Array(0), truncated: false };
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
+  let truncated = false;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
     const room = maxBytes - total;
-    chunks.push(value.byteLength > room ? value.subarray(0, room) : value);
-    total += Math.min(value.byteLength, room);
-    if (total >= maxBytes) {
+    if (value.byteLength > room) {
+      chunks.push(value.subarray(0, room));
+      total = maxBytes;
+      truncated = true;
       await reader.cancel().catch(() => {});
       break;
     }
+    chunks.push(value);
+    total += value.byteLength;
   }
-  return new TextDecoder().decode(Buffer.concat(chunks));
+  return { bytes: Buffer.concat(chunks), truncated };
 }
 
 export default definePack({ providers: [provider] });

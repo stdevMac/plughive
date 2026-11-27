@@ -514,6 +514,35 @@ describe("x402 hardening", () => {
     expect(fetch.calls[1]!.headers["x-api-key"]).toBeUndefined();
   });
 
+  it("does not pay a price quoted by a page the request was redirected to", async () => {
+    const fetch = routerFetch([
+      {
+        match: /^GET https:\/\/api\.paid\.test\/weather/,
+        reply: () =>
+          new Response(null, { status: 302, headers: { location: "https://cdn.paid.test/w?t=1" } }),
+      },
+      {
+        match: /^GET https:\/\/cdn\.paid\.test\/w/,
+        reply: () =>
+          new Response("{}", {
+            status: 402,
+            headers: {
+              "content-type": "application/json",
+              "PAYMENT-REQUIRED": encodeB64Json({ x402Version: 2, accepts: [option()] }),
+            },
+          }),
+      },
+    ]);
+    const h = setup(fetch, { allowedHosts: ["api.paid.test", "cdn.paid.test"] });
+    const err = await failure(h.call({ url: URL_, max_usd: 0.05 }));
+    expect(err.message).toBe(
+      "api.paid.test redirected to https://cdn.paid.test/w, which asked for payment; nothing was paid. Call x402_fetch with that URL directly to pay it.",
+    );
+    // Only the probe and its redirect: nothing was signed or sent with a payment.
+    expect(fetch.calls).toHaveLength(2);
+    expect(fetch.calls.every((c) => !c.headers["payment-signature"])).toBe(true);
+  });
+
   it("never follows a redirect on the paid request", async () => {
     const seen: Seen = { payloads: [] };
     const inner = v2Server([option()], seen);

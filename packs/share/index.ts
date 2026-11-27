@@ -137,6 +137,7 @@ function sign(
   url: string,
   expiresIn: number,
   headers?: Record<string, string>,
+  query?: Record<string, string>,
 ): string {
   return presignUrl({
     method,
@@ -146,6 +147,7 @@ function sign(
     secretAccessKey: t.secretAccessKey,
     expiresIn,
     ...(headers ? { headers } : {}),
+    ...(query ? { query } : {}),
   });
 }
 
@@ -247,7 +249,11 @@ const shareArtifact = defineTool({
     } finally {
       await copy.cleanup();
     }
-    const link = sign(t, "GET", url, input.expires_in_s);
+    // The link downloads the file instead of showing it: an HTML or SVG
+    // artifact opened inline would run its scripts on the bucket's origin.
+    const link = sign(t, "GET", url, input.expires_in_s, undefined, {
+      "response-content-disposition": "attachment",
+    });
     ctx.logger.info("share uploaded", { artifact: art.id, key });
     return {
       url: link,

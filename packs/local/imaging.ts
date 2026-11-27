@@ -110,8 +110,32 @@ export function realesrganModelsDir(ctx: PackContext): string | null {
   return existsSync(join(models, "realesrgan-x4plus.param")) ? models : null;
 }
 
+/** Refuse a scale outside 2 to 4 (whole numbers): the schema says so, and it is checked here too. */
+function checkScale(scale: number): number {
+  if (!Number.isInteger(scale) || scale < 2 || scale > 4) {
+    throw unsupported(`an upscale factor of ${scale} (use 2, 3 or 4)`);
+  }
+  return scale;
+}
+
+/**
+ * The factor realesrgan itself runs at for `model` and `scale`, after checking
+ * that neither its own output nor the final image goes over MAX_UPSCALE_DIM.
+ * The x4plus models only upscale by 4; other factors run at 4 and are scaled
+ * down, so a 4096 px image at scale 2 would first be rendered at 16384 px.
+ */
+export function upscalePlan(width: number, height: number, scale: number, model: string): number {
+  const native = model === "realesr-animevideov3" ? scale : 4;
+  if (Math.max(width, height) * Math.max(scale, native) > MAX_UPSCALE_DIM) {
+    throw unsupported(
+      `an upscaled image over ${MAX_UPSCALE_DIM} px (input is ${width}x${height}, and ${model} renders it x${native} first)`,
+    );
+  }
+  return native;
+}
+
 export async function upscaleImage(ctx: PackContext, input: UpscaleImageInput, tool: string) {
-  const scale = input.scale ?? 4;
+  const scale = checkScale(input.scale ?? 4);
   const model = input.model ?? "realesrgan-x4plus";
   if (!(REALESRGAN_MODELS as readonly string[]).includes(model)) {
     throw unsupported(`the upscale model ${model} (use ${REALESRGAN_MODELS.join(", ")})`);
@@ -120,13 +144,7 @@ export async function upscaleImage(ctx: PackContext, input: UpscaleImageInput, t
   return withWorkDir(ctx, async (work) => {
     ctx.progress?.(0.05, "reading image");
     const src = await stageImage(ctx, work, input.artifact_id);
-    if (Math.max(src.width, src.height) * scale > MAX_UPSCALE_DIM) {
-      throw unsupported(
-        `an upscaled image over ${MAX_UPSCALE_DIM} px (input is ${src.width}x${src.height})`,
-      );
-    }
-    // The x4plus models only upscale by 4; other factors run at 4 and are scaled down.
-    const native = model === "realesr-animevideov3" ? scale : 4;
+    const native = upscalePlan(src.width, src.height, scale, model);
     const raw = join(work, "upscaled.png");
     ctx.progress?.(0.15, `upscaling x${scale} with ${model}`);
     const r = await run(
@@ -217,7 +235,7 @@ export async function upscaleVideo(
   input: { artifact_id: string; scale?: number },
   tool: string,
 ) {
-  const scale = input.scale ?? 2;
+  const scale = checkScale(input.scale ?? 2);
   return withWorkDir(ctx, async (work) => {
     ctx.progress?.(0.05, "probing video");
     const src = await stageInput(ctx, work, input.artifact_id, 0);
@@ -282,6 +300,15 @@ export const DEMUCS_MODELS = [
   "mdx_extra_q",
 ] as const;
 const SIX_STEMS = new Set(["piano", "guitar"]);
+/** The stems Demucs can split out (the capability schema's list). */
+const STEMS = new Set(["vocals", "drums", "bass", "other", "piano", "guitar"]);
+
+function checkStem(stem: string): string {
+  if (!STEMS.has(stem)) {
+    throw unsupported(`a "${stem.slice(0, 40)}" stem (use ${[...STEMS].join(", ")})`);
+  }
+  return stem;
+}
 
 export interface StemsInput {
   artifact_id: string;
@@ -291,6 +318,7 @@ export interface StemsInput {
 }
 
 export function pickDemucsModel(input: Pick<StemsInput, "two_stems" | "model">): string {
+  if (input.two_stems !== undefined) checkStem(input.two_stems);
   if (input.model) {
     if (!(DEMUCS_MODELS as readonly string[]).includes(input.model)) {
       throw unsupported(`the Demucs model ${input.model} (use ${DEMUCS_MODELS.join(", ")})`);
@@ -309,7 +337,7 @@ export function demucsArgs(model: string, outDir: string, wav: string, twoStems?
   return [
     "-n",
     model,
-    ...(twoStems ? ["--two-stems", twoStems] : []),
+    ...(twoStems ? ["--two-stems", checkStem(twoStems)] : []),
     "-o",
     outDir,
     "--filename",

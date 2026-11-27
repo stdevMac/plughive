@@ -1,6 +1,12 @@
+import type { PackContext } from "plughive/pack";
 import { afterEach, describe, expect, it } from "vitest";
 import type { LeadPerson } from "../../../packs/growth/types.js";
-import { siteUrl, untrustedBlock } from "../../../packs/growth/util.js";
+import {
+  MAX_ARTIFACT_TEXT_BYTES,
+  readArtifactText,
+  siteUrl,
+  untrustedBlock,
+} from "../../../packs/growth/util.js";
 import { DRAFT_JSON, type Env, SENDER, apolloPerson, makeEnv } from "./helpers.js";
 
 let env: Env;
@@ -339,6 +345,42 @@ describe("personalize_outreach", () => {
         cta_url: "https://cal.test/me",
       }),
     ).rejects.toThrow(/links to https:\/\/sho\.rt\/evil/);
+
+    // An upper-case scheme is still a link a mail client will open.
+    const upper = JSON.stringify({
+      ...JSON.parse(DRAFT_JSON),
+      body: "Hi Ada, see HTTPS://evil.test/steal for details",
+    });
+    env = makeEnv({ llm: [upper], tools: () => ({ short_url: "https://sho.rt/x", id: "l1" }) });
+    const fourth = seedPerson(env);
+    await expect(
+      env.call("draft_cold_email", {
+        person_id: fourth.personId,
+        sender: SENDER,
+        cta_url: "https://cal.test/me",
+      }),
+    ).rejects.toThrow(/links to HTTPS:\/\/evil\.test\/steal/);
+  });
+
+  it("refuses to read an oversized artifact as text", async () => {
+    const big = new Uint8Array(MAX_ARTIFACT_TEXT_BYTES + 1).fill(0x61);
+    let reads = 0;
+    const ctx = {
+      library: {
+        get: async (id: string) => ({ id, bytes: big.byteLength }),
+        read: async () => {
+          reads++;
+          return big;
+        },
+      },
+    } as unknown as PackContext;
+    await expect(readArtifactText(ctx, "r1")).rejects.toThrow(/larger than 2 MB/);
+    expect(reads).toBe(0);
+    // A record that under-reports its size is still caught after the read.
+    const lying = {
+      library: { get: async (id: string) => ({ id, bytes: 10 }), read: async () => big },
+    } as unknown as PackContext;
+    await expect(readArtifactText(lying, "r1")).rejects.toThrow(/larger than 2 MB/);
   });
 
   it("degrades to lead data alone when scraping is unavailable", async () => {

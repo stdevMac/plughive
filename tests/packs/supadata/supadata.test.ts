@@ -128,6 +128,16 @@ describe("supadata pack", () => {
     expect(progress.length).toBeGreaterThan(0);
   });
 
+  it("refuses a job id with spaces or control characters", async () => {
+    for (const jobId of ["job 1", "job\u001b[2J", "x".repeat(201)]) {
+      const { ctx, fetch } = setup([{ match: START, reply: () => json({ jobId }, 202) }]);
+      const e = (await failure(provider.run({ url: VIDEO }, ctx))) as CapabilityError;
+      expect(e).toMatchObject({ code: "BAD_RESPONSE" });
+      expect(e.message).toBe("Supadata accepted the request but returned no job id.");
+      expect(fetch.calls).toHaveLength(1);
+    }
+  });
+
   it("a failed job is a non-retryable error that may have charged", async () => {
     const { ctx } = setup([
       { match: START, reply: () => json({ jobId: "job-1" }, 202) },

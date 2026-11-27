@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import type { CapabilityError } from "plughive/pack";
 import { type TestContext, createTestContext } from "plughive/pack/testing";
 import { afterEach, describe, expect, it } from "vitest";
-import mistralPack, { provider } from "../../../packs/mistral/index.js";
+import mistralPack, { MAX_BYTES, provider } from "../../../packs/mistral/index.js";
 import { type Route, failure, routerFetch } from "../provider-support.js";
 
 const packDir = fileURLToPath(new URL("../../../packs/mistral", import.meta.url));
@@ -103,6 +103,20 @@ describe("mistral pack", () => {
       retryable: true,
       code: "NOT_CONFIGURED",
     });
+  });
+
+  it("checks the size of the bytes it read, not only the size the record states", async () => {
+    const a = setup([]);
+    const big = new Uint8Array(MAX_BYTES + 1);
+    const ctx = {
+      ...a.ctx,
+      library: { ...a.ctx.library, read: async () => big },
+    } as typeof a.ctx;
+    expect(await failure(provider.run({ artifact_id: "pdf1" }, ctx))).toMatchObject({
+      code: "UNSUPPORTED_OPTION",
+      message: expect.stringMatching(/files over 50 MB/),
+    });
+    expect(a.fetch.calls).toHaveLength(0);
   });
 
   it("a missing artifact is not retryable", async () => {

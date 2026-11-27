@@ -13,6 +13,8 @@ const HOSTNAME =
 
 /** Most of an error body that is ever read, and the most of its message that is shown. */
 const MAX_ERROR_BYTES = 16 * 1024;
+/** Most of a successful JSON response that is read; a larger one is refused. */
+const MAX_JSON_BYTES = 8 * 1024 * 1024;
 const MAX_ERROR_CHARS = 200;
 
 const shorten = defineTool({
@@ -66,7 +68,7 @@ const shorten = defineTool({
       }),
     });
     if (!res.ok) throw new Error(await dubError(res, apiKey));
-    const j = (await res.json()) as { id?: unknown; shortLink?: unknown; key?: unknown };
+    const j = (await readJson(res)) as { id?: unknown; shortLink?: unknown; key?: unknown } | null;
     if (typeof j?.id !== "string" || typeof j.shortLink !== "string") {
       throw new Error(
         "Dub created the link but returned no id or short link. Check the Dub dashboard before trying again.",
@@ -75,6 +77,17 @@ const shorten = defineTool({
     return { id: j.id, short_url: j.shortLink, key: typeof j.key === "string" ? j.key : null };
   },
 });
+
+/** A JSON body of at most MAX_JSON_BYTES, or null when it is larger or not JSON. */
+async function readJson(res: Response): Promise<unknown> {
+  const { bytes, truncated } = await readCapped(res, MAX_JSON_BYTES);
+  if (truncated) return null;
+  try {
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
+    return null;
+  }
+}
 
 /** A short message for a failed Dub response: Dub's own error message when it sends one, never the raw body. */
 export async function dubError(res: Response, apiKey?: string): Promise<string> {
@@ -106,22 +119,34 @@ export async function dubError(res: Response, apiKey?: string): Promise<string> 
 }
 
 async function readCappedText(res: Response, maxBytes: number): Promise<string> {
-  if (!res.body) return "";
+  return new TextDecoder().decode((await readCapped(res, maxBytes)).bytes);
+}
+
+/** Up to `maxBytes` of a body; `truncated` when there was more (the rest is not read). */
+async function readCapped(
+  res: Response,
+  maxBytes: number,
+): Promise<{ bytes: Uint8Array; truncated: boolean }> {
+  if (!res.body) return { bytes: new Uint8Array(0), truncated: false };
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
+  let truncated = false;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
     const room = maxBytes - total;
-    chunks.push(value.byteLength > room ? value.subarray(0, room) : value);
-    total += Math.min(value.byteLength, room);
-    if (total >= maxBytes) {
+    if (value.byteLength > room) {
+      chunks.push(value.subarray(0, room));
+      total = maxBytes;
+      truncated = true;
       await reader.cancel().catch(() => {});
       break;
     }
+    chunks.push(value);
+    total += value.byteLength;
   }
-  return new TextDecoder().decode(Buffer.concat(chunks));
+  return { bytes: Buffer.concat(chunks), truncated };
 }
 
 export default definePack({ tools: [shorten] });

@@ -259,7 +259,12 @@ export function parseProbe(raw: unknown): MediaInfo {
     bit_rate: num(fmt.bit_rate),
     hasVideo: video !== undefined,
     hasAudio: audio !== undefined,
-    isImage: video !== undefined && (/image2|_pipe/.test(format) || num(fmt.duration) === null),
+    // A still image: an image demuxer, or a GIF / APNG with no duration. A
+    // video container with no duration (a live-recorded WebM or MKV) is still
+    // a video, bounded by MAX_OUTPUT_SECONDS.
+    isImage:
+      video !== undefined &&
+      (/image2|_pipe/.test(format) || (num(fmt.duration) === null && /^(gif|apng)$/.test(format))),
     width: video?.width ?? null,
     height: video?.height ?? null,
     fps: video?.fps ?? null,
@@ -302,8 +307,12 @@ export async function probeFile(ctx: PackContext, path: string): Promise<MediaIn
   const info = parseProbe(json);
   const problem = formatProblem(info.format);
   if (problem) throw new Error(problem);
-  if ((info.width ?? 0) > MAX_INPUT_DIM || (info.height ?? 0) > MAX_INPUT_DIM) {
-    throw new Error(`input is larger than ${MAX_INPUT_DIM} pixels on a side`);
+  // Every picture stream, cover art included: `-map 0:v:0` and ffmpeg's
+  // default stream choice can both pick an attached picture.
+  for (const s of info.streams) {
+    if ((s.width ?? 0) > MAX_INPUT_DIM || (s.height ?? 0) > MAX_INPUT_DIM) {
+      throw new Error(`input is larger than ${MAX_INPUT_DIM} pixels on a side`);
+    }
   }
   return info;
 }

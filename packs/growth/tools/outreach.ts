@@ -89,7 +89,8 @@ const DraftSchema = z.object({
 });
 const PersonalizedSchema = DraftSchema.extend({ personalization_notes: z.string().optional() });
 
-const URL_RE = /https?:\/\/[^\s<>"'`)]+/g;
+// Case-insensitive: "HTTPS://evil.example" is a link to a mail client too.
+const URL_RE = /https?:\/\/[^\s<>"'`)]+/gi;
 
 /**
  * Post-validate a generated draft: it may link only to the CTA itself (raw or

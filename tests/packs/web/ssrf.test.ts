@@ -397,6 +397,32 @@ describe("installGuards", () => {
     ).toHaveBeenCalledWith("blockedbyclient");
   });
 
+  it("with allowLocalUrls, an about:blank popup a public frame opened cannot load local resources (R4-M7)", async () => {
+    const h = fakeContext();
+    const gate = makeGate({ allowLocal: true, resolve }, true);
+    await installGuards(h.ctx as never, gate);
+    await h.request("http://app.local.example/", { navigation: true, frame: frame("about:blank") });
+    const doc = frame("http://app.local.example/");
+    // Before anything public has loaded, a local page's own popup still works.
+    const ownPopup = frame("about:blank");
+    expect(
+      (await h.request("http://127.0.0.1:5173/ok.png", { frame: ownPopup })).continue,
+    ).toHaveBeenCalled();
+    await h.request("https://public.example/ad", {
+      navigation: true,
+      frame: frame("about:blank", doc),
+    });
+    expect(gate.localTop).toBe(true);
+    // The ad calls window.open() and writes <img src=LAN> into the blank popup:
+    // the popup's top frame has no parent to trace, so it is not local.
+    const popup = frame("about:blank");
+    const sub = await h.request("http://other.local.example/admin", { frame: popup });
+    expect(sub.abort).toHaveBeenCalledWith("blockedbyclient");
+    expect(
+      (await h.request("http://127.0.0.1:5173/x", { frame: frame("about:srcdoc", popup) })).abort,
+    ).toHaveBeenCalled();
+  });
+
   it("with allowLocalUrls, a local frame that redirected to a public page also ends the allowance", async () => {
     // The route handler saw only the first hop (local); the frame committed a public URL.
     const committed: unknown[] = [];

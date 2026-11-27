@@ -553,6 +553,11 @@ async function main() {
     env: daemonEnv(home, imports),
     stdio: ["ignore", "ignore", "inherit"],
   });
+  // Say so when the daemon goes away mid-run, so "fetch failed" has a cause.
+  let stopping = false;
+  child.on("exit", (code, signal) => {
+    if (!stopping) process.stderr.write(`[live-check] daemon exited (code ${code}, signal ${signal})\n`);
+  });
   try {
     await waitForHealth(child);
     await checkMcpSurface(dotPath);
@@ -566,6 +571,7 @@ async function main() {
         "skip  CLI bridge (pass --cli-bridge; it is billed to your Claude account)\n",
       );
   } finally {
+    stopping = true;
     await stopDaemon(child);
     stub?.close();
     rmSync(work, { recursive: true, force: true });
@@ -576,6 +582,7 @@ async function main() {
 }
 
 main().catch((err) => {
-  process.stderr.write(`[live-check] ${err instanceof Error ? err.message : String(err)}\n`);
+  const cause = err instanceof Error && err.cause instanceof Error ? ` (${err.cause.message})` : "";
+  process.stderr.write(`[live-check] ${err instanceof Error ? err.message : String(err)}${cause}\n`);
   process.exitCode = 1;
 });

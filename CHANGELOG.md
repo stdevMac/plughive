@@ -4,6 +4,41 @@ All notable changes are listed here. Versions follow semantic versioning.
 
 ## Unreleased
 
+### Security
+
+- `run_tool_script` runs each script in its own Node process instead of a
+  worker thread. The process runs under Node's permission model (no files,
+  no child processes, no workers, no addons) with an empty environment, a
+  64 MB heap and code generation from strings turned off. It is killed when
+  the script ends, times out or is cancelled, and when the daemon exits.
+- Office documents: ZIPs nested inside a document are scanned too (two
+  levels deep, sharing the outer document's limits), and packages that are
+  corrupt, prefixed or wrapped in OLE are refused. Word fields that fetch or
+  link content (INCLUDEPICTURE, INCLUDETEXT, INCLUDE, LINK, IMPORT, DDE,
+  DDEAUTO, DATABASE) are refused, also when split across runs, as are
+  HYPERLINK fields to `file:`, UNC or drive paths and ODF DDE links.
+- Paid calls made inside another tool (a script, a code tool, a workflow
+  step) take their turn under the caps like any other paid call, including
+  next to their siblings. A nested call that would wait on a cap held by a
+  call that is itself waiting for it is refused with `SPEND_BLOCKED` rather
+  than hanging.
+- Media tools pick the first real video stream, so a file's cover art is no
+  longer used as the video.
+- The redacted argument summary keeps a `__proto__` key as a plain key.
+- The mount list hides key-like path segments in a mount's URL, not just
+  its query.
+
+### Fixes
+
+- `live-check` opens a fresh connection for each request, so it no longer
+  fails with `ECONNRESET` when the daemon closes an idle keep-alive socket.
+- Timing tests (pack load deadline, kill tree) allow for a busy machine, and
+  the chat approval token test no longer fails 1 run in 64.
+
+### CI
+
+- CI runs `pnpm lint` and `pnpm typecheck:tests`.
+
 ## 0.1.4
 
 ### Security

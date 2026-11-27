@@ -64,7 +64,7 @@ are not configurable.
 | `PLUGHIVE_TRIGGERS` | on | `0`, `false`, `no` or `off` turns off triggers: no scheduler, no `/hooks`, no `/api/triggers`. Saved triggers stay in `jobs.db` and run again when it is back on. See [triggers.md](triggers.md). |
 | `PLUGHIVE_HOOK_RATE_LIMIT` | `30` | Inbound webhook requests per minute, per hook. All hooks together get 10 times this. |
 | `PLUGHIVE_PAID_CACHE` | on | `0` turns off the paid-call cache. With it on, the same paid media call made again within 24 h returns the saved result (`cached: true`, no new charge); `cache: false` on a call asks for a fresh one. See [spend and approvals](spend-and-approvals.md#repeated-paid-calls). |
-| `PLUGHIVE_CODE_MODE` | off | `1` registers `run_tool_script`, which runs a short JavaScript snippet that chains tool calls through `tools.call`, limited to the caller's profile. It runs in a worker thread, in a frozen `node:vm` context with no `require`, `process`, `import` or `eval`, with limits on time (30 s, at most 120 s), calls (25, at most 100), code (64 KB), output (256 KB) and memory. `node:vm` is not a security boundary: turn this on only for your own agent. |
+| `PLUGHIVE_CODE_MODE` | off | `1` registers `run_tool_script`, which runs a short JavaScript snippet that chains tool calls through `tools.call`, limited to the caller's profile. It runs in its own Node process under the permission model with an empty environment, in a frozen `node:vm` context with no `require`, `process`, `import` or `eval`, with limits on time (30 s, at most 120 s), calls (25, at most 100), code (64 KB), output (256 KB) and memory. `node:vm` is not a security boundary: turn this on only for your own agent. |
 
 ## Logs
 

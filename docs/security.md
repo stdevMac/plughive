@@ -219,7 +219,12 @@ open it in the dashboard (Packs > <pack> > Settings):
   subset, an entity declaration, a non-http(s) external DTD, `file:` or UNC
   references, or external links other than http(s), `mailto:` and `tel:`;
   references are decoded (entities, percent-encoding, Unicode forms) before
-  they are checked, and UTF-16 parts are decoded rather than skipped. OCR and
+  they are checked, and UTF-16 parts are decoded rather than skipped. ZIPs
+  nested in the package are scanned the same way, two levels deep, within
+  the outer document's limits; corrupt, prefixed or OLE-wrapped packages are
+  refused. Word fields that fetch or link content (INCLUDEPICTURE,
+  INCLUDETEXT, INCLUDE, LINK, IMPORT, DDE, DDEAUTO, DATABASE), HYPERLINK
+  fields to `file:`, UNC or drive paths, and ODF DDE links are refused. OCR and
   speech languages must be plain codes (OCR codes joined by `+`).
 - **telegram** sends only to the default chat (`defaultChatId`) and to the
   chats in `allowedChatIds`. With neither set it sends nothing. Message text
@@ -406,8 +411,11 @@ See [spend-and-approvals.md](spend-and-approvals.md) for how they work.
   does not cover the same call with a higher `max_cost_usd`.
 - Calls still running count against caps, so parallel calls cannot pass a cap
   together. Paid calls whose cost is not known up front run one at a time per
-  cap (the lock is let go while a call waits for approval); one such call can
-  still overshoot, since its cost is known only after it runs.
+  cap, also when they are made inside another tool (the lock is let go while
+  a call waits for approval). A nested call that would wait on a cap held by
+  a call that is itself waiting for it is refused instead of hanging. One
+  such call can still go over a cap by its own cost, since that cost is
+  known only after it runs.
 - Every item of a `batch`, every `tools.call` in a script and the contact
   sheet's inner call is checked by the policy on its own; the outer approval
   does not carry into them. Always-ask and destructive tools still ask inside an approved
@@ -470,9 +478,12 @@ tools you call, mounts you enable and the dashboard loading its own files.
 - x402 compares amounts with ordinary BigInt arithmetic, not in constant
   time. The amounts are public (they come from the server's quote), so this
   leaks nothing secret.
-- A `wf_*` step counts as free in the parent workflow's plan, and a paid tool
-  called from inside a code tool that is not tagged `paid` is not seen by the
-  caps. Caps on the inner tool's own calls still apply.
+- A `wf_*` step counts as free in the parent workflow's plan, and the outer
+  approval and estimate of a code tool leave out the cost of the paid tools
+  it calls. Those inner calls are still checked on their own against the
+  caps. Inside an approved paid tool, its inner paid calls do not ask again
+  for cost under an `ask` cap; `block` caps and the one-at-a-time locks still
+  apply.
 - Tools tagged only destructive (`uninstall_software`, `remove_mount`,
   `forget`, closing a browser session) ask only when `ask_before_destructive`
   is on, which it is not by default. Add them to `always_ask_tools` to make
@@ -486,10 +497,15 @@ tools you call, mounts you enable and the dashboard loading its own files.
   host and port the page already requested directly.
 - The Mac app does not use the hardened runtime.
 - Binary office formats (doc, xls, ppt, rtf) cannot be scanned like the ZIP
-  formats. They rely only on the locked-down LibreOffice profile. A ZIP
-  nested inside a document is not scanned again, and Word field codes
-  (INCLUDEPICTURE, INCLUDETEXT) are not checked.
-- `run_tool_script` (`PLUGHIVE_CODE_MODE`) runs in `node:vm`, which is not a
-  security boundary. Only strings cross between the script and the daemon,
-  and its Promises and Errors are made inside the sandbox, but turn it on only
-  for your own agent.
+  formats. They rely only on the locked-down LibreOffice profile, and so do
+  OLE objects inside a ZIP document and Excel external and DDE links.
+- `run_tool_script` (`PLUGHIVE_CODE_MODE`) runs each script in its own Node
+  process under the permission model, with an empty environment, inside a
+  frozen `node:vm` context; only strings cross to the daemon. The process
+  can still use the network on Node 22 and 24 (the permission model limits
+  it from Node 25), can read the host and user name, calls tools through
+  `tools.call` (checked by the policy as usual), and uses CPU and memory up
+  to its time limit and 64 MB heap. The process exits when the daemon goes
+  away, but a script stuck in a synchronous loop keeps running until that
+  loop ends. Turn it on
+  only for your own agent.

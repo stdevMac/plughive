@@ -130,7 +130,9 @@ export function daemonOrigin(
 
 function expandHome(p: string): string {
   if (p === "~") return homedir();
-  if (p.startsWith("~/")) return resolve(homedir(), p.slice(2));
+  if (p.startsWith("~/") || (process.platform === "win32" && p.startsWith("~\\"))) {
+    return resolve(homedir(), p.slice(2));
+  }
   return resolve(p);
 }
 

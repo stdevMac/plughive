@@ -1,7 +1,17 @@
 // src/lib/logger.ts
-import { chmodSync, existsSync, mkdirSync, renameSync, rmSync, statSync } from "node:fs";
+import {
+  constants,
+  chmodSync,
+  closeSync,
+  existsSync,
+  fstatSync,
+  lstatSync,
+  mkdirSync,
+  rmSync,
+} from "node:fs";
 import { join } from "node:path";
 import pino from "pino";
+import { atomicReplaceSync, fchmodBestEffort, openSyncNoFollow } from "./platform.js";
 
 export type Logger = ReturnType<typeof pino>;
 
@@ -21,29 +31,70 @@ export interface LoggerOptions {
 /**
  * Rotate `file` when it is larger than `maxBytes`: file -> file.1 -> file.2 ->
  * file.3, the oldest is removed. Returns true when it rotated. Rotated files
- * keep the owner-only mode.
+ * keep the owner-only mode. Only a regular file is rotated (a symlink in its
+ * place is left alone), and renames retry on Windows while another process
+ * (an antivirus scanner) holds a file open.
  */
 export function rotateLogFile(file: string, maxBytes: number): boolean {
   let size: number;
   try {
-    size = statSync(file).size;
+    const st = lstatSync(file);
+    if (!st.isFile()) return false;
+    size = st.size;
   } catch {
     return false;
   }
   if (size <= maxBytes) return false;
-  rmSync(`${file}.${LOG_KEEP_FILES}`, { force: true });
+  // Shift the older files first and drop the oldest only when its slot is
+  // needed, so a rename that fails part-way loses nothing.
   for (let n = LOG_KEEP_FILES - 1; n >= 1; n--) {
-    if (existsSync(`${file}.${n}`)) renameSync(`${file}.${n}`, `${file}.${n + 1}`);
+    if (existsSync(`${file}.${n}`)) {
+      rmSync(`${file}.${n + 1}`, { force: true });
+      atomicReplaceSync(`${file}.${n}`, `${file}.${n + 1}`);
+    }
   }
-  renameSync(file, `${file}.1`);
+  rmSync(`${file}.1`, { force: true });
+  atomicReplaceSync(file, `${file}.1`);
   return true;
 }
 
+/** chmod `path`, but never through a symbolic link. */
 function ownerOnly(path: string, mode: number): void {
   try {
+    if (lstatSync(path).isSymbolicLink()) return;
     chmodSync(path, mode);
   } catch {
     // Not ours to change (a mounted volume, for example): keep logging.
+  }
+}
+
+/**
+ * Create the live log file owner-only, or tighten the one already there,
+ * before the logger opens it by name. A symlink or anything but a regular
+ * file in its place is refused: the log would be written wherever it points.
+ */
+function prepareLogFile(path: string): void {
+  let fd: number;
+  try {
+    fd = openSyncNoFollow(path, constants.O_WRONLY | constants.O_CREAT | constants.O_APPEND, 0o600);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ELOOP" || code === "EMLINK") {
+      throw new Error(`refusing to write the log to ${path}: it is a symbolic link`);
+    }
+    throw err;
+  }
+  try {
+    if (!fstatSync(fd).isFile()) {
+      throw new Error(`refusing to write the log to ${path}: it is not a regular file`);
+    }
+    try {
+      fchmodBestEffort(fd, 0o600);
+    } catch {
+      // Not ours to change (a mounted volume, for example): keep logging.
+    }
+  } finally {
+    closeSync(fd);
   }
 }
 
@@ -93,15 +144,14 @@ export function createLogger(root: string, opts: LoggerOptions = {}): Logger {
       })
     : process.stdout;
 
+  prepareLogFile(filePath);
   const fileStream = pino.destination({ dest: filePath, sync: true, mode: 0o600 });
-  // `mode` only applies when the file is created.
-  ownerOnly(filePath, 0o600);
 
   const timer = setInterval(() => {
     try {
       if (rotateLogFile(filePath, maxBytes)) {
+        prepareLogFile(filePath);
         fileStream.reopen();
-        ownerOnly(filePath, 0o600);
       }
     } catch {
       // Try again at the next check.

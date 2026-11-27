@@ -2,14 +2,16 @@
 //
 // File plumbing for client config writes: resolve the real target without
 // leaving the user's home, read it, keep one backup, write atomically.
+// Every open of the resolved target, its backup and the temp file refuses a
+// symlink in the last component (O_NOFOLLOW, or the Windows equivalent), so a
+// link swapped in after resolveTarget is never followed.
 
 import { randomBytes } from "node:crypto";
 import {
   constants,
-  chmodSync,
   closeSync,
   existsSync,
-  fchmodSync,
+  fstatSync,
   fsyncSync,
   lstatSync,
   mkdirSync,
@@ -23,7 +25,7 @@ import {
   writeSync,
 } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { atomicReplaceSync } from "../lib/platform.js";
+import { atomicReplaceSync, fchmodBestEffort, openSyncNoFollow } from "../lib/platform.js";
 import { ClientConfigError } from "./errors.js";
 
 function inside(child: string, parent: string): boolean {
@@ -73,15 +75,49 @@ export function resolveTarget(path: string, home: string): string {
   return target;
 }
 
+const NO_FOLLOW = constants.O_NOFOLLOW ?? 0;
+
+function linkRefused(err: unknown, target: string): unknown {
+  const code = (err as NodeJS.ErrnoException).code;
+  if (code === "ELOOP" || code === "EMLINK") {
+    return new ClientConfigError(`refusing to use ${target}: it is a symbolic link`);
+  }
+  return err;
+}
+
+/** Open the resolved target without following a symlink in its place. */
+function openTarget(target: string, flags: number): number {
+  try {
+    return openSyncNoFollow(target, flags);
+  } catch (err) {
+    throw linkRefused(err, target);
+  }
+}
+
+function readTarget(target: string): Buffer {
+  const fd = openTarget(target, constants.O_RDONLY);
+  try {
+    return readFileSync(fd);
+  } finally {
+    closeSync(fd);
+  }
+}
+
 /** Narrow an existing file to 0600 (no-op when it already is). */
 export function restrictMode(target: string): void {
-  if (existsSync(target) && (statSync(target).mode & 0o077) !== 0) chmodSync(target, 0o600);
+  if (!existsSync(target)) return;
+  const fd = openTarget(target, constants.O_RDONLY);
+  try {
+    if ((fstatSync(fd).mode & 0o077) !== 0) fchmodBestEffort(fd, 0o600);
+  } finally {
+    closeSync(fd);
+  }
 }
 
 /** File contents, or null when it does not exist. */
 export function readIfExists(target: string): string | null {
   try {
-    return readFileSync(target, "utf8");
+    return readTarget(target).toString("utf8");
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw err;
@@ -109,11 +145,15 @@ export function backupOnce(target: string, now = new Date()): string | undefined
   const base = basename(target);
   if (readdirSync(dir).some((f) => f.startsWith(base + BACKUP_TAG))) return undefined;
   const out = join(dir, `${base}${BACKUP_TAG}${stamp(now)}`);
-  const bytes = readFileSync(target);
+  const bytes = readTarget(target);
   // O_EXCL: never overwrite (or follow a planted link at) the backup path.
-  const fd = openSync(out, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL, 0o600);
+  const fd = openSync(
+    out,
+    constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | NO_FOLLOW,
+    0o600,
+  );
   try {
-    fchmodSync(fd, 0o600);
+    fchmodBestEffort(fd, 0o600);
     writeSync(fd, bytes);
     fsyncSync(fd);
   } catch (err) {
@@ -143,9 +183,13 @@ export function writeAtomic(target: string, text: string, opts: WriteOptions = {
     dir,
     `.${basename(target)}.plughive-${process.pid}-${randomBytes(4).toString("hex")}.tmp`,
   );
-  const fd = openSync(tmp, "wx", mode);
+  const fd = openSync(
+    tmp,
+    constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | NO_FOLLOW,
+    mode,
+  );
   try {
-    fchmodSync(fd, mode); // the umask may have narrowed it
+    fchmodBestEffort(fd, mode); // the umask may have narrowed it
     writeSync(fd, text);
     fsyncSync(fd);
   } catch (err) {

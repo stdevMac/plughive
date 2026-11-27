@@ -1,5 +1,5 @@
 import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 // tests/lib/config.test.ts
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -21,6 +21,17 @@ describe("config", () => {
     expect(loadConfig({ env: { PLUGHIVE_HOME: dir } }).root).toBe(dir);
     expect(loadConfig({ env: {} }).port).toBe(7777);
     expect(() => loadConfig({ env: { PLUGHIVE_PORT: "70000" } })).toThrow(/PLUGHIVE_PORT/);
+  });
+
+  it("expands ~\\ to the home folder on Windows", () => {
+    const saved = Object.getOwnPropertyDescriptor(process, "platform") as PropertyDescriptor;
+    Object.defineProperty(process, "platform", { value: "win32" });
+    try {
+      const cfg = loadConfig({ env: { PLUGHIVE_ROOT: "~\\plughive-test" } });
+      expect(cfg.root).toBe(resolve(homedir(), "plughive-test"));
+    } finally {
+      Object.defineProperty(process, "platform", saved);
+    }
   });
 
   it("loads import roots and worker defaults", () => {

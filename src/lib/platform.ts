@@ -11,6 +11,7 @@ import {
   closeSync,
   fchmodSync,
   fstatSync,
+  ftruncateSync,
   lstatSync,
   openSync,
   renameSync,
@@ -64,10 +65,14 @@ export function exeCandidates(
   env: NodeJS.ProcessEnv = process.env,
 ): string[] {
   if (!isWindows(platform)) return [name];
-  const exts = (env.PATHEXT ?? DEFAULT_PATHEXT)
-    .split(";")
-    .map((e) => e.trim().toLowerCase())
-    .filter((e) => /^\.[a-z0-9]+$/.test(e));
+  const parse = (raw: string): string[] =>
+    raw
+      .split(";")
+      .map((e) => e.trim().toLowerCase())
+      .filter((e) => /^\.[a-z0-9]+$/.test(e));
+  // An empty or unusable PATHEXT would leave nothing to try: use the default.
+  let exts = parse(env.PATHEXT ?? "");
+  if (exts.length === 0) exts = parse(DEFAULT_PATHEXT);
   const lower = name.toLowerCase();
   if (exts.some((e) => lower.endsWith(e))) return [name];
   return exts.map((e) => `${name}${e}`);
@@ -206,7 +211,9 @@ function symlinkRefused(path: string): NodeJS.ErrnoException {
  * O_NOFOLLOW (the open fails with ELOOP). Windows has no O_NOFOLLOW, so the
  * name is lstat-ed before the open and again after it, and must be the very
  * file the descriptor refers to and not a link; otherwise the descriptor is
- * closed and the same ELOOP error is thrown.
+ * closed and the same ELOOP error is thrown. O_TRUNC is held back until that
+ * check has passed (and the file is a regular one), so a link swapped in
+ * between the checks cannot get its target truncated.
  */
 export function openSyncNoFollow(
   path: string,
@@ -220,18 +227,47 @@ export function openSyncNoFollow(
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
   }
-  const fd = openSync(path, flags, mode);
+  const trunc = constants.O_TRUNC ?? 0;
+  const truncate = trunc !== 0 && (flags & trunc) !== 0;
+  const fd = openSync(path, truncate ? flags & ~trunc : flags, mode);
   try {
     const named = lstatSync(path, { bigint: true });
     const opened = fstatSync(fd, { bigint: true });
     if (named.isSymbolicLink() || named.ino !== opened.ino || named.dev !== opened.dev) {
       throw symlinkRefused(path);
     }
+    if (truncate) {
+      if (!opened.isFile()) {
+        throw Object.assign(new Error(`refusing to truncate '${path}': it is not a regular file`), {
+          code: "EINVAL",
+          syscall: "open",
+          path,
+        });
+      }
+      ftruncateSync(fd, 0);
+    }
   } catch (e) {
     closeSync(fd);
     throw e;
   }
   return fd;
+}
+
+/**
+ * fchmod that a Windows file system may refuse (EPERM, ENOSYS, ...): there the
+ * mode is only a read-only bit anyway, so a refusal is ignored. On POSIX the
+ * error is thrown.
+ */
+export function fchmodBestEffort(
+  fd: number,
+  mode: number,
+  platform: Platform = process.platform,
+): void {
+  try {
+    fchmodSync(fd, mode);
+  } catch (err) {
+    if (!isWindows(platform)) throw err;
+  }
 }
 
 /**
@@ -250,7 +286,7 @@ export function writeFileAtomicSync(target: string, text: string, mode = 0o600):
   const fd = openSync(tmp, flags, mode);
   try {
     try {
-      fchmodSync(fd, mode); // the umask may have narrowed it
+      fchmodBestEffort(fd, mode); // the umask may have narrowed it
       writeFileSync(fd, text); // loops until every byte is written
     } finally {
       closeSync(fd);

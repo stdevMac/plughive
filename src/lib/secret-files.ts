@@ -5,7 +5,7 @@
 // passed in the container's environment, where `docker inspect` shows it. The variable itself wins when both are set. The file is read
 // once at startup and must be a regular file of at most 4 KiB (symlinks are
 // allowed: Kubernetes projects secrets through them).
-import { constants, closeSync, fstatSync, openSync, readFileSync } from "node:fs";
+import { constants, closeSync, fstatSync, openSync, readSync } from "node:fs";
 
 /** The credentials that accept a _FILE variant. */
 export const SECRET_FILE_VARS = [
@@ -28,8 +28,18 @@ function readSecretFile(name: string, path: string): string {
     const st = fstatSync(fd);
     if (!st.isFile()) throw new Error(`${name}_FILE: ${path} is not a regular file`);
     if (st.size > MAX_BYTES) throw new Error(`${name}_FILE: ${path} is over ${MAX_BYTES} bytes`);
+    // Read at most one byte past the cap: a file that reports size 0 (a
+    // /proc-style pseudo-file) can still stream far more than it declares.
+    const buf = Buffer.alloc(MAX_BYTES + 1);
+    let got = 0;
+    for (;;) {
+      const n = readSync(fd, buf, got, buf.length - got, null);
+      if (n === 0) break;
+      got += n;
+      if (got > MAX_BYTES) throw new Error(`${name}_FILE: ${path} is over ${MAX_BYTES} bytes`);
+    }
     // A trailing newline (echo, most editors) is not part of the secret.
-    const value = readFileSync(fd, "utf8").replace(/\r?\n$/, "");
+    const value = buf.toString("utf8", 0, got).replace(/\r?\n$/, "");
     if (value.trim() === "") throw new Error(`${name}_FILE: ${path} is empty`);
     return value;
   } finally {

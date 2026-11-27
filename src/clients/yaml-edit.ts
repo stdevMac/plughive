@@ -12,6 +12,16 @@
 
 import { ClientConfigError, ConfigParseError } from "./errors.js";
 
+const BOM = "\uFEFF";
+
+/**
+ * A UTF-8 byte order mark (Windows editors write one) is not part of the
+ * first key: it is set aside while reading and put back on an edited text.
+ */
+function splitBom(text: string): { bom: string; body: string } {
+  return text.startsWith(BOM) ? { bom: BOM, body: text.slice(1) } : { bom: "", body: text };
+}
+
 interface Line {
   text: string;
   start: number;
@@ -309,7 +319,7 @@ function prepare(text: string, section: string) {
 
 /** All entries of the top-level `section` mapping (unparseable ones as undefined). */
 export function getYamlSection(text: string, section: string): Record<string, unknown> {
-  const { lines, children } = prepare(text, section);
+  const { lines, children } = prepare(splitBom(text).body, section);
   const out: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
   for (const [k, c] of children) out[k] = readBlock(lines, c.from, c.to)?.[k];
   return out;
@@ -322,11 +332,21 @@ export function getYamlEntry(text: string, section: string, name: string): unkno
 
 /** Whether `section.name` exists at all. */
 export function hasYamlEntry(text: string, section: string, name: string): boolean {
-  return prepare(text, section).children.has(name);
+  return prepare(splitBom(text).body, section).children.has(name);
 }
 
 /** `text` with `section.name` set to `entry`; every other line unchanged. */
 export function setYamlEntry(
+  text: string,
+  section: string,
+  name: string,
+  entry: Record<string, unknown>,
+): string {
+  const { bom, body } = splitBom(text);
+  return bom + setEntry(body, section, name, entry);
+}
+
+function setEntry(
   text: string,
   section: string,
   name: string,
@@ -365,6 +385,11 @@ export function setYamlEntry(
 
 /** `text` without `section.name`; unchanged when absent. */
 export function removeYamlEntry(text: string, section: string, name: string): string {
+  const { bom, body } = splitBom(text);
+  return bom + removeEntry(body, section, name);
+}
+
+function removeEntry(text: string, section: string, name: string): string {
   const { lines, sec, children } = prepare(text, section);
   const existing = children.get(name);
   if (!existing) return text;

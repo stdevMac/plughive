@@ -1,10 +1,13 @@
 import {
   chmodSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  statSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -91,5 +94,36 @@ describe("logger", () => {
     expect(readFileSync(file, "utf8")).toContain('"second"');
     expect(readFileSync(file, "utf8")).not.toContain('"first"');
     if (posix) expectMode(file, 0o600);
+  });
+  it.runIf(posix)("R4-M4: refuses a symlink planted at the live log file", () => {
+    const logs = join(dir, "logs");
+    mkdirSync(logs, { mode: 0o700 });
+    const victim = join(dir, "victim");
+    writeFileSync(victim, "keep", { mode: 0o644 });
+    chmodSync(victim, 0o644);
+    symlinkSync(victim, join(logs, "server.jsonl"));
+    expect(() => createLogger(dir)).toThrow(/refusing to write the log .* symbolic link/);
+    expect(readFileSync(victim, "utf8")).toBe("keep");
+    expect(statSync(victim).mode & 0o777).toBe(0o644);
+  });
+
+  it.runIf(posix)("R4-M4: never chmods through a symlink at a rotated file", () => {
+    const logs = join(dir, "logs");
+    mkdirSync(logs, { mode: 0o700 });
+    const victim = join(dir, "victim");
+    writeFileSync(victim, "keep", { mode: 0o644 });
+    chmodSync(victim, 0o644);
+    symlinkSync(victim, join(logs, "server.jsonl.2"));
+    createLogger(dir);
+    expect(statSync(victim).mode & 0o777).toBe(0o644);
+  });
+
+  it.runIf(posix)("R4-M4: a symlink at the live path is not rotated", () => {
+    const victim = join(dir, "victim");
+    writeFileSync(victim, "x".repeat(100));
+    const file = join(dir, "server.jsonl");
+    symlinkSync(victim, file);
+    expect(rotateLogFile(file, 10)).toBe(false);
+    expect(lstatSync(file).isSymbolicLink()).toBe(true);
   });
 });

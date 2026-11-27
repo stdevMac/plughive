@@ -21,6 +21,7 @@ import {
   browserCommand,
   defaultSystemPath,
   exeCandidates,
+  fchmodBestEffort,
   homeEnv,
   isAbsoluteAnyOs,
   isBatchScript,
@@ -58,6 +59,10 @@ describe("platform helpers", () => {
     // A junk PATHEXT entry is dropped, not turned into a file name.
     expect(exeCandidates("x", "win32", { PATHEXT: ".EXE;evil;.e x" })).toEqual(["x.exe"]);
     expect(exeCandidates("ffmpeg", "darwin")).toEqual(["ffmpeg"]);
+    // An empty or unusable PATHEXT falls back to the default list.
+    const defaults = ["x.com", "x.exe", "x.bat", "x.cmd"];
+    expect(exeCandidates("x", "win32", { PATHEXT: "" })).toEqual(defaults);
+    expect(exeCandidates("x", "win32", { PATHEXT: ";evil;" })).toEqual(defaults);
   });
 
   it("recognises batch scripts in any case", () => {
@@ -214,6 +219,14 @@ describe("SSH identity paths", () => {
     );
     expect(normalizeIdentityPath("~/.ssh/id", "/home/me")).toBe("/home/me/.ssh/id");
     expect(normalizeIdentityPath("C:\\keys\\id", "C:\\Users\\me")).toBe("C:\\keys\\id");
+  });
+});
+
+describe("fchmodBestEffort", () => {
+  it("ignores a refused fchmod on Windows and throws it elsewhere", () => {
+    // A closed descriptor makes fchmod fail on every OS.
+    expect(() => fchmodBestEffort(2_000_000, 0o600, "win32")).not.toThrow();
+    expect(() => fchmodBestEffort(2_000_000, 0o600, "linux")).toThrow();
   });
 });
 

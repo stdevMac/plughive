@@ -1148,6 +1148,28 @@ describe("review regressions", () => {
   );
 
   it(
+    "D-M3: stacked encodings are decoded under the same byte cap",
+    async () => {
+      // gzip twice: about 1 KB on the wire, 64 MiB decoded, no Content-Length.
+      const bomb = gzipSync(gzipSync(Buffer.alloc(64 * 1024 * 1024)));
+      const s = await serve((_req, res) => {
+        res.writeHead(200, { "content-encoding": "gzip, gzip" });
+        res.end(bomb);
+      });
+      const f = fetcher({
+        allowHosts: [],
+        allowLocal: [`127.0.0.1:${s.port}`],
+        maxResponseBytes: 1024 * 1024,
+        lookup: noDns,
+      });
+      const res = await f(`http://127.0.0.1:${s.port}/`);
+      expect(res.headers.get("content-encoding")).toBeNull();
+      await expect(res.arrayBuffer()).rejects.toBeInstanceOf(ResponseTooLargeError);
+    },
+    T,
+  );
+
+  it(
     "F5: an encoding that was not decoded keeps its headers",
     async () => {
       const s = await serve((_req, res) => {

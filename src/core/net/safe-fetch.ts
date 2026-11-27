@@ -19,9 +19,13 @@
 //
 // Redirects are followed manually so each hop passes through both layers.
 import { lookup as dnsLookup } from "node:dns/promises";
+import * as zlib from "node:zlib";
 import { Agent, buildConnector, fetch as undiciFetch } from "undici";
 import type { Response as UndiciResponse } from "undici";
 import { ipVersion, isPrivateAddress } from "./ip.js";
+
+/** Longest wait for response headers, and longest silence inside a body. */
+const SOCKET_IDLE_TIMEOUT_MS = 300_000;
 
 export { isPrivateAddress } from "./ip.js";
 
@@ -636,7 +640,15 @@ export function createSafeFetch(policy: SafeFetchPolicy): SafeFetch {
     );
   };
 
-  const agent = new Agent({ connect: connector });
+  // Explicit and finite, so a server that stalls before or inside the
+  // response cannot hold a socket forever even when the policy has no total
+  // time budget (timeoutMs: 0, used for long-lived MCP streams). bodyTimeout
+  // is the idle gap between chunks, not the length of the whole body.
+  const agent = new Agent({
+    connect: connector,
+    headersTimeout: SOCKET_IDLE_TIMEOUT_MS,
+    bodyTimeout: SOCKET_IDLE_TIMEOUT_MS,
+  });
 
   const safeFetch = async (
     input: string | URL | Request,
@@ -884,7 +896,16 @@ async function readRequestBody(
   return out;
 }
 
-const DECODED_CODINGS = new Set(["gzip", "x-gzip", "deflate", "br"]);
+// undici also decodes zstd when this Node's zlib has it.
+const DECODED_CODINGS = new Set([
+  "gzip",
+  "x-gzip",
+  "deflate",
+  "br",
+  ...(typeof (zlib as { createZstdDecompress?: unknown }).createZstdDecompress === "function"
+    ? ["zstd"]
+    : []),
+]);
 
 /**
  * Mirrors undici 6's fetch: it decodes the body only when every listed coding

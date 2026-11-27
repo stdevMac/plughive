@@ -1189,13 +1189,16 @@ export default (api) => api.definePack({
         });\n`,
       });
       writePack(builtinDir, "zulu", { code: toolModule("zulu_tool") });
-      const loader = makeLoader({ loadTimeoutMs: 150 });
+      // Long enough that alpha and zulu load in time on a busy machine (a
+      // short deadline failed them too); the hang still ends well before
+      // the test timeout.
+      const loader = makeLoader({ loadTimeoutMs: 4000 });
       const started = Date.now();
       await loader.loadAll();
-      expect(Date.now() - started).toBeLessThan(5000);
+      expect(Date.now() - started).toBeLessThan(15_000);
       expect((await loader.listPacks()).find((p) => p.id === "hang")).toMatchObject({
         state: "failed",
-        error: "loading took longer than 150 ms (import, setup() or tools())",
+        error: "loading took longer than 4000 ms (import, setup() or tools())",
         tools: [],
       });
       expect(flags.__hangDisposed).toBe(true);

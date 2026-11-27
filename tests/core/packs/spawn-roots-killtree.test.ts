@@ -258,7 +258,9 @@ describe("killTree", () => {
     const pidFile = join(tmp(), "helper.pid");
     fakeBinary(bin, "tool", PARENT_SOURCE(pidFile));
     const t = harness({ manifest: { ...base, permissions: { spawn: ["tool"] } }, spawnPath: bin });
-    const r = await t.forTool("t").spawn("tool", [], { timeoutMs: 1500, killTree: true });
+    // The child and its helper are two Node start-ups; 1.5 s was too short for
+    // both on a busy machine, so the helper had not written its pid yet.
+    const r = await t.forTool("t").spawn("tool", [], { timeoutMs: 6000, killTree: true });
     expect(r, JSON.stringify(r)).toMatchObject({ timedOut: true, exitCode: -1 });
     expect(existsSync(pidFile)).toBe(true);
     const helper = Number(readFileSync(pidFile, "utf8"));

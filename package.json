@@ -33,13 +33,7 @@
   "engines": {
     "node": ">=22"
   },
-  "keywords": [
-    "mcp",
-    "model-context-protocol",
-    "gateway",
-    "mcp-server",
-    "byok"
-  ],
+  "keywords": ["mcp", "model-context-protocol", "gateway", "mcp-server", "byok"],
   "scripts": {
     "dev": "tsx --conditions=plughive-source src/server.ts",
     "dev:watch": "tsx watch --conditions=plughive-source src/server.ts",

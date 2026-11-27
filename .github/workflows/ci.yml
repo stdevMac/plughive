@@ -57,6 +57,13 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Typecheck tests
+        run: pnpm typecheck:tests
+
+      - name: Lint
+        if: runner.os == 'Linux'
+        run: pnpm lint
+
       - name: Test
         run: pnpm test
 

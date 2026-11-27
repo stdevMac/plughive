@@ -30,6 +30,8 @@ export interface TriggerOptions {
   fetch?: (url: string, init: RequestInit) => Promise<Response>;
   /** Clock, for tests. */
   now?: () => number;
+  /** Sees every webhook secret (start-up, create, rotate), e.g. to register it with the redactor. */
+  onSecret?: (secret: string) => void;
 }
 
 export interface MountedTriggers {
@@ -52,7 +54,7 @@ export function createTriggers(
     profileExists?: (id: string) => boolean;
   },
 ) {
-  const store = new TriggerStore(opts.db);
+  const store = new TriggerStore(opts.db, opts.onSecret);
   const safe = opts.fetch ?? createSafeFetch({ allowHosts: ["*"], maxRedirects: 0 });
   const service = new TriggerService({
     store,

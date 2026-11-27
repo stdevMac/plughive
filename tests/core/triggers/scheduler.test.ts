@@ -270,3 +270,31 @@ describe("cron scheduler", () => {
     });
   });
 });
+
+describe("D-M6: webhook secrets reach the redactor", () => {
+  it("reports stored secrets at start-up, and new ones on create and rotation", () => {
+    const db = new Database(":memory:");
+    const first = new TriggerStore(db);
+    const { trigger, secret } = first.create({
+      name: "hook",
+      kind: "webhook",
+      workflow: "wf_report",
+      args: {},
+      schedule: null,
+      timezone: "UTC",
+      catchUp: false,
+      useBody: false,
+      enabled: true,
+      profile: null,
+      callback: null,
+      nextRunAt: null,
+    });
+    const seen: string[] = [];
+    const store = new TriggerStore(db, (s) => seen.push(s));
+    expect(seen).toEqual([secret]);
+    const rotated = store.rotateSecret(trigger.id);
+    expect(rotated).toMatch(/^whsec_/);
+    expect(seen).toEqual([secret, rotated]);
+    db.close();
+  });
+});

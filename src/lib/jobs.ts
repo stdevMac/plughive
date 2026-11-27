@@ -85,6 +85,9 @@ const SECRET_ARG_KEY =
   /^(authorization|cookie|set-cookie|passwd|password|passphrase|secret|.*credentials?|.*signature|sig|bearer|.*api[_-]?key|.*access[_-]?key|.*private[_-]?key|.*[_-]?token|token.*|.*[_-]?secret|.*password|x-.*-key|key)$/i;
 const PRUNE_EVERY_MS = 10 * 60 * 1000;
 const TERMINAL = "('succeeded','failed','cancelled','expired')";
+// A paid submission whose outcome is unknown waits for the user to reconcile
+// it, so it is never dropped to make room; it still ages out with the rest.
+const AGED_OUT = "('succeeded','failed','cancelled','expired','submission_unknown')";
 
 export interface JobQueueOpts {
   db: Database.Database;
@@ -464,7 +467,7 @@ export class JobQueue {
     this.lastPrune = now;
     const cutoff = new Date(now - this.retentionMs).toISOString();
     const aged = this.db
-      .prepare(`DELETE FROM jobs WHERE status IN ${TERMINAL} AND updated_at < ?`)
+      .prepare(`DELETE FROM jobs WHERE status IN ${AGED_OUT} AND updated_at < ?`)
       .run(cutoff).changes;
     const excess = this.db
       .prepare(

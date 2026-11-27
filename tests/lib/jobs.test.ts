@@ -250,6 +250,24 @@ describe("jobs", () => {
     expect(MAX_FINISHED_JOBS).toBe(1000);
   });
 
+  it("D-M7: an unknown paid submission ages out but is never dropped to make room", () => {
+    const q = new JobQueue({ db, concurrency: 1, maxFinished: 1 });
+    const fresh = q.enqueue("t", {});
+    const stale = q.enqueue("t", {});
+    const done = q.enqueue("t", {});
+    const longAgo = new Date(Date.now() - JOB_RETENTION_MS - 60_000).toISOString();
+    db.prepare("UPDATE jobs SET status = 'submission_unknown' WHERE id IN (?, ?)").run(
+      fresh,
+      stale,
+    );
+    db.prepare("UPDATE jobs SET updated_at = ? WHERE id = ?").run(longAgo, stale);
+    db.prepare("UPDATE jobs SET status = 'succeeded' WHERE id = ?").run(done);
+    expect(q.prune()).toBe(1);
+    expect(q.get(stale)).toBeNull();
+    expect(q.get(fresh)?.status).toBe("submission_unknown");
+    expect(q.get(done)?.status).toBe("succeeded");
+  });
+
   it("M3: the database file is owner-only, and an existing loose file is fixed at open", () => {
     const file = join(dir, "loose.db");
     const loose = new Database(file);

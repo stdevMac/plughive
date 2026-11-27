@@ -175,7 +175,14 @@ export type TriggerPatch = Partial<
 >;
 
 export class TriggerStore {
-  constructor(private readonly db: Database.Database) {
+  /**
+   * `onSecret` sees every webhook secret this store holds (at start-up, on
+   * create and on rotation), so the daemon can keep them out of logs.
+   */
+  constructor(
+    private readonly db: Database.Database,
+    private readonly onSecret?: (secret: string) => void,
+  ) {
     db.exec(`
       CREATE TABLE IF NOT EXISTS triggers (
         id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL,
@@ -200,6 +207,11 @@ export class TriggerStore {
         PRIMARY KEY (trigger_id, signature)
       );
     `);
+    if (onSecret) {
+      for (const r of db.prepare("SELECT secret FROM triggers").all() as { secret: string }[]) {
+        onSecret(r.secret);
+      }
+    }
   }
 
   count(): number {
@@ -229,6 +241,7 @@ export class TriggerStore {
   create(t: NewTrigger, now = Date.now()): { trigger: Trigger; secret: string } {
     const id = newId();
     const secret = newSecret();
+    this.onSecret?.(secret);
     this.db
       .prepare(
         `INSERT INTO triggers (id, name, kind, workflow, args_json, schedule, timezone, catch_up,
@@ -283,6 +296,7 @@ export class TriggerStore {
 
   rotateSecret(id: string): string | null {
     const secret = newSecret();
+    this.onSecret?.(secret);
     const res = this.db
       .prepare("UPDATE triggers SET secret = ?, updated_at = ? WHERE id = ?")
       .run(secret, Date.now(), id);

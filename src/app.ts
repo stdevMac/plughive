@@ -325,14 +325,22 @@ export function createApp(deps: AppDeps): CreatedApp {
   // it is mounted before the /api guard; /api/triggers after it.
   const triggerKit =
     tasks && deps.triggers
-      ? createTriggers(deps.triggers, {
-          registry,
-          tasks,
-          logger,
-          origin,
-          scopeFor,
-          ...(profiles ? { profileExists: (id: string) => profiles.get(id) !== undefined } : {}),
-        })
+      ? createTriggers(
+          deps.store && !deps.triggers.onSecret
+            ? {
+                ...deps.triggers,
+                onSecret: (secret: string) => deps.store?.redactor.register(secret),
+              }
+            : deps.triggers,
+          {
+            registry,
+            tasks,
+            logger,
+            origin,
+            scopeFor,
+            ...(profiles ? { profileExists: (id: string) => profiles.get(id) !== undefined } : {}),
+          },
+        )
       : undefined;
   triggerKit?.mountHooks(app);
   const store = deps.store;

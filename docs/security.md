@@ -206,12 +206,21 @@ open it in the dashboard (Packs > <pack> > Settings):
   dead proxy. HTML input keeps only `data:` and `#` references; every other
   URL or path is removed before it is converted, and anything the sanitiser
   cannot read safely (CSS escapes, `srcdoc`, processing instructions) is
-  dropped. ZIP-based office files (docx, xlsx, pptx, odt, ods, odp, epub) are
-  scanned first and refused if they hold ZIP64 records, entries outside the
-  archive, oversized or highly compressed content, external entities, `file:`
-  or UNC references, or external links other than http(s), `mailto:` and
-  `tel:`. OCR and speech languages must be plain codes (OCR codes joined by
-  `+`).
+  dropped. The sanitiser reads attributes the way a browser does and writes
+  the markup back in one fixed form; `data:` is kept only for raster images
+  in image attributes, and `<meta http-equiv>`, `<script>` and `<base>` are
+  removed. Document inputs are checked by their bytes, not their declared
+  type: anything that is a ZIP gets the ZIP scan and anything that is XML gets
+  the XML scan, whatever its extension. The ZIP scan refuses ZIP64 and
+  multi-disk archives, more than one end record, a directory that does not
+  match the entries, entries outside the archive, symlink entries, oversized
+  or highly compressed content, and DTD files. Every XML part (and SVG, HTML
+  and the like inside the package) is refused if it holds a DTD internal
+  subset, an entity declaration, a non-http(s) external DTD, `file:` or UNC
+  references, or external links other than http(s), `mailto:` and `tel:`;
+  references are decoded (entities, percent-encoding, Unicode forms) before
+  they are checked, and UTF-16 parts are decoded rather than skipped. OCR and
+  speech languages must be plain codes (OCR codes joined by `+`).
 - **telegram** sends only to the default chat (`defaultChatId`) and to the
   chats in `allowedChatIds`. With neither set it sends nothing. Message text
   is capped at 4096 characters and captions at 1024.
@@ -229,13 +238,18 @@ open it in the dashboard (Packs > <pack> > Settings):
   ones. Set `allowedRecipients` before you let an agent read mail it did not
   write: a message can ask to be answered.
 - **x402** pays any host until `allowedHosts` is set; set it. Every redirect
-  hop is checked again, a paid request never follows one, and it signs only
-  for the known USDC domain.
+  hop is checked again, a paid request never follows one, it signs only
+  for the known USDC domain, and it never pays a price quoted by a page it
+  was redirected to.
+- **share** links are signed with `response-content-disposition=attachment`,
+  so a shared HTML or SVG file downloads instead of opening on the bucket's
+  site.
+- Provider replies are read with an 8 MiB cap before they are parsed.
 - **web** `web_screenshot` resolves every name through its own pinning proxy:
   Chromium runs without QUIC, its own DNS or unproxied WebRTC. With
   `allowLocalUrls` a local page may be captured, but once a public frame
   loads, or a local name answers with a public address, the capture loses
-  local access.
+  local access. A popup the page opens is closed at once.
 - **browser** `steel_start_session` returns Steel's `viewer_url` and
   `debug_url`: anyone with those links can watch and drive the session until
   it is released.
@@ -265,6 +279,9 @@ Treat what it returns as untrusted.
   names every header a pack mount sends.
 - Errors, logs and the mount list show a remote mount's URL as origin and
   path only, so a key carried in a query string (Browserbase) is not printed.
+  Path segments that look like keys (16 or more characters with letters and
+  digits, as in `/s/<key>/mcp`) show as `[redacted]`. Mounted tool schemas
+  lose `$comment`, `examples` and `x-*` fields.
 - For a stdio mount you add, pass secrets in `env`, not in arguments: other
   local users can see a process's arguments in `ps`.
 - Mount headers may not contain CR, LF or NUL. A bad header is refused by
@@ -306,6 +323,17 @@ can start a program as you or send your keys somewhere, so:
   ${secret:NAME}`), so you see which key goes where.
 - A mount whose description would not fit in the approval text (500
   characters) is refused, so nothing hides past the cut.
+- A proposed mount may not set `env` names that change what runs or where it
+  connects (`PATH`, `NODE_OPTIONS`, `LD_*`, `DYLD_*`, proxies and the rest of
+  the list pack programs lose), may not use a key name only a bundled pack may
+  read, and may not put a literal key in a credential header or an
+  `--api-key` argument. A stdio mount you write yourself keeps its `env` as
+  written.
+- `optimize_mounts` asks before it parks mounts, applies keep lists, switches
+  the sweep to `auto`, removes a keep or lowers `idle_days`; smart mount
+  changes run one at a time.
+- `describe_tool` on a parked or hidden tool says so; it does not wake the
+  mount.
 - `connect_mount` hands the agent the vendor's sign-in link for you to open.
   The tokens go to the secret store, not to the agent.
 
@@ -353,7 +381,18 @@ backup it makes of a config file is created 0600 whatever the original's mode.
 Clients that only speak stdio (Claude Desktop) reach the daemon through
 `mcp-remote`, run by `npx`. The version is pinned (`mcp-remote@0.16.7`) so an
 upgrade of that package is a change you make, not one `npx` makes for you.
-`mcp-remote` is a third-party package and sees the access key.
+`mcp-remote` is a third-party package and sees the access key. `connect`
+refuses to write the access key for a plain `http://` endpoint on another
+machine unless you pass `--allow-http`.
+
+## Files the daemon writes
+
+The log, client config backups, downloads and secret files are opened without
+following symlinks and checked to be the file that was opened before they are
+truncated, so a symlink swapped in at the last moment is refused rather than
+written through (on Windows too). The daemon refuses to start if
+`server.jsonl` is a symbolic link. Log files are owner-only before the first
+line is written.
 
 ## Spend caps and approvals
 
@@ -366,7 +405,12 @@ See [spend-and-approvals.md](spend-and-approvals.md) for how they work.
   arguments) and is used at most once. It expires, 30 minutes by default. It
   does not cover the same call with a higher `max_cost_usd`.
 - Calls still running count against caps, so parallel calls cannot pass a cap
-  together. Always-ask and destructive tools still ask inside an approved
+  together. Paid calls whose cost is not known up front run one at a time per
+  cap (the lock is let go while a call waits for approval); one such call can
+  still overshoot, since its cost is known only after it runs.
+- Every item of a `batch`, every `tools.call` in a script and the contact
+  sheet's inner call is checked by the policy on its own; the outer approval
+  does not carry into them. Always-ask and destructive tools still ask inside an approved
   workflow run, and a paid-cache hit asks when a rule says so.
 - A workflow started inside an approved run is checked against its own
   rules, so an approval for the outer call does not carry into it.
@@ -381,7 +425,8 @@ See [spend-and-approvals.md](spend-and-approvals.md) for how they work.
   profile. The count is in memory and starts again when the daemon restarts.
 - A trigger webhook cannot change what the trigger runs: the saved args win
   over the request body, and `dry_run` in the body is ignored. A trigger has
-  at most 5 runs unfinished at a time. See [triggers.md](triggers.md).
+  at most 5 runs unfinished at a time. Webhook signing secrets are registered
+  with the log redactor. See [triggers.md](triggers.md).
 - `policy.json` is written atomically, mode 0600. A file that does not
   validate is never overwritten, and the daemon fails closed while it is
   broken: calls that may cost money and destructive tools are refused.
@@ -441,4 +486,10 @@ tools you call, mounts you enable and the dashboard loading its own files.
   host and port the page already requested directly.
 - The Mac app does not use the hardened runtime.
 - Binary office formats (doc, xls, ppt, rtf) cannot be scanned like the ZIP
-  formats. They rely only on the locked-down LibreOffice profile.
+  formats. They rely only on the locked-down LibreOffice profile. A ZIP
+  nested inside a document is not scanned again, and Word field codes
+  (INCLUDEPICTURE, INCLUDETEXT) are not checked.
+- `run_tool_script` (`PLUGHIVE_CODE_MODE`) runs in `node:vm`, which is not a
+  security boundary. Only strings cross between the script and the daemon,
+  and its Promises and Errors are made inside the sandbox, but turn it on only
+  for your own agent.

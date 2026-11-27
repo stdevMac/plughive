@@ -4,6 +4,51 @@ All notable changes are listed here. Versions follow semantic versioning.
 
 ## Unreleased
 
+### Security
+
+- `run_tool_script` no longer hands host objects to the script: a script
+  could reach the daemon's `process` through an error or a promise. Only
+  strings cross now. A script that returns `undefined`, a function or a
+  symbol no longer crashes the daemon.
+- Paid calls whose cost is not known up front run one at a time per spend
+  cap, so parallel calls cannot pass the cap together. Each `batch` item and
+  each `tools.call` in a script is checked by the policy on its own, and a
+  batch or script runs at most 2 long-running calls at a time.
+- Mounts: an agent now needs your approval before smart mount parks mounts,
+  changes keep lists or turns on the auto sweep. A mount an agent proposes
+  can no longer set `PATH`, `NODE_OPTIONS`, `LD_*` or proxy settings, use a
+  bundled pack's key name, or carry a literal key. Describing a parked tool
+  no longer switches its mount back on. Keys in a mount's URL path are
+  hidden in logs and errors.
+- Office documents are checked by their content, not their declared type:
+  every XML part is scanned for DTDs, entities and local-file references, and
+  malformed or ambiguous ZIP structure, symlink entries and unknown text
+  encodings are refused. HTML sanitising reads attributes like a browser,
+  keeps `data:` only for raster images and handles nested CSS `image-set()`.
+- Provider replies are capped at 8 MB. Share links always download.
+  Screenshot popups are closed at once. Media and upscale size limits count
+  cover art and the x4 model pass. x402 won't pay a price quoted by a page it
+  was redirected to. Outreach drafts catch upper-case `HTTPS://` links.
+- Logs, client config backups and downloads are never written through a
+  swapped-in symlink (Windows included). The daemon refuses to start if its
+  log file is a symbolic link.
+- `plughive connect` no longer writes the access key for a plain `http://`
+  endpoint on another computer unless you pass `--allow-http`.
+- Trigger webhook secrets are registered with the log redactor.
+
+### Fixed
+
+- The daemon and CLI can reach IPv6-only hosts.
+- YAML client configs that start with a BOM are edited correctly. On Windows,
+  `~\` paths and an empty `PATHEXT` are handled.
+- `watch` backs off properly when the daemon keeps dropping the stream.
+- Very large `--since`/`--days` values give a clear error. Downloaded artifact
+  names lose hidden control and direction-reversing characters.
+- A job whose paid submission outcome is unknown ages out with the others but
+  is never dropped early to make room.
+- A job waiting on several approvals shows as running again only after the
+  last one is answered.
+
 ## 0.1.3
 
 ### Fixed

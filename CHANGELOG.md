@@ -4,6 +4,8 @@ All notable changes are listed here. Versions follow semantic versioning.
 
 ## Unreleased
 
+## 0.1.4
+
 ### Security
 
 - `run_tool_script` no longer hands host objects to the script: a script

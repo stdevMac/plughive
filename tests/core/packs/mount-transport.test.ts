@@ -218,6 +218,10 @@ createInterface({ input: process.stdin }).on("line", (line) => {
   }
   if (msg.method === "tools/call") {
     const a = msg.params.arguments;
+    if (a.env) {
+      const seen = { NODE_OPTIONS: process.env.NODE_OPTIONS ?? null, DYLD_INSERT_LIBRARIES: process.env.DYLD_INSERT_LIBRARIES ?? null, HTTPS_PROXY: process.env.HTTPS_PROXY ?? null, BIG_KEEP: process.env.BIG_KEEP ?? null, BIG_DAEMON_ONLY: process.env.BIG_DAEMON_ONLY ?? null };
+      return send({ id: msg.id, result: { content: [{ type: "text", text: JSON.stringify(seen) }] } });
+    }
     if (a.fail) return send({ id: msg.id, error: { code: -32000, message: "e".repeat(a.fail) } });
     if (a.depth) {
       let v = "leaf";
@@ -271,6 +275,41 @@ describe("PackMounts result size", () => {
   }, 30_000);
 });
 
+describe("PackMounts stdio environment", () => {
+  it("keeps the env the user configured for their own stdio mount, and nothing from the daemon", async () => {
+    const dir = realpathSync.native(mkdtempSync(join(tmpdir(), "plughive-envmount-")));
+    process.env.BIG_DAEMON_ONLY = "leak";
+    try {
+      const script = join(dir, "server.mjs");
+      writeFileSync(script, BIG_SERVER);
+      mounts = new PackMounts({ logger: { info() {}, warn() {} } });
+      const mount = {
+        id: "user/envy",
+        prefix: "envy",
+        transport: "stdio" as const,
+        command: process.execPath,
+        args: [script],
+        env: { NODE_OPTIONS: "--max-old-space-size=256", BIG_KEEP: "yes" },
+      };
+      await mounts.sync({ resolvedMounts: async () => [mount] });
+      expect(mounts.connection("user/envy")).toMatchObject({ connected: true });
+      const r = (await mounts.call("user/envy", "blob", { env: true })) as {
+        content: { text: string }[];
+      };
+      expect(JSON.parse(r.content[0]?.text ?? "{}")).toMatchObject({
+        NODE_OPTIONS: "--max-old-space-size=256",
+        BIG_KEEP: "yes",
+      });
+      expect(JSON.parse(r.content[0]?.text ?? "{}").BIG_DAEMON_ONLY).toBeNull();
+    } finally {
+      delete process.env.BIG_DAEMON_ONLY;
+      await mounts?.stop();
+      mounts = null;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 30_000);
+});
+
 describe("a remote mount's resolved url", () => {
   const KEY = "bb_live_S3cr3t+key/with=chars";
   const url = `https://mcp.browserbase.com/mcp?browserbaseApiKey=${encodeURIComponent(KEY)}`;
@@ -306,5 +345,20 @@ describe("a remote mount's resolved url", () => {
       "failed https://mcp.browserbase.com/mcp then [redacted] and [redacted]; see https://other.example/x",
     );
     expect(scrubMountUrls("plain message")).toBe("plain message");
+  });
+
+  it("redacts a key that sits in the url path, keeping the plain segments", () => {
+    const PATH_KEY = "zp4Kq9xT2mWv8sLr6bNc";
+    const pathUrl = `https://mcp.zapier.example/api/mcp/s/${PATH_KEY}/mcp`;
+    const msg = `failed ${pathUrl}: key ${PATH_KEY}; also https://x.example/s/Ab12Cd34Ef56Gh78Ij/sse?k=v`;
+    const out = scrubMountUrls(msg, pathUrl);
+    expect(out).not.toContain(PATH_KEY);
+    expect(out).toBe(
+      "failed https://mcp.zapier.example/api/mcp/s/[redacted]/mcp: key [redacted]; also https://x.example/s/[redacted]/sse",
+    );
+    // Names, versions and short ids stay readable.
+    expect(scrubMountUrls("see https://api.example/v1/modelcontextprotocol/2024-11-05/mcp")).toBe(
+      "see https://api.example/v1/modelcontextprotocol/2024-11-05/mcp",
+    );
   });
 });

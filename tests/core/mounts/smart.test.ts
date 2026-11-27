@@ -552,6 +552,47 @@ describe("smart mount", () => {
     expect(Object.keys(state.since)).toEqual(["mounts/exa"]);
   });
 
+  it("R4-H2: a settings change made while a report waits for the mount list is kept", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const s = new SmartMounts({
+      home,
+      mounts: {
+        listMounts: async () => {
+          await gate;
+          return mounts;
+        },
+        setMountEnabled: async () => {},
+      },
+      usage: { lastUseByVendor: () => lastUse, useByTool: () => [] },
+      tools: () => tools,
+      logger: { info() {}, warn() {} },
+      now: () => now,
+    });
+    const pending = s.report();
+    await new Promise((r) => setImmediate(r));
+    s.setSettings({ wake: "ask", keep: ["mounts/exa"] });
+    release();
+    await pending;
+    expect(s.settings()).toMatchObject({ wake: "ask", keep: ["mounts/exa"] });
+  });
+
+  it("R4-H2: concurrent park, wake and report run one at a time and lose nothing", async () => {
+    const s = smart();
+    await s.report();
+    now = T0 + 20 * DAY;
+    const [parked] = await Promise.all([s.park(["user/notes"]), s.report(), s.report()]);
+    expect(parked.parked).toEqual(["user/notes"]);
+    s.setSettings({ wake: "ask" });
+    await Promise.all([s.report(), s.sweep(), s.report()]);
+    const state = JSON.parse(readFileSync(join(home, SMART_MOUNTS_FILE), "utf8"));
+    expect(state.settings.wake).toBe("ask");
+    expect(Object.keys(state.parked)).toEqual(["user/notes"]);
+    expect(state.events.filter((e: { kind: string }) => e.kind === "parked")).toHaveLength(1);
+  });
+
   it("reads a state file from before profile changes and wake", async () => {
     writeFileSync(
       join(home, SMART_MOUNTS_FILE),

@@ -83,7 +83,7 @@ export const SERVER_INSTRUCTIONS =
   "To add an MCP server the user asks for, look in list_mounts first (enable_mount, or connect_mount for an OAuth sign-in); " +
   "otherwise add_mount proposes it, and it is added once the user approves it. " +
   "optimize_mounts lists mounts that are unused, costly or failing; ask the user before it parks (switches off) any. " +
-  "search_tools also finds tools of parked mounts (marked parked): describing or calling one switches its mount back on. " +
+  "search_tools also finds tools of parked mounts (marked parked): calling one switches its mount back on. " +
   "Keys are typed on the dashboard, never in chat.";
 
 /** inputResponses key of the spend-approval URL elicitation. */
@@ -749,18 +749,32 @@ export function buildMcpServer(
           })),
           total_matches: total,
           next: anyParked
-            ? "describe_tool for the input schema, then execute_tool; a parked tool's mount is switched back on when you describe or call it"
+            ? "describe_tool for the input schema, then execute_tool; a parked tool's mount is switched back on when you call it"
             : "describe_tool for the input schema, then execute_tool",
         });
       }
       case "describe_tool": {
         const input = parseArgs(name, DescribeToolInput, args);
         const names = [...new Set(typeof input.name === "string" ? [input.name] : input.name)];
+        // Describing is read-only: it never wakes a parked mount (that would
+        // start its server) nor shows a hidden tool again. It says what is
+        // dormant and that calling the tool brings it back.
         const notices: ErrorBody[] = [];
-        for (const n of names) {
-          if (find(n)) continue;
-          const r = await revive(n);
-          if (r && !isTool(r)) notices.push(r);
+        const missing = names.filter((n) => !find(n));
+        const dormant = missing.length && deps.dormant ? deps.dormant.list(currentProfile()) : [];
+        for (const n of missing) {
+          const d = dormant.find((t) => t.name === n);
+          if (!d) continue;
+          notices.push({
+            code: d.reason === "parked" ? "TOOL_PARKED" : "TOOL_HIDDEN",
+            message:
+              d.reason === "parked"
+                ? `${n} belongs to the mount ${d.mount}, which smart mount parked (switched off). Its input schema is known once the mount is on: call it with execute_tool to switch the mount back on (or to be told to ask the user first).`
+                : `${n} is hidden from this profile by smart mount. Call it with execute_tool to show it again (or to be told to ask the user first).`,
+            retryable: true,
+            tool: n,
+            ...(d.description ? { description: d.description } : {}),
+          });
         }
         const found = names.map(find).filter((t): t is RegisteredTool => t !== undefined);
         return okResult({

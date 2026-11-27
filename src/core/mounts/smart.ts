@@ -35,7 +35,8 @@
 //                   (reconnects already back off on their own: packs/mounts.ts)
 //
 // Nothing is lost by acting: a parked mount's tool list is remembered, so
-// search_tools still finds its tools, and describing or calling one switches
+// search_tools still finds its tools (describe_tool says it is parked, and
+// never wakes it), and calling one switches
 // the mount back on (settings.wake "auto", the default) or answers that it is
 // parked ("ask"). A tool smart mount hid from a profile comes back the same
 // way. Every change is recorded and can be undone, and the report sums up the
@@ -412,8 +413,16 @@ function mountOf(t: Pick<RegisteredTool, "origin" | "tags">): string | null {
   return tag ? tag.slice("mount:".length) : null;
 }
 
+/**
+ * State changes and concurrency: every change to smart-mounts.json reads the
+ * file, changes it and writes it back (atomically) with no await in between,
+ * so two changes can never interleave and one cannot overwrite the other with
+ * stale data. The async operations (report, park, applyProfiles, wake, sweep)
+ * also run one at a time, in call order, through `serial`.
+ */
 export class SmartMounts {
   private timer: NodeJS.Timeout | null = null;
+  private queue: Promise<unknown> = Promise.resolve();
   private readonly now: () => number;
   private profiles: ProfileAccess | null;
 
@@ -425,6 +434,13 @@ export class SmartMounts {
   /** Give smart mount the profile store (it is built after the runtime). */
   attachProfiles(profiles: ProfileAccess): void {
     this.profiles = profiles;
+  }
+
+  /** Runs `fn` after every operation queued before it has finished. */
+  private serial<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.queue.then(fn, fn);
+    this.queue = run.catch(() => {});
+    return run;
   }
 
   private get path(): string {
@@ -486,9 +502,15 @@ export class SmartMounts {
   }
 
   /** Looks at every mount and profile, records what it saw, and says what to change. */
-  async report(): Promise<SmartMountReport> {
-    const state = this.read();
+  report(): Promise<SmartMountReport> {
+    return this.serial(() => this.reportNow());
+  }
+
+  private async reportNow(): Promise<SmartMountReport> {
+    // The mount list first: the state is read only after the last await, so a
+    // change made meanwhile (setSettings, undo) is not written over.
     const mounts = await this.opts.mounts.listMounts();
+    const state = this.read();
     const report = this.build(state, mounts);
     this.write(state);
     return report;
@@ -880,8 +902,12 @@ export class SmartMounts {
    * the current report suggests parking (idle, heavy, overlap) are parked;
    * anything else in `ids` is returned in `skipped`.
    */
-  async park(ids?: readonly string[]): Promise<{ parked: string[]; skipped: string[] }> {
-    const report = await this.report();
+  park(ids?: readonly string[]): Promise<{ parked: string[]; skipped: string[] }> {
+    return this.serial(() => this.parkNow(ids));
+  }
+
+  private async parkNow(ids?: readonly string[]): Promise<{ parked: string[]; skipped: string[] }> {
+    const report = await this.reportNow();
     const parkable = new Map(
       report.suggestions.filter((s) => PARK_KINDS.includes(s.kind)).map((s) => [s.id, s]),
     );
@@ -917,9 +943,15 @@ export class SmartMounts {
    * Apply profile suggestions (profile_unused, unused_tools, search_mode) by
    * key, or all of them. Returns what was applied and the keys it could not.
    */
-  async applyProfiles(keys?: readonly string[]): Promise<{ applied: string[]; skipped: string[] }> {
+  applyProfiles(keys?: readonly string[]): Promise<{ applied: string[]; skipped: string[] }> {
+    return this.serial(() => this.applyProfilesNow(keys));
+  }
+
+  private async applyProfilesNow(
+    keys?: readonly string[],
+  ): Promise<{ applied: string[]; skipped: string[] }> {
     const profiles = this.profiles;
-    const report = await this.report();
+    const report = await this.reportNow();
     const open = new Map(
       report.suggestions.filter((s) => PROFILE_KINDS.includes(s.kind)).map((s) => [s.key, s]),
     );
@@ -1069,7 +1101,11 @@ export class SmartMounts {
    * An agent asked for `name`, which `profile` cannot see. If smart mount
    * took it away, bring it back (wake "auto") or say how (wake "ask").
    */
-  async wake(profile: Profile, name: string): Promise<WakeResult> {
+  wake(profile: Profile, name: string): Promise<WakeResult> {
+    return this.serial(() => this.wakeNow(profile, name));
+  }
+
+  private async wakeNow(profile: Profile, name: string): Promise<WakeResult> {
     const tool = this.dormantTools(profile).find((t) => t.name === name);
     if (!tool) return { status: "none" };
     const { settings } = this.read();
@@ -1115,12 +1151,16 @@ export class SmartMounts {
   }
 
   /** In "auto" mode: park every mount idle for `idleDays`. */
-  async sweep(): Promise<string[]> {
-    if (this.settings().mode !== "auto") return [];
-    const report = await this.report();
-    const idle = report.suggestions.filter((s) => s.kind === "idle").map((s) => s.id);
-    if (idle.length === 0) return [];
-    return (await this.park(idle)).parked;
+  sweep(): Promise<string[]> {
+    return this.serial(async () => {
+      if (this.settings().mode !== "auto") return [];
+      const report = await this.reportNow();
+      // The user may have switched auto off while the report was made.
+      if (this.settings().mode !== "auto") return [];
+      const idle = report.suggestions.filter((s) => s.kind === "idle").map((s) => s.id);
+      if (idle.length === 0) return [];
+      return (await this.parkNow(idle)).parked;
+    });
   }
 
   /** Run the sweep every hour (the first one a minute after start). */

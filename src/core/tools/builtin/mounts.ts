@@ -39,7 +39,8 @@ import {
   plainHttpSecretProblem,
   userMountSecretRefs,
 } from "../../mounts/user-mounts.js";
-import { SECRET_REF_PATTERN } from "../../packs/manifest.js";
+import { isStrippedEnvName } from "../../packs/context.js";
+import { SECRET_REF_PATTERN, isBundledOnlySecretName } from "../../packs/manifest.js";
 import type { PolicyGate } from "../../policy/gate.js";
 import type { RegisteredTool } from "../registry.js";
 import { systemTool } from "./system.js";
@@ -65,7 +66,10 @@ export interface MountToolDeps {
    */
   secrets?: { hasStored(name: string): Promise<boolean> };
   /** Smart mount. Absent: no optimize_mounts tool. */
-  smart?: Pick<SmartMounts, "report" | "park" | "setSettings" | "applyProfiles" | "undo">;
+  smart?: Pick<
+    SmartMounts,
+    "report" | "park" | "settings" | "setSettings" | "applyProfiles" | "undo"
+  >;
 }
 
 /** What the person reads before approving (the queue keeps 500 characters of it). */
@@ -77,6 +81,11 @@ const mountId = z
   .regex(new RegExp(`^${MOUNT_PART}/${MOUNT_PART}$`), 'a mount id from list_mounts, "<pack>/<id>"');
 const ONLY_SECRET_REF = /^\$\{secret:[^}]*\}$/;
 const KEY_LIKE_PARAM = /key|token|secret|auth|password|sig/i;
+/** A command-line flag that takes a credential: --api-key, --token, -password=... */
+const KEY_FLAG = /^--?[a-z0-9-_]*(?:api[-_]?key|token|secret|password)$/i;
+/** What may sit next to a ${secret:NAME} in a credential header: an auth scheme. */
+const AUTH_SCHEME = /^(?:[A-Za-z][A-Za-z0-9-]*)?$/;
+const ANY_SECRET_REF = new RegExp(SECRET_REF_PATTERN.source, "g");
 
 function mountsUrl(): string {
   return `${currentScope()?.baseUrl ?? ""}/mounts`;
@@ -136,7 +145,13 @@ function toolError(e: unknown): never {
 /** A literal credential an agent tried to write into the mount, or null. */
 export function literalCredentialProblem(m: UserMount): string | null {
   for (const [name, value] of Object.entries(m.headers ?? {})) {
-    if (CREDENTIAL_HEADER.test(name) && !value.match(SECRET_REF_PATTERN)) {
+    // A reference plus literal text ("Bearer sk-live-...${secret:X}") still
+    // carries a literal key: only an auth scheme word may sit next to it.
+    const rest = value.replace(ANY_SECRET_REF, "").trim();
+    if (
+      CREDENTIAL_HEADER.test(name) &&
+      (!value.match(SECRET_REF_PATTERN) || !AUTH_SCHEME.test(rest))
+    ) {
       return `the header ${name} carries a credential: write it as \${secret:NAME} (for example "Bearer \${secret:${m.id.toUpperCase().replaceAll("-", "_")}_MCP_TOKEN}") and ask the user to set the value on the Mounts page`;
     }
   }
@@ -152,9 +167,40 @@ export function literalCredentialProblem(m: UserMount): string | null {
       // the schema has already checked the url
     }
   }
+  const args = m.args ?? [];
+  for (const [i, arg] of args.entries()) {
+    const eq = arg.indexOf("=");
+    const flag = eq > 0 ? arg.slice(0, eq) : arg;
+    if (!KEY_FLAG.test(flag)) continue;
+    const value = eq > 0 ? arg.slice(eq + 1) : args[i + 1];
+    if (value !== undefined && !value.startsWith("-") && !ONLY_SECRET_REF.test(value)) {
+      return `the argument ${flag} carries a credential: write its value as \${secret:NAME} and ask the user to set the value on the Mounts page`;
+    }
+  }
   for (const [name, value] of Object.entries(m.env ?? {})) {
     if (!ONLY_SECRET_REF.test(value)) {
       return `env ${name}: a mount proposed by an agent may only set env values to a \${secret:NAME} reference (the user types the value on the Mounts page)`;
+    }
+  }
+  return null;
+}
+
+/**
+ * What a mount proposed by an agent may not use even with the user's
+ * approval, or null: a well-known credential of another tool (the user may
+ * store it later for the bundled pack, and this mount would then send it to
+ * its server), or an env name the daemon strips from every child process
+ * (PATH, NODE_OPTIONS, LD_*, proxies and the like change what the command runs).
+ */
+export function agentMountProblem(m: UserMount): string | null {
+  for (const name of userMountSecretRefs(m)) {
+    if (isBundledOnlySecretName(name)) {
+      return `the secret ${name} is a well-known credential of another tool: a mount cannot read it. Use a new name for this mount (e.g. ${m.id.toUpperCase().replaceAll("-", "_")}_MCP_KEY)`;
+    }
+  }
+  for (const name of Object.keys(m.env ?? {})) {
+    if (isStrippedEnvName(name)) {
+      return `env ${name}: a mount cannot set it, because it changes what the command runs or where it connects (PATH, NODE_OPTIONS, LD_*, proxies and the like are removed from every server's environment)`;
     }
   }
   return null;
@@ -168,7 +214,7 @@ const quote = (s: string) => (/^[A-Za-z0-9_./:=@%+,-]+$/.test(s) ? s : JSON.stri
  */
 function askApproval(
   gate: PolicyGate,
-  tool: "add_mount" | "enable_mount",
+  tool: "add_mount" | "enable_mount" | "optimize_mounts",
   args: unknown,
   reason: string,
 ): Record<string, unknown> | null {
@@ -235,6 +281,43 @@ const addInput = z
   })
   .strict();
 
+/**
+ * What in an optimize_mounts call changes mounts for every agent and so needs
+ * the user's approval, as one sentence, or null when nothing does. Parking,
+ * profile changes, the hourly auto sweep, fewer kept mounts and a shorter idle
+ * window all switch tools off; undo, "ask first", off/suggest, keeping more
+ * mounts and a longer idle window only hold back.
+ */
+export function optimizeApprovalReason(
+  current: { mode: string; idleDays: number; keep: readonly string[] },
+  req: {
+    apply?: boolean;
+    ids?: readonly string[];
+    apply_keys?: readonly string[];
+    settings?: { mode?: string; idle_days?: number; keep?: readonly string[] };
+  },
+): string | null {
+  const parts: string[] = [];
+  if (req.apply) {
+    parts.push(req.ids?.length ? `park ${req.ids.join(", ")}` : "park every suggested mount");
+  }
+  if (req.apply_keys?.length) parts.push(`apply profile changes ${req.apply_keys.join(", ")}`);
+  const s = req.settings;
+  if (s?.mode === "auto" && current.mode !== "auto") {
+    parts.push("switch on the hourly sweep that parks idle mounts (mode auto)");
+  }
+  const dropped = s?.keep ? current.keep.filter((id) => !s.keep?.includes(id)) : [];
+  if (dropped.length) parts.push(`stop keeping ${dropped.join(", ")}`);
+  if (s?.idle_days !== undefined && s.idle_days < current.idleDays) {
+    parts.push(`park mounts after ${s.idle_days} idle days instead of ${current.idleDays}`);
+  }
+  if (!parts.length) return null;
+  const text = parts.join("; ");
+  return text.length <= MAX_APPROVAL_REASON - 20
+    ? text
+    : `${text.slice(0, MAX_APPROVAL_REASON - 21)}…`;
+}
+
 export function mountTools(deps: MountToolDeps): RegisteredTool[] {
   const { mounts, gate, secrets, smart } = deps;
   const find = async (id: string) => {
@@ -285,7 +368,7 @@ export function mountTools(deps: MountToolDeps): RegisteredTool[] {
         const mount = parsed.data;
         const insecure = plainHttpSecretProblem(mount);
         if (insecure) throw new Error(insecure.message);
-        const literal = literalCredentialProblem(mount);
+        const literal = literalCredentialProblem(mount) ?? agentMountProblem(mount);
         if (literal) throw new Error(literal);
         const fileError = mounts.userFileError();
         if (fileError) throw new Error(`${fileError}; the user has to fix or remove it first`);
@@ -402,7 +485,7 @@ export function mountTools(deps: MountToolDeps): RegisteredTool[] {
           systemTool({
             name: "optimize_mounts",
             description:
-              "Smart mount: for every mount, when it was last called, calls in 30 days, how long it has been idle and roughly how many tokens its tools cost in every tools/list, plus suggestions, each with a `key`. Park kinds (switch the mount off): idle (unused for idle_days), heavy (many tokens, few calls), overlap (does the same job as a mount or built-in that gets the calls). Profile kinds (change one list-mode profile): profile_unused (other profiles use the mount, this one never does: hide it), unused_tools (hide the tools of a mount the profile never calls), search_mode (switch a costly list-mode profile to auto). Health kinds, to fix and never applied: sign_in, missing_key (the user sets the key on the Mounts page, never in chat), failing, failing_tool. apply: true parks the park kinds (or just `ids`); keys and sign-ins stay, and search_tools still finds a parked mount's tools: describing or calling one switches it back on (settings.wake auto) or answers TOOL_PARKED (ask). apply_keys applies profile suggestions by key; undo takes the keys of `changes` and reverts them. Also returns a 7-day summary. `settings` changes the mode (off, suggest, auto: an hourly sweep parks idle mounts), idle_days, keep (mount ids never suggested) and wake (you may set ask; only the user switches ask back to auto). Ask the user before apply, apply_keys or switching to auto.",
+              "Smart mount: for every mount, when it was last called, calls in 30 days, how long it has been idle and roughly how many tokens its tools cost in every tools/list, plus suggestions, each with a `key`. Park kinds (switch the mount off): idle (unused for idle_days), heavy (many tokens, few calls), overlap (does the same job as a mount or built-in that gets the calls). Profile kinds (change one list-mode profile): profile_unused (other profiles use the mount, this one never does: hide it), unused_tools (hide the tools of a mount the profile never calls), search_mode (switch a costly list-mode profile to auto). Health kinds, to fix and never applied: sign_in, missing_key (the user sets the key on the Mounts page, never in chat), failing, failing_tool. apply: true parks the park kinds (or just `ids`); keys and sign-ins stay, and search_tools still finds a parked mount's tools: calling one switches it back on (settings.wake auto) or answers TOOL_PARKED (ask). apply_keys applies profile suggestions by key; undo takes the keys of `changes` and reverts them. Also returns a 7-day summary. `settings` changes the mode (off, suggest, auto: an hourly sweep parks idle mounts), idle_days, keep (mount ids never suggested) and wake (you may set ask; only the user switches ask back to auto). apply, apply_keys, switching to auto, taking ids out of keep and lowering idle_days go through the user's approvals queue first (status approval_required: ask the user to approve, then call again once with the same arguments); undo, wake ask, mode off or suggest, adding to keep and raising idle_days do not.",
             input: z
               .object({
                 apply: z.boolean().default(false),
@@ -429,6 +512,28 @@ export function mountTools(deps: MountToolDeps): RegisteredTool[] {
                 throw new Error(
                   `the user set parked tools to "ask first": only they can change that, on the Mounts page (${mountsUrl()})`,
                 );
+              }
+              const needs = optimizeApprovalReason(smart.settings(), {
+                apply,
+                ids,
+                apply_keys,
+                settings,
+              });
+              if (needs) {
+                if (!gate) {
+                  return {
+                    status: "unavailable",
+                    message: `Approvals are off in this daemon, so an agent cannot ${needs}. Ask the user to do it on the Mounts page (${mountsUrl()}).`,
+                    mounts_page: mountsUrl(),
+                  };
+                }
+                const waiting = askApproval(
+                  gate,
+                  "optimize_mounts",
+                  { apply, ids, apply_keys, settings },
+                  `smart mount: ${needs}`,
+                );
+                if (waiting) return waiting;
               }
               if (settings) {
                 smart.setSettings({

@@ -204,6 +204,54 @@ describe("mount tools", () => {
     expect(approvals.pendingCount()).toBe(0);
   });
 
+  it("R4-M3: refuses well-known keys of other tools, stripped env names and half-literal keys", async () => {
+    await expect(
+      call("add_mount", {
+        ...github,
+        headers: { Authorization: `Bearer ${ref("ANTHROPIC_API_KEY")}` },
+      }),
+    ).rejects.toThrow(/ANTHROPIC_API_KEY is a well-known credential of another tool/);
+    await expect(
+      call("add_mount", {
+        id: "env",
+        transport: "stdio",
+        command: "npx",
+        env: { NODE_OPTIONS: ref("ENV_MCP_OPTS") },
+      }),
+    ).rejects.toThrow(/env NODE_OPTIONS: a mount cannot set it/);
+    await expect(
+      call("add_mount", {
+        id: "env",
+        transport: "stdio",
+        command: "npx",
+        env: { LD_PRELOAD: ref("ENV_MCP_LIB") },
+      }),
+    ).rejects.toThrow(/env LD_PRELOAD/);
+    await expect(
+      call("add_mount", {
+        ...github,
+        headers: { Authorization: `Bearer ghp_literal${ref("GITHUB_MCP_TOKEN")}` },
+      }),
+    ).rejects.toThrow(/Authorization carries a credential/);
+    for (const args of [
+      ["server", "--api-key", "sk-literal"],
+      ["server", "--token=sk-literal"],
+    ]) {
+      await expect(
+        call("add_mount", { id: "argkey", transport: "stdio", command: "npx", args }),
+      ).rejects.toThrow(/carries a credential/);
+    }
+    expect(approvals.pendingCount()).toBe(0);
+    // A reference in a flag, or a flag that only names a file, is fine.
+    for (const args of [
+      ["server", "--api-key", ref("ARGKEY_MCP_KEY")],
+      ["server", "--token-file", "/tmp/t"],
+    ]) {
+      const r = await call("add_mount", { id: "argkey", transport: "stdio", command: "npx", args });
+      expect(r.status).toBe("approval_required");
+    }
+  });
+
   it("refuses a secret name that already holds a stored key", async () => {
     await secrets.set("EXA_API_KEY", "exa-live-key");
     const steal = {
@@ -287,6 +335,12 @@ describe("mount tools", () => {
     ]);
     expect(catalog[0]?.enabled).toBe(true);
 
+    // Parking switches tools off for every agent: the user approves it first.
+    const asked = await call("optimize_mounts", { apply: true });
+    expect(asked.status).toBe("approval_required");
+    expect(asked.reason).toBe("smart mount: park every suggested mount");
+    expect(catalog[0]?.enabled).toBe(true);
+    approvals.decide(asked.approval_id as string, "approved", "dashboard", TTL);
     const applied = await call("optimize_mounts", { apply: true });
     expect(applied.parked).toEqual(["mounts/exa"]);
     expect(catalog[0]?.enabled).toBe(false);
@@ -297,7 +351,13 @@ describe("mount tools", () => {
       }),
     ]);
 
-    const changed = await call("optimize_mounts", { settings: { mode: "auto", idle_days: 7 } });
+    const auto = { settings: { mode: "auto", idle_days: 7 } };
+    const askAuto = await call("optimize_mounts", auto);
+    expect(askAuto.status).toBe("approval_required");
+    expect(askAuto.reason).toContain("mode auto");
+    expect(askAuto.reason).toContain("after 7 idle days instead of 14");
+    approvals.decide(askAuto.approval_id as string, "approved", "dashboard", TTL);
+    const changed = await call("optimize_mounts", auto);
     expect(changed.settings).toEqual({ mode: "auto", idle_days: 7, keep: [], wake: "auto" });
     const ask = await call("optimize_mounts", { settings: { wake: "ask" } });
     expect(ask.settings).toMatchObject({ wake: "ask" });
@@ -343,10 +403,53 @@ describe("mount tools", () => {
     );
     expect((await call("optimize_mounts", {})).settings).toMatchObject({ wake: "ask" });
     // Other settings still change while wake stays "ask".
-    expect((await call("optimize_mounts", { settings: { idle_days: 9 } })).settings).toMatchObject({
-      idle_days: 9,
+    expect((await call("optimize_mounts", { settings: { idle_days: 20 } })).settings).toMatchObject(
+      {
+        idle_days: 20,
+        wake: "ask",
+      },
+    );
+  });
+
+  it("R4-M3: optimize_mounts changes nothing that switches tools off without an approval", async () => {
+    catalog = [{ ...catalogExa, enabled: true }];
+    clock += 20 * 86_400_000;
+    await call("optimize_mounts", { settings: { keep: ["mounts/exa"] } });
+    for (const args of [
+      { apply: true, ids: ["mounts/exa"] },
+      { apply_keys: ["profile_unused:x:mounts/exa"] },
+      { settings: { mode: "auto" } },
+      { settings: { keep: [] } },
+      { settings: { idle_days: 3 } },
+    ]) {
+      const r = await call("optimize_mounts", args);
+      expect(r.status, JSON.stringify(args)).toBe("approval_required");
+    }
+    expect(catalog[0]?.enabled).toBe(true);
+    expect((await call("optimize_mounts", {})).settings).toEqual({
+      mode: "suggest",
+      idle_days: 14,
+      keep: ["mounts/exa"],
+      wake: "auto",
+    });
+
+    // Holding back needs no approval.
+    const held = await call("optimize_mounts", {
+      settings: { mode: "off", idle_days: 30, keep: ["mounts/exa", "mounts/other"], wake: "ask" },
+    });
+    expect(held.status).toBeUndefined();
+    expect(held.settings).toEqual({
+      mode: "off",
+      idle_days: 30,
+      keep: ["mounts/exa", "mounts/other"],
       wake: "ask",
     });
+
+    // Without an approvals queue the agent is sent to the user.
+    build(false);
+    const off = await call("optimize_mounts", { apply: true });
+    expect(off.status).toBe("unavailable");
+    expect(catalog[0]?.enabled).toBe(true);
   });
 
   it("keeps the approval text within what the queue stores", () => {

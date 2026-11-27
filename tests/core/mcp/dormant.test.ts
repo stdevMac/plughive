@@ -1,5 +1,5 @@
 // Parked and hidden tools over MCP: search_tools still finds them (marked
-// parked), and describe_tool or a call brings them back. In wake "ask" mode
+// parked), describe_tool says they are parked, and a call brings them back. In wake "ask" mode
 // the agent is told how instead, and an unknown tool is still an error.
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -149,14 +149,19 @@ describe("dormant tools over MCP", () => {
     expect((await smart.report()).summary).toMatchObject({ parked: 1, woken: 1 });
   });
 
-  it("describe_tool wakes a parked tool too", async () => {
+  it("describe_tool is read-only: it says a tool is parked and never wakes its mount", async () => {
     const call = await connect("agent");
     const d = body(await call("describe_tool", { name: ["exa__search", "nope"] }));
     expect(d.result).toMatchObject({
-      tools: [expect.objectContaining({ name: "exa__search" })],
-      not_found: ["nope"],
+      tools: [],
+      not_found: ["exa__search", "nope"],
+      notices: [expect.objectContaining({ code: "TOOL_PARKED", tool: "exa__search" })],
     });
-    expect(enabled).toBe(true);
+    expect(String((d.result?.notices as { message: string }[])[0]?.message)).toMatch(
+      /execute_tool/,
+    );
+    expect(enabled).toBe(false);
+    expect(smart.dormantTools(profiles.get("agent") as Profile)).toHaveLength(1);
   });
 
   it("in ask mode says how to switch it on instead of doing it", async () => {

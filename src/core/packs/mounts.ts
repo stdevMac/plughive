@@ -221,7 +221,10 @@ export function mountFetchPolicy(
     allowedProtocols: [url.protocol],
     maxRedirects: 0,
     maxResponseBytes: MOUNT_MAX_RESPONSE_BYTES,
-    // MCP streams are long-lived; the MCP client carries its own timeouts.
+    // No total budget: it would also count the body, and an MCP stream (SSE)
+    // stays open for the whole session. A stalled server is still cut off:
+    // safe-fetch's agent waits at most 5 minutes for response headers and for
+    // each gap inside a body, and the MCP client times out every request.
     timeoutMs: 0,
     lookup: async (hostname) => {
       const addrs = await baseLookup(hostname);
@@ -280,10 +283,33 @@ export function urlWithoutQuery(url: string): string {
 }
 
 /**
+ * A path segment that looks like a key rather than a name: 16 or more token
+ * characters with both letters and digits (Zapier-style /s/<key>/mcp urls).
+ */
+function credentialLikeSegment(seg: string): boolean {
+  return (
+    seg.length >= 16 && /^[A-Za-z0-9._~%+=-]+$/.test(seg) && /[A-Za-z]/.test(seg) && /\d/.test(seg)
+  );
+}
+
+/** urlWithoutQuery, with path segments that look like keys shown as [redacted]. */
+export function safeMountUrl(url: string): string {
+  const bare = urlWithoutQuery(url);
+  const m = /^([a-z][a-z0-9+.-]*:\/\/[^/]*)(\/.*)?$/i.exec(bare);
+  if (!m?.[2]) return bare;
+  const path = m[2]
+    .split("/")
+    .map((seg) => (credentialLikeSegment(seg) ? "[redacted]" : seg))
+    .join("/");
+  return `${m[1]}${path}`;
+}
+
+/**
  * Removes a remote mount's resolved url from a message, and the query and
  * fragment of any http(s) url in it: a mount may carry its API key in the
- * query string (Browserbase does), so errors, logs and status show the
- * origin and path at most.
+ * query string (Browserbase does) or in the path, so errors, logs and status
+ * show the origin and the path at most, with path segments that look like
+ * keys redacted.
  */
 export function scrubMountUrls(message: string, url?: string): string {
   let out = message;
@@ -292,6 +318,15 @@ export function scrubMountUrls(message: string, url?: string): string {
     try {
       const u = new URL(url);
       variants.add(u.href);
+      for (const seg of u.pathname.split("/")) {
+        if (!credentialLikeSegment(seg)) continue;
+        variants.add(seg);
+        try {
+          variants.add(decodeURIComponent(seg));
+        } catch {
+          // not valid percent-encoding: the raw segment is enough
+        }
+      }
       if (u.search) variants.add(u.search);
       if (u.search.length > 1) {
         variants.add(u.search.slice(1));
@@ -310,10 +345,10 @@ export function scrubMountUrls(message: string, url?: string): string {
       if (v)
         out = out
           .split(v)
-          .join(v === url || v.startsWith("http") ? urlWithoutQuery(url) : "[redacted]");
+          .join(v === url || v.startsWith("http") ? safeMountUrl(url) : "[redacted]");
     }
   }
-  return out.replace(/\bhttps?:\/\/[^\s"'<>()]+/gi, (m) => urlWithoutQuery(m));
+  return out.replace(/\bhttps?:\/\/[^\s"'<>()]+/gi, (m) => safeMountUrl(m));
 }
 
 /** Fetch confined to one origin, no redirects, response body capped. */
@@ -672,12 +707,16 @@ export class PackMounts implements MountedToolSource {
       let transport: StreamableHTTPClientTransport | StdioClientTransport;
       if (isStdio(mount)) {
         // The child gets a minimal environment plus what the user configured
-        // for this mount: never the daemon's own environment.
+        // for this mount: never the daemon's own environment. A stdio mount is
+        // the user's own config (or one they approved through add_mount, which
+        // refuses PATH, NODE_OPTIONS, LD_* and the like), so its env is kept
+        // as written: a user may need PATH for nvm or a proxy on purpose.
         const { StdioClientTransport, getDefaultEnvironment } = await loadMcpStdio();
+        const env = mount.env ?? {};
         transport = new StdioClientTransport({
           command: mount.command,
           args: mount.args,
-          env: { ...getDefaultEnvironment(), ...mount.env },
+          env: { ...getDefaultEnvironment(), ...env },
           stderr: "ignore",
           ...(this.opts.stdioCwd ? { cwd: this.opts.stdioCwd } : {}),
         });

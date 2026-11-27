@@ -318,8 +318,74 @@ export function sanitizeMountedSchema(schema: unknown): Record<string, unknown> 
   ) {
     return null;
   }
-  const { $schema: _schema, $id: _id, ...rest } = copy;
+  const {
+    $schema: _schema,
+    $id: _id,
+    ...rest
+  } = stripSchemaMetadata(copy) as Record<string, unknown>;
   return { ...rest, type: "object" };
+}
+
+// Keywords whose value is a map of subschemas (the keys are names, kept as is).
+const SCHEMA_MAP_KEYWORDS = new Set([
+  "properties",
+  "patternProperties",
+  "$defs",
+  "definitions",
+  "dependentSchemas",
+]);
+// Keywords whose value is a subschema or an array of subschemas.
+const SCHEMA_KEYWORDS = new Set([
+  "items",
+  "additionalItems",
+  "additionalProperties",
+  "unevaluatedItems",
+  "unevaluatedProperties",
+  "contains",
+  "propertyNames",
+  "not",
+  "if",
+  "then",
+  "else",
+  "allOf",
+  "anyOf",
+  "oneOf",
+  "prefixItems",
+]);
+
+/**
+ * A schema (already a JSON copy) without the annotations that carry free text
+ * and nothing a caller needs to build arguments: `$comment`, `examples` and
+ * vendor `x-*` keys, at every level. Property names are never touched.
+ */
+function stripSchemaMetadata(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map(stripSchemaMetadata);
+  if (schema === null || typeof schema !== "object") return schema;
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(schema as Record<string, unknown>)) {
+    if (k === "$comment" || k === "examples" || k.toLowerCase().startsWith("x-")) continue;
+    let value = v;
+    if (SCHEMA_KEYWORDS.has(k)) value = stripSchemaMetadata(v);
+    else if (
+      SCHEMA_MAP_KEYWORDS.has(k) &&
+      v !== null &&
+      typeof v === "object" &&
+      !Array.isArray(v)
+    ) {
+      const map: Record<string, unknown> = {};
+      for (const [name, sub] of Object.entries(v as Record<string, unknown>)) {
+        Object.defineProperty(map, name, {
+          value: stripSchemaMetadata(sub),
+          enumerable: true,
+          writable: true,
+          configurable: true,
+        });
+      }
+      value = map;
+    }
+    Object.defineProperty(out, k, { value, enumerable: true, writable: true, configurable: true });
+  }
+  return out;
 }
 
 export const MOUNT_PACK_ID = "gateway";
@@ -719,7 +785,14 @@ export function redactArgs(args: unknown, depth = 0): unknown {
   const out: Record<string, unknown> = {};
   const entries = Object.entries(args as Record<string, unknown>);
   for (const [k, v] of entries.slice(0, MAX_LOGGED_KEYS)) {
-    out[k] = SECRET_KEY_NAME.test(k) ? MASK : redactArgs(v, depth + 1);
+    // defineProperty: a "__proto__" key from the caller stays a plain key and
+    // never becomes the copy's prototype.
+    Object.defineProperty(out, k, {
+      value: SECRET_KEY_NAME.test(k) ? MASK : redactArgs(v, depth + 1),
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
   }
   if (entries.length > MAX_LOGGED_KEYS) out["…"] = `${entries.length - MAX_LOGGED_KEYS} more keys`;
   return out;

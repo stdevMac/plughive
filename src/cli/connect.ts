@@ -23,7 +23,7 @@ import {
   planConnect,
   restartHint,
 } from "../clients/index.js";
-import { daemonTarget } from "./api.js";
+import { daemonTarget, isThisMachine } from "./api.js";
 import { CliError, type CliIo, EXIT_FAIL, EXIT_OK, EXIT_USAGE, parse } from "./args.js";
 
 export const CONNECT_HELP = `Usage: plughive clients
@@ -42,12 +42,16 @@ Options:
   --name NAME     server name in the client config (default plughive)
   --dry-run       show the file as it would be written, change nothing
   --remove        remove the entry instead of adding it
+  --allow-http    write the access key even though the endpoint is plain
+                  http:// on another computer (it then crosses the network
+                  unencrypted)
   -h, --help      show this help
 
 Only the one entry is changed. The file is backed up once before the first
 change, and a file that does not parse is left alone. When
 PLUGHIVE_ACCESS_KEY is set, it is written as an Authorization header where
-the client supports one.`;
+the client supports one. The key is only written for an https:// endpoint
+or one on this computer, unless --allow-http is given.`;
 
 const OPTIONS = {
   url: { type: "string" },
@@ -55,6 +59,7 @@ const OPTIONS = {
   name: { type: "string" },
   "dry-run": { type: "boolean" },
   remove: { type: "boolean" },
+  "allow-http": { type: "boolean" },
   help: { type: "boolean", short: "h" },
 } as const;
 
@@ -98,6 +103,20 @@ function endpoint(io: CliIo, url: string | undefined, profile: string | undefine
     return `${base}/p/${profile}/mcp`;
   }
   return `${base}/mcp`;
+}
+
+/**
+ * The client sends the access key with every request. Over plain HTTP to
+ * another computer anyone on the network path could read it, so that needs
+ * --allow-http.
+ */
+function assertKeyTransport(url: string): void {
+  const parsed = new URL(url);
+  if (parsed.protocol === "https:" || isThisMachine(parsed.hostname)) return;
+  throw new CliError(
+    `refusing to write the access key for plain HTTP to ${parsed.host}: the client would send it unencrypted over the network. Use an https:// PLUGHIVE_PUBLIC_URL, or pass --allow-http if this network is trusted.`,
+    EXIT_USAGE,
+  );
 }
 
 function runClients(io: CliIo, deps: ConnectDeps): number {
@@ -146,6 +165,7 @@ export function runConnect(
     }
     const url = endpoint(io, values.url, values.profile);
     const accessKey = values.url === undefined ? daemonTarget(io.env).config.accessKey : undefined;
+    if (accessKey && !values["allow-http"]) assertKeyTransport(url);
     const opts = {
       ...env,
       url,

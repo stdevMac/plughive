@@ -11,7 +11,7 @@ import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import { openSyncNoFollow } from "../lib/platform.js";
 import { daemonTarget } from "./api.js";
-import { CliError, type CliIo, EXIT_FAIL, EXIT_OK, EXIT_USAGE, jsonText } from "./args.js";
+import { CliError, type CliIo, EXIT_FAIL, EXIT_OK, EXIT_USAGE, clean, jsonText } from "./args.js";
 import {
   COMMON_HELP,
   type Ctx,
@@ -287,6 +287,16 @@ function artifactUrl(ctx: Ctx, a: ArtifactView): string {
   return new URL(`${url.pathname}${url.search}`, target.localUrl).toString();
 }
 
+/**
+ * The file name to save an artifact under, from the name the daemon gives:
+ * only its last part, so "../../.bashrc" cannot write outside the current
+ * folder, and without control or bidi characters (the same set clean() drops,
+ * plus newline and tab), so it cannot hide or reverse what the name shows.
+ */
+export function artifactFileName(name: string | null | undefined): string {
+  return clean(basename((name ?? "").replaceAll("\\", "/"))).replace(/[\n\t]/g, "");
+}
+
 async function findArtifact(ctx: Ctx, id: string): Promise<ArtifactView> {
   // There is no GET /api/artifacts/:id; page through the library.
   for (let offset = 0; ; offset += 200) {
@@ -383,11 +393,8 @@ export async function runArtifacts(argv: string[], io: CliIo): Promise<number> {
           { min: 1, max: 1, usage: "<id> [-o FILE]" },
         );
         const a = await findArtifact(ctx, positionals[0] ?? "");
-        // The name comes from the daemon: keep only its last part, so a name
-        // like "../../.bashrc" cannot write outside the current folder.
-        const safeName = [...basename((a.name ?? "").replaceAll("\\", "/"))]
-          .filter((ch) => ch.charCodeAt(0) >= 0x20)
-          .join("");
+        // The name comes from the daemon; see artifactFileName.
+        const safeName = artifactFileName(a.name);
         if (!values.output && (!safeName || safeName === "." || safeName === ".."))
           throw new CliError(`artifact ${a.id} has no usable file name; pass -o FILE`, EXIT_USAGE);
         const dest = resolve(values.output ?? safeName);
@@ -418,9 +425,19 @@ export async function runArtifacts(argv: string[], io: CliIo): Promise<number> {
             createWriteStream(dest, { fd }),
           );
         } catch (e) {
-          closeSync(fd);
+          // The write stream closes the fd itself (autoClose), so this close
+          // may fail with EBADF; that must not skip the removal below.
+          try {
+            closeSync(fd);
+          } catch {
+            // Already closed.
+          }
           // Leave no half-written file behind to block the retry.
-          rmSync(dest, { force: true });
+          try {
+            rmSync(dest, { force: true });
+          } catch {
+            // Nothing more to do; the error below says what failed.
+          }
           throw new CliError(
             `could not save ${a.id} to ${dest}: ${e instanceof Error ? e.message : String(e)}`,
           );
@@ -499,8 +516,12 @@ const AGO_MS: Record<string, number> = { m: 60_000, h: 3_600_000, d: 86_400_000,
 /** --since as an ISO timestamp: "7d", "24h" or "90m" ago, or a date. */
 export function sinceOf(text: string, now = Date.now()): string {
   const m = /^(\d+(?:\.\d+)?)\s*([mhdw])$/i.exec(text.trim());
-  if (m)
-    return new Date(now - Number(m[1]) * (AGO_MS[(m[2] ?? "d").toLowerCase()] ?? 0)).toISOString();
+  if (m) {
+    const at = new Date(now - Number(m[1]) * (AGO_MS[(m[2] ?? "d").toLowerCase()] ?? 0));
+    if (Number.isNaN(at.getTime()))
+      throw new CliError(`--since: "${text}" reaches back further than a date can`, EXIT_USAGE);
+    return at.toISOString();
+  }
   const t = Date.parse(text);
   if (Number.isNaN(t))
     throw new CliError(
@@ -527,7 +548,10 @@ export async function runUsage(argv: string[], io: CliIo): Promise<number> {
   if (values.days) {
     const days = Number(values.days);
     if (!(days > 0)) throw new CliError("--days must be a positive number", EXIT_USAGE);
-    q.set("since", new Date(Date.now() - days * 86_400_000).toISOString());
+    const at = new Date(Date.now() - days * 86_400_000);
+    if (Number.isNaN(at.getTime()))
+      throw new CliError(`--days: ${values.days} reaches back further than a date can`, EXIT_USAGE);
+    q.set("since", at.toISOString());
   } else if (values.since) q.set("since", sinceOf(values.since));
   if (values.limit) q.set("limit", values.limit);
   const body = await ctx.api().get<UsageBody>(`/api/usage${q.size ? `?${q}` : ""}`);

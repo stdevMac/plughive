@@ -6,7 +6,15 @@
 // The escape hatch (anything the dashboard can do, through the same /api it
 // uses) and the live feed the dashboard listens to.
 import { ApiError, type HttpMethod } from "./api.js";
-import { CliError, type CliIo, EXIT_FAIL, EXIT_OK, EXIT_USAGE, jsonText } from "./args.js";
+import {
+  CliError,
+  type CliIo,
+  EXIT_FAIL,
+  EXIT_OK,
+  EXIT_USAGE,
+  cleanLine,
+  jsonText,
+} from "./args.js";
 import { COMMON_HELP, readJsonInput, sub } from "./common.js";
 
 export const API_HELP = `Usage: plughive api [METHOD] <path> [options]
@@ -122,7 +130,13 @@ export async function* sseFrames(
   }
 }
 
+/** One line per event; a newline inside daemon text cannot start a forged line. */
 function describe(f: Frame): string | null {
+  const line = describeRaw(f);
+  return line === null ? null : cleanLine(line);
+}
+
+function describeRaw(f: Frame): string | null {
   const time = new Date().toLocaleTimeString();
   const d = f.data as Record<string, unknown>;
   switch (f.event) {
@@ -174,6 +188,15 @@ export async function runWatch(argv: string[], io: CliIo): Promise<number> {
   let connected = false;
   try {
     for (;;) {
+      // The backoff starts over only once a connection proved healthy: it
+      // delivered an event or stayed open a while. A server (or proxy) that
+      // answers 200 and hangs up at once is otherwise retried every second.
+      let openedAt: number | null = null;
+      let healthy = false;
+      const settle = () => {
+        if (healthy || (openedAt !== null && Date.now() - openedAt >= HEALTHY_STREAM_MS))
+          delay = 1000;
+      };
       try {
         const res = await ctx.api().stream("/api/events", controller.signal);
         if (!res.body) throw new CliError("the daemon sent no event stream");
@@ -182,9 +205,10 @@ export async function runWatch(argv: string[], io: CliIo): Promise<number> {
             connected ? "Reconnected." : "Watching jobs, packs and approvals. Ctrl-C to stop.",
           );
         connected = true;
-        delay = 1000;
+        openedAt = Date.now();
         for await (const f of sseFrames(res.body)) {
           if (f.event === "hello") continue;
+          healthy = true;
           if (only && !only.has(f.event)) continue;
           if (ctx.json) io.out(jsonText(f));
           else {
@@ -196,12 +220,15 @@ export async function runWatch(argv: string[], io: CliIo): Promise<number> {
           io.err("The daemon closed the stream.");
           return EXIT_FAIL;
         }
-        io.err("The daemon closed the stream; reconnecting.");
+        settle();
+        io.err(`The daemon closed the stream; reconnecting in ${delay / 1000} s.`);
       } catch (e) {
         if (controller.signal.aborted) return EXIT_OK;
         if (values["no-reconnect"] || !connected || !retryable(e)) throw e;
+        settle();
         io.err(`${e instanceof Error ? e.message : String(e)}; retrying in ${delay / 1000} s.`);
       }
+      settle();
       if (!(await wait(delay, controller.signal))) return EXIT_OK;
       delay = Math.min(delay * 2, 30_000);
     }
@@ -209,6 +236,9 @@ export async function runWatch(argv: string[], io: CliIo): Promise<number> {
     process.off("SIGINT", stop);
   }
 }
+
+/** How long a stream must stay open, without events, to count as healthy. */
+const HEALTHY_STREAM_MS = 30_000;
 
 /** A dropped stream, an unreachable daemon, a restart (503) or a rate limit. */
 function retryable(e: unknown): boolean {

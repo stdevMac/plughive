@@ -14,12 +14,13 @@ import { type Server, createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { runCli } from "../../src/cli.js";
 import { apiUrl, assertTokenTransport, readBody } from "../../src/cli/api.js";
 import { type CliIo, clean, cleanLine, jsonText } from "../../src/cli/args.js";
 import { MAX_INPUT_BYTES, parseAssignments, readJsonInput } from "../../src/cli/common.js";
 import { runConnect } from "../../src/cli/connect.js";
+import { artifactFileName, sinceOf } from "../../src/cli/jobs.js";
 import { redactUrl } from "../../src/cli/pack.js";
 import { sseFrames } from "../../src/cli/raw.js";
 import { loadOrCreateAdminToken } from "../../src/lib/admin-token.js";
@@ -380,5 +381,191 @@ describe("sseFrames limits", () => {
       }
     };
     await expect(run()).rejects.toThrow(/too large/);
+  });
+});
+
+describe("watch", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  const sse = (text: string) =>
+    new Response(streamOf([text]), {
+      status: 200,
+      headers: { "content-type": "text/event-stream" },
+    });
+
+  it("backs off when the stream answers 200 and closes at once", async () => {
+    loadOrCreateAdminToken(home, {});
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    let calls = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      calls++;
+      // Ends the run: a 401 is not retried.
+      if (calls > 6) return new Response("{}", { status: 401 });
+      return sse("event: hello\ndata: {}\n\n");
+    });
+    const c = capture({ PLUGHIVE_HOME: home, PLUGHIVE_PORT: "7791", PLUGHIVE_NO_DOTENV: "1" });
+    const run = runCli(["watch"], c);
+    await vi.waitFor(() => expect(calls).toBe(1), { timeout: 10_000 });
+    // Connections at 0, 1, 3 and 7 s; without backoff, at 0, 1, 2, ... 6 s.
+    await vi.advanceTimersByTimeAsync(6_500);
+    expect(calls).toBe(3);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(await run).toBe(1);
+    const waits = c.stderr
+      .map((l) => /reconnecting in (\d+) s/.exec(l)?.[1])
+      .filter((x) => x !== undefined);
+    expect(waits).toEqual(["1", "2", "4", "8", "16", "30"]);
+  });
+
+  it("starts the backoff over after a connection that delivered an event", async () => {
+    loadOrCreateAdminToken(home, {});
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    let calls = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      calls++;
+      if (calls > 4) return new Response("{}", { status: 401 });
+      if (calls === 3) return sse('event: pack\ndata: {"id":"p","state":"ready"}\n\n');
+      return sse("");
+    });
+    const c = capture({ PLUGHIVE_HOME: home, PLUGHIVE_PORT: "7791", PLUGHIVE_NO_DOTENV: "1" });
+    const run = runCli(["watch"], c);
+    await vi.waitFor(() => expect(calls).toBe(1), { timeout: 10_000 });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(await run).toBe(1);
+    const waits = c.stderr
+      .map((l) => /reconnecting in (\d+) s/.exec(l)?.[1])
+      .filter((x) => x !== undefined);
+    expect(waits).toEqual(["1", "2", "1", "2"]);
+  });
+
+  it("a newline in event text cannot forge a second watch line", async () => {
+    loadOrCreateAdminToken(home, {});
+    const forged = "x\n12:00:00  job       job_evil fake succeeded";
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+      sse(
+        `event: job\ndata: ${JSON.stringify({ job_id: "job_1", tool: "t", status: "failed", error: forged })}\n\n` +
+          `event: pack\ndata: ${JSON.stringify({ id: "p", state: "error", error: forged })}\n\n`,
+      ),
+    );
+    const c = capture({ PLUGHIVE_HOME: home, PLUGHIVE_PORT: "7791", PLUGHIVE_NO_DOTENV: "1" });
+    expect(await runCli(["watch", "--no-reconnect"], c)).toBe(1);
+    expect(c.stdout).toHaveLength(2);
+    for (const line of c.stdout) expect(line).not.toContain("\n");
+    expect(c.stdout.join("\n")).not.toMatch(/^12:00:00/m);
+  });
+});
+
+describe("usage --since bounds", () => {
+  it("refuses a time ago no date can hold, as a usage error", () => {
+    for (const bad of ["999999999999w", "99999999999999999d"]) {
+      let err: unknown;
+      try {
+        sinceOf(bad);
+      } catch (e) {
+        err = e;
+      }
+      expect(err, bad).toBeInstanceOf(Error);
+      expect((err as Error).name, bad).not.toBe("RangeError");
+      expect((err as { exitCode?: number }).exitCode, bad).toBe(2);
+      expect((err as Error).message).toMatch(/further than a date can/);
+    }
+  });
+
+  it("refuses --days no date can hold", async () => {
+    const c = capture({ PLUGHIVE_HOME: home, PLUGHIVE_NO_DOTENV: "1" });
+    expect(await runCli(["usage", "--days", "1e20"], c)).toBe(2);
+    expect(c.stderr.join("\n")).toMatch(/further than a date can/);
+  });
+});
+
+describe("artifact file names", () => {
+  it("drops DEL, C1 and bidi controls, newlines and folders", () => {
+    expect(artifactFileName("../../a\u202egnp.exe")).toBe("agnp.exe");
+    expect(artifactFileName("a\x7fb\u0085c\u009bd\u2066e\u200ff\u061cg\nh\ti.png")).toBe(
+      "abcdefghi.png",
+    );
+    expect(artifactFileName("dir\\name.png")).toBe("name.png");
+    expect(artifactFileName(null)).toBe("");
+  });
+
+  it("removes the half-written file when the download fails midway", async () => {
+    const token = loadOrCreateAdminToken(home, {}).token;
+    const server = createServer((req, res) => {
+      if (req.url?.startsWith("/artifacts/")) {
+        res.writeHead(200, { "content-length": "100000" });
+        res.write("partial");
+        setTimeout(() => res.destroy(), 20);
+        return;
+      }
+      if (req.headers.authorization !== `Bearer ${token}`) {
+        res.writeHead(401);
+        return res.end();
+      }
+      const port = (server.address() as AddressInfo).port;
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          ok: true,
+          total: 1,
+          artifacts: [{ id: "a_1", name: "x.png", url: `http://127.0.0.1:${port}/artifacts/a_1` }],
+        }),
+      );
+    });
+    await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+    try {
+      const port = (server.address() as AddressInfo).port;
+      const out = join(home, "x.png");
+      const c = capture({ PLUGHIVE_HOME: home, PLUGHIVE_PORT: String(port) });
+      expect(await runCli(["artifacts", "download", "a_1", "-o", out], c)).toBe(1);
+      expect(c.stderr.join("\n")).toContain("could not save a_1");
+      expect(c.stderr.join("\n")).not.toContain("EBADF");
+      expect(existsSync(out)).toBe(false);
+    } finally {
+      await new Promise<void>((done) => server.close(() => done()));
+    }
+  });
+});
+
+describe("connect access key transport", () => {
+  const deps = () => ({
+    clientEnv: { home, env: {}, platform: "darwin" as const, applicationsDirs: [] },
+  });
+  const key = "k".repeat(32);
+
+  it("refuses to write the key for plain HTTP to another computer", () => {
+    const c = capture({
+      PLUGHIVE_ACCESS_KEY: key,
+      PLUGHIVE_PUBLIC_URL: "http://daemon.example.com:7777",
+      PLUGHIVE_NO_DOTENV: "1",
+    });
+    expect(() => runConnect("connect", ["cursor"], c, deps())).toThrow(
+      /refusing to write the access key for plain HTTP/,
+    );
+    expect(() => runConnect("connect", ["cursor", "--dry-run"], c, deps())).toThrow(/plain HTTP/);
+    expect(existsSync(join(home, ".cursor", "mcp.json"))).toBe(false);
+  });
+
+  it("writes it over https, to this computer, or with --allow-http", () => {
+    for (const [env, args] of [
+      [{ PLUGHIVE_PUBLIC_URL: "https://daemon.example.com" }, []],
+      [{ PLUGHIVE_PORT: "7791" }, []],
+      [{ PLUGHIVE_PUBLIC_URL: "http://daemon.example.com:7777" }, ["--allow-http"]],
+    ] as const) {
+      const c = capture({ ...env, PLUGHIVE_ACCESS_KEY: key, PLUGHIVE_NO_DOTENV: "1" });
+      expect(runConnect("connect", ["cursor", ...args], c, deps())).toBe(0);
+      expect(readFileSync(join(home, ".cursor", "mcp.json"), "utf8")).toContain(key);
+      rmSync(join(home, ".cursor"), { recursive: true, force: true });
+    }
+  });
+
+  it("an http --url to another computer is written without the key", () => {
+    const c = capture({ PLUGHIVE_ACCESS_KEY: key, PLUGHIVE_NO_DOTENV: "1" });
+    expect(
+      runConnect("connect", ["cursor", "--url", "http://203.0.113.5:7777/mcp"], c, deps()),
+    ).toBe(0);
+    expect(readFileSync(join(home, ".cursor", "mcp.json"), "utf8")).not.toContain(key);
   });
 });

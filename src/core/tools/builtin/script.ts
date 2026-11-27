@@ -231,7 +231,7 @@ const BOOTSTRAP = String.raw`(function (send, maxOut) {
 // Before anything else it takes away what the permission model leaves a
 // process that has no fs, child_process or worker rights: signalling other
 // processes (process.kill, so an escape cannot kill the daemon or any other
-// process of this user) and changing their priority.
+// process of this user) and changing their priority, and it empties its env.
 const CHILD = String.raw`"use strict";
 const vm = require("node:vm");
 const deny = () => { throw new Error("not available to a script"); };
@@ -241,6 +241,11 @@ for (const k of ["kill", "_kill"]) {
 try {
   Object.defineProperty(require("node:os"), "setPriority", { value: deny, writable: false, configurable: false });
 } catch {}
+// The daemon starts this process with an empty env, but Windows (libuv) still
+// copies in a few system variables such as USERNAME and PATH: drop them.
+for (const k of Object.keys(process.env)) {
+  try { delete process.env[k]; } catch {}
+}
 const post = (m) => { try { process.send(m); } catch {} };
 // The daemon went away: nothing is left to answer the script.
 process.on("disconnect", () => process.exit(0));

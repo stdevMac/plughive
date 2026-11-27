@@ -120,6 +120,14 @@ describe("logged tool arguments", () => {
     expect(JSON.stringify(out)).toBe('{"__proto__":{"polluted":true,"apiKey":"[redacted]"},"a":1}');
   });
 
+  it("describeArgs keeps a __proto__ key as a plain key, never as the copy's prototype", () => {
+    const args = JSON.parse('{"__proto__":{"polluted":true},"a":"xy"}');
+    const out = describeArgs(args) as Record<string, unknown>;
+    expect(Object.getPrototypeOf(out)).toBe(Object.prototype);
+    expect((out as { polluted?: unknown }).polluted).toBeUndefined();
+    expect(JSON.stringify(out)).toBe('{"__proto__":{"polluted":"boolean"},"a":"string(2)"}');
+  });
+
   it("maskUrlCredentials leaves ordinary URLs and text alone", () => {
     expect(maskUrlCredentials("see https://example.com/a?b=1&page=2#x")).toBe(
       "see https://example.com/a?b=1&page=2#x",

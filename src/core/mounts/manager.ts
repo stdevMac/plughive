@@ -21,7 +21,7 @@ import {
   type ConnectableMount,
   type MountProvider,
   type PackMounts,
-  urlWithoutQuery,
+  safeMountUrl,
 } from "../packs/mounts.js";
 import type { LayeredSecretStore } from "../secrets/index.js";
 import {
@@ -183,8 +183,9 @@ export class MountManager implements MountProvider {
     for (const m of await this.opts.loader.listMounts()) {
       out.push({
         ...m,
-        // Origin and path only: a query string may carry a key.
-        url: m.url === null ? null : urlWithoutQuery(m.url),
+        // Origin and path only, key-like path segments hidden: a query
+        // string or a path segment may carry a key.
+        url: m.url === null ? null : safeMountUrl(m.url),
         source: "pack" as const,
         command: null,
         ...conn.connection(m.id),
@@ -216,7 +217,7 @@ export class MountManager implements MountProvider {
         mountId: m.id,
         name: m.name ?? m.id,
         description: m.description ?? null,
-        url: m.url ? urlWithoutQuery(m.url) : null,
+        url: m.url ? safeMountUrl(m.url) : null,
         transport: m.transport,
         prefix: m.prefix,
         auth: m.transport === "http" ? (m.headers ? "header" : "none") : "none",

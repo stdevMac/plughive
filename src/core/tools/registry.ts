@@ -810,7 +810,13 @@ export function describeArgs(args: unknown, depth = 0): unknown {
   const out: Record<string, unknown> = {};
   for (const [k, v] of entries.slice(0, MAX_LOGGED_KEYS)) {
     // Argument names come from the caller too: keep them short and plain.
-    out[k.slice(0, 64).replace(/[^\w.-]/g, "_")] = describeArgs(v, depth + 1);
+    // defineProperty, as in redactArgs: "__proto__" stays a plain key.
+    Object.defineProperty(out, k.slice(0, 64).replace(/[^\w.-]/g, "_"), {
+      value: describeArgs(v, depth + 1),
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
   }
   if (entries.length > MAX_LOGGED_KEYS) out["…"] = `${entries.length - MAX_LOGGED_KEYS} more keys`;
   return out;

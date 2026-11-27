@@ -60,6 +60,18 @@ describe("MountManager: user mounts", () => {
   });
   afterEach(() => rmSync(home, { recursive: true, force: true }));
 
+  it("lists a user mount's url without key-like path segments or the query", async () => {
+    user.add({
+      id: "zap",
+      transport: "http",
+      prefix: "zap",
+      url: "https://actions.example.com/s/sk9Fq2LmZ81xYbW4kP7t/mcp?api_key=abc123",
+    });
+    const { mgr } = manager();
+    const zap = (await mgr.listMounts()).find((m) => m.id === "user/zap");
+    expect(zap?.url).toBe("https://actions.example.com/s/[redacted]/mcp");
+  });
+
   it("fills a secret reference only from the store, never from the environment", async () => {
     const { secrets, mgr } = manager();
     // The layered store itself would hand the environment's value to a bundled pack.

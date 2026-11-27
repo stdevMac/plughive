@@ -307,8 +307,9 @@ export async function probeFile(ctx: PackContext, path: string): Promise<MediaIn
   const info = parseProbe(json);
   const problem = formatProblem(info.format);
   if (problem) throw new Error(problem);
-  // Every picture stream, cover art included: `-map 0:v:0` and ffmpeg's
-  // default stream choice can both pick an attached picture.
+  // Every picture stream, cover art included. The tools map the real video
+  // with `0:V:0` (never an attached picture), but ffmpeg still reads and may
+  // decode cover art while it probes the input, so its size is bounded too.
   for (const s of info.streams) {
     if ((s.width ?? 0) > MAX_INPUT_DIM || (s.height ?? 0) > MAX_INPUT_DIM) {
       throw new Error(`input is larger than ${MAX_INPUT_DIM} pixels on a side`);

@@ -130,6 +130,9 @@ export function planConvert(input: ConvertArgs, info: MediaInfo, inPath: string)
   const pre = start ? ["-ss", fixed(start, 3)] : [];
   const op = input.operation;
   const realVideo = info.hasVideo && !info.isImage;
+  // `0:V:0` (capital V) is the first video stream that is not an attached
+  // picture: the same stream parseProbe describes as the video. `0:v:0` would
+  // pick cover art stored ahead of the real video.
 
   if (op === "thumbnail") {
     if (!info.hasVideo)
@@ -144,7 +147,7 @@ export function planConvert(input: ConvertArgs, info: MediaInfo, inPath: string)
       args: [
         ...inputArgs(inPath, info.isImage ? [] : ["-ss", fixed(at, 3)]),
         "-map",
-        "0:v:0",
+        "0:V:0",
         "-frames:v",
         "1",
         "-an",
@@ -189,7 +192,7 @@ export function planConvert(input: ConvertArgs, info: MediaInfo, inPath: string)
       args: [
         ...inputArgs(inPath, pre),
         "-map",
-        "0:v:0",
+        "0:V:0",
         "-an",
         "-vf",
         graph,
@@ -243,7 +246,7 @@ export function planConvert(input: ConvertArgs, info: MediaInfo, inPath: string)
     args: [
       ...inputArgs(inPath, pre),
       "-map",
-      "0:v:0",
+      "0:V:0",
       ...(info.hasAudio ? ["-map", "0:a:0"] : []),
       ...(filters.length > 0 ? ["-vf", filters.join(",")] : []),
       ...videoCodecArgs(fmt, input.crf ?? 23),
@@ -629,7 +632,7 @@ export function buildConcatGraph(
   const { width: w, height: h } = size;
   items.forEach((item, i) => {
     parts.push(
-      `[${i}:v:0]scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=${fps},format=yuv420p[vid${i}]`,
+      `[${i}:V:0]scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=${fps},format=yuv420p[vid${i}]`,
     );
     if (audio) {
       parts.push(
@@ -915,7 +918,7 @@ export function planMux(
       "-filter_complex",
       graph,
       "-map",
-      "0:v:0",
+      "0:V:0",
       "-map",
       "[muxa]",
       ...(copy
@@ -1142,7 +1145,7 @@ const burnCaptions = defineTool({
       const args = [
         ...inputArgs(v.path),
         "-map",
-        "0:v:0",
+        "0:V:0",
         ...(v.info.hasAudio ? ["-map", "0:a:0"] : []),
         "-vf",
         buildCaptionsFilter(file, input),

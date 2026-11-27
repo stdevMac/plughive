@@ -63,7 +63,7 @@ export function buildContactSheetGraph(n: number, layout: SheetLayout): string {
   const parts: string[] = [];
   const labels: string[] = [];
   for (let i = 0; i < n; i++) {
-    parts.push(`[${i}:v:0]trim=end_frame=1,${fit}[t${i}]`);
+    parts.push(`[${i}:V:0]trim=end_frame=1,${fit}[t${i}]`);
     labels.push(`[t${i}]`);
   }
   parts.push(

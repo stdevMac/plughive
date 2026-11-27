@@ -256,7 +256,7 @@ export async function upscaleVideo(
       [
         ...inputArgs(src.path),
         "-map",
-        "0:v:0",
+        "0:V:0",
         "-map",
         "0:a:0?",
         "-vf",

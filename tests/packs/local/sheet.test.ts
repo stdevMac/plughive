@@ -19,7 +19,7 @@ describe("contact sheet layout", () => {
 
   it("builds one tile chain per input and a single tile filter", () => {
     const g = buildContactSheetGraph(3, sheetLayout(3));
-    expect(g).toContain("[0:v:0]trim=end_frame=1,scale=256:256");
+    expect(g).toContain("[0:V:0]trim=end_frame=1,scale=256:256");
     expect(g).toContain("[t0][t1][t2]concat=n=3:v=1:a=0,tile=2x2");
     expect(g.endsWith("[sheet]")).toBe(true);
   });

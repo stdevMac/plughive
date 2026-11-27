@@ -36,6 +36,13 @@ import { type Server, createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { Agent, setGlobalDispatcher } from "undici";
+
+// A fresh connection for every request. Reusing an idle keep-alive socket
+// races the daemon closing it (its keep-alive timeout is 5 s), and on a busy
+// machine the client's own idle timer fires late, so a reused socket was
+// sometimes reset mid-run ("fetch failed", read ECONNRESET).
+setGlobalDispatcher(new Agent({ pipelining: 0 }));
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PORT = Number(process.env.LIVE_CHECK_PORT ?? 7793);
@@ -556,7 +563,8 @@ async function main() {
   // Say so when the daemon goes away mid-run, so "fetch failed" has a cause.
   let stopping = false;
   child.on("exit", (code, signal) => {
-    if (!stopping) process.stderr.write(`[live-check] daemon exited (code ${code}, signal ${signal})\n`);
+    if (!stopping)
+      process.stderr.write(`[live-check] daemon exited (code ${code}, signal ${signal})\n`);
   });
   try {
     await waitForHealth(child);
@@ -583,6 +591,8 @@ async function main() {
 
 main().catch((err) => {
   const cause = err instanceof Error && err.cause instanceof Error ? ` (${err.cause.message})` : "";
-  process.stderr.write(`[live-check] ${err instanceof Error ? err.message : String(err)}${cause}\n`);
+  process.stderr.write(
+    `[live-check] ${err instanceof Error ? err.message : String(err)}${cause}\n`,
+  );
   process.exitCode = 1;
 });

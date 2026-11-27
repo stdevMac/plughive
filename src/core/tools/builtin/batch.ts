@@ -11,6 +11,7 @@
 // runs when the tool is registered and allowed; otherwise the result says why.
 import { z } from "zod";
 import { currentScopeAllows } from "../../mcp/scope.js";
+import { runNotPreApproved } from "../../policy/run-context.js";
 import {
   type CallContext,
   MAX_ERROR_MESSAGE_CHARS,
@@ -23,6 +24,11 @@ import { CORE_PACK_ID } from "./define.js";
 export const MAX_BATCH_ITEMS = 100;
 export const MAX_BATCH_CONCURRENCY = 8;
 export const DEFAULT_BATCH_CONCURRENCY = 2;
+/**
+ * Long-running tools and workflows a batch or script runs at once. The batch
+ * holds one job slot, so it must not run many jobs' worth of work inside it.
+ */
+export const MAX_NESTED_LONG_RUNNING = 2;
 export const CONTACT_SHEET_TOOL = "local_contact_sheet";
 /** Results kept inline across all items; later items past it keep only a notice. */
 export const MAX_BATCH_RESULT_BYTES = 8 * 1024 * 1024;
@@ -104,6 +110,12 @@ export function toolForCapability(
     })[0];
 }
 
+/** A long-running tool or a workflow (wf_*): counts against MAX_NESTED_LONG_RUNNING. */
+export function isHeavyTool(name: string, tools?: readonly RegisteredTool[]): boolean {
+  if (name.startsWith("wf_")) return true;
+  return tools?.some((t) => t.name === name && t.longRunning === true) === true;
+}
+
 /** Image artifact ids in a tool result: objects with a string id and an image/* mime. */
 export function imageArtifactIds(result: unknown, depth = 0, out: string[] = []): string[] {
   if (depth > 4 || result === null || typeof result !== "object") return out;
@@ -155,7 +167,12 @@ export async function runBatch(
     }
   }
   const total = input.inputs.length;
-  const concurrency = Math.min(input.concurrency ?? DEFAULT_BATCH_CONCURRENCY, total);
+  const heavy = isHeavyTool(toolName, deps.tools());
+  const concurrency = Math.min(
+    input.concurrency ?? DEFAULT_BATCH_CONCURRENCY,
+    heavy ? MAX_NESTED_LONG_RUNNING : MAX_BATCH_CONCURRENCY,
+    total,
+  );
   const items: BatchItem[] = new Array(total);
   let done = 0;
   let kept = 0;
@@ -171,7 +188,9 @@ export async function runBatch(
     async (i) => {
       let env: ToolEnvelope;
       try {
-        env = await deps.call(toolName, input.inputs[i], nested);
+        // A person's approval of whatever started this batch covered that
+        // call, not each item: every item is checked on its own.
+        env = await runNotPreApproved(() => deps.call(toolName, input.inputs[i], nested));
       } catch (e) {
         env = {
           ok: false,
@@ -235,10 +254,8 @@ async function contactSheet(
   if (!currentScopeAllows(CONTACT_SHEET_TOOL)) {
     return { skipped: `${CONTACT_SHEET_TOOL} is not available in this profile` };
   }
-  const env = await deps.call(
-    CONTACT_SHEET_TOOL,
-    { artifact_ids: ids.slice(0, MAX_BATCH_ITEMS) },
-    nested,
+  const env = await runNotPreApproved(() =>
+    deps.call(CONTACT_SHEET_TOOL, { artifact_ids: ids.slice(0, MAX_BATCH_ITEMS) }, nested),
   );
   return env.ok ? env.result : { error: env.error.message };
 }

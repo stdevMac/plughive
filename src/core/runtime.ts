@@ -237,6 +237,7 @@ export async function createPackRuntime(opts: PackRuntimeOptions): Promise<PackR
             script: {
               call: (name: string, args: unknown, callCtx?: CallContext) =>
                 (host.tools as NonNullable<PackHost["tools"]>).call(name, args, callCtx ?? {}),
+              tools: () => registry.list(),
             },
           }
         : {}),

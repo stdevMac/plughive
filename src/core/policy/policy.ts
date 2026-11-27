@@ -214,7 +214,9 @@ export class PolicyCache {
 
 /** The rules that apply to a profile: the global rules with its overrides. */
 export function rulesFor(policy: Policy, profile: string | undefined): Rules {
-  const own = profile ? policy.profiles[profile] : undefined;
+  // Own keys only: a profile named like an Object.prototype key has no overrides.
+  const own =
+    profile && Object.hasOwn(policy.profiles, profile) ? policy.profiles[profile] : undefined;
   if (!own) return policy.rules;
   return {
     auto_approve_under_usd:

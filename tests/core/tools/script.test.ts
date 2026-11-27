@@ -120,6 +120,15 @@ describe("run_tool_script: running", () => {
     ).rejects.toMatchObject({ code: "SCRIPT_TIMEOUT" });
   }, 15_000);
 
+  it("reports a busy loop as a timeout even when the worker's own limit fires first", async () => {
+    const { run } = setup();
+    // Several at once, so the worker's sync limit and the host timer race.
+    const runs = Array.from({ length: 4 }, () => run({ code: "while (true) {}", timeout_ms: 250 }));
+    for (const r of runs) {
+      await expect(r).rejects.toMatchObject({ code: "SCRIPT_TIMEOUT", message: /ran over 250 ms/ });
+    }
+  }, 20_000);
+
   it("limits the number of tool calls", async () => {
     const { run } = setup();
     const out = await run({

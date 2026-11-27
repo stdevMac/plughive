@@ -3,10 +3,12 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { requestScope } from "../../../src/core/mcp/scope.js";
+import { currentPolicyRun, runPreApproved } from "../../../src/core/policy/run-context.js";
 import {
   BatchInput,
   CONTACT_SHEET_TOOL,
   MAX_BATCH_RESULT_BYTES,
+  MAX_NESTED_LONG_RUNNING,
   batchTools,
   imageArtifactIds,
   pool,
@@ -213,6 +215,34 @@ describe("batch_run", () => {
       artifact: { id: "sheet1", mime: "image/png" },
     });
     expect(sheetCalls).toEqual([{ artifact_ids: ["img1", "img2"] }]);
+  });
+
+  it("R4-L: long-running items share one job slot at a bounded fan-out, without a prior approval", async () => {
+    let inFlight = 0;
+    let peak = 0;
+    const approved: boolean[] = [];
+    const env = setup([
+      mockTool(
+        "render_long",
+        async () => {
+          approved.push(currentPolicyRun().preApproved === true);
+          inFlight++;
+          peak = Math.max(peak, inFlight);
+          await new Promise((r) => setTimeout(r, 15));
+          inFlight--;
+          return "ok";
+        },
+        { input: ItemInput, longRunning: true },
+      ),
+    ]);
+    const inputs = [1, 2, 3, 4, 5, 6].map((n) => ({ n }));
+    // The batch itself was approved; its items are each checked again.
+    const out = await runPreApproved(() =>
+      env.registry.call("batch_run", { tool: "render_long", inputs, concurrency: 6, max_items: 6 }),
+    );
+    expect(res(out)).toMatchObject({ total: 6, succeeded: 6 });
+    expect(peak).toBe(MAX_NESTED_LONG_RUNNING);
+    expect(approved).toEqual(inputs.map(() => false));
   });
 
   it("helpers: image ids and the pool", async () => {

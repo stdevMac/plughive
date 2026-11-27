@@ -24,12 +24,14 @@
 import { Worker } from "node:worker_threads";
 import { z } from "zod";
 import { currentScope, requestScope } from "../../mcp/scope.js";
+import { runNotPreApproved } from "../../policy/run-context.js";
 import {
   type CallContext,
   type RegisteredTool,
   type ToolEnvelope,
   toolInputJsonSchema,
 } from "../registry.js";
+import { MAX_BATCH_CONCURRENCY, MAX_NESTED_LONG_RUNNING, isHeavyTool } from "./batch.js";
 import { CORE_PACK_ID } from "./define.js";
 
 export const CODE_MODE_TOOL = "run_tool_script";
@@ -40,6 +42,8 @@ export const MAX_SCRIPT_TIMEOUT_MS = 120_000;
 export const DEFAULT_SCRIPT_CALLS = 25;
 export const MAX_SCRIPT_CALLS = 100;
 export const MAX_SCRIPT_OUTPUT_BYTES = 256 * 1024;
+/** Tool calls a script has in flight at once; more wait their turn. */
+export const MAX_SCRIPT_IN_FLIGHT = MAX_BATCH_CONCURRENCY;
 const HEAP_MB = 64;
 /** Tools a script may never call. */
 export const SCRIPT_REFUSED: ReadonlySet<string> = new Set(["run_tool_script", "batch_run"]);
@@ -47,6 +51,49 @@ export const SCRIPT_REFUSED: ReadonlySet<string> = new Set(["run_tool_script", "
 export interface ScriptToolDeps {
   /** The scoped call path (host.tools.call). */
   call(name: string, args: unknown, callCtx?: CallContext): Promise<ToolEnvelope>;
+  /** Every registered tool, to tell long-running ones apart (optional). */
+  tools?(): readonly RegisteredTool[];
+}
+
+/**
+ * At most `limit` calls in flight, and at most `heavyLimit` of them heavy
+ * (long-running tools and workflows): the whole script holds one job slot, so
+ * it must not run many jobs' worth of work inside it. Extra calls wait.
+ */
+class CallSlots {
+  private running = 0;
+  private heavyRunning = 0;
+  private readonly waiting: { heavy: boolean; start: () => void }[] = [];
+
+  constructor(
+    private readonly limit: number,
+    private readonly heavyLimit: number,
+  ) {}
+
+  run(heavy: boolean, fn: () => Promise<void>): void {
+    this.waiting.push({ heavy, start: () => void fn().finally(() => this.release(heavy)) });
+    this.pump();
+  }
+
+  private release(heavy: boolean): void {
+    this.running--;
+    if (heavy) this.heavyRunning--;
+    this.pump();
+  }
+
+  private pump(): void {
+    for (let i = 0; i < this.waiting.length && this.running < this.limit; ) {
+      const next = this.waiting[i] as { heavy: boolean; start: () => void };
+      if (next.heavy && this.heavyRunning >= this.heavyLimit) {
+        i++;
+        continue;
+      }
+      this.waiting.splice(i, 1);
+      this.running++;
+      if (next.heavy) this.heavyRunning++;
+      next.start();
+    }
+  }
 }
 
 export const ScriptInput = z
@@ -87,15 +134,33 @@ export class ScriptError extends Error {
 }
 
 // The worker. Plain JavaScript (eval'd), so it runs the same from src/ and dist/.
-// Inside the context, BOOTSTRAP captures the bridge, freezes the intrinsics and
-// defines `tools` and `console` before the snippet is compiled.
-const BOOTSTRAP = String.raw`(function (bridge, maxOut) {
+//
+// Realm rule: nothing created in the worker's own realm (a function, Error,
+// Promise or object) may ever become reachable from the snippet, because
+// `x.constructor.constructor` on any of them is the worker's Function, which
+// ignores the context's code-generation ban and reaches `process`. So the two
+// realms only trade primitives: the context calls `send(kind, id, text, text)`
+// (which returns nothing, and whose own errors are swallowed in the context),
+// and the worker calls the context's `deliver(id, ok, text)`. Promises and
+// Errors the snippet sees are made inside the context, and JSON is parsed
+// there. The worker also never calls `.then` on a context promise: the
+// context's `start` does that.
+//
+// BOOTSTRAP runs inside the context: it captures what it needs, freezes the
+// intrinsics and defines `tools` and `console` before the snippet is compiled.
+const BOOTSTRAP = String.raw`(function (send, maxOut) {
   "use strict";
   const g = globalThis;
   const parse = JSON.parse, stringify = JSON.stringify;
+  const P = Promise;
+  const pending = new Map();
+  let seq = 0;
+  const post = (kind, id, a, b) => {
+    try { send(kind, id, a, b); return true; } catch { return false; }
+  };
   const logs = [];
   let logBytes = 0;
-  const show = (v) => { try { return typeof v === "string" ? v : stringify(v); } catch { return String(v); } };
+  const show = (v) => { try { return typeof v === "string" ? v : String(stringify(v)); } catch { try { return String(v); } catch { return "?"; } } };
   const log = (...args) => {
     const line = args.map(show).join(" ");
     logBytes += line.length + 1;
@@ -105,10 +170,39 @@ const BOOTSTRAP = String.raw`(function (bridge, maxOut) {
   const tools = Object.freeze({
     call: async (name, args) => {
       if (typeof name !== "string") throw new TypeError("tools.call(name, args): name must be a string");
-      const json = await bridge(name, stringify(args === undefined ? {} : args));
-      return parse(json);
+      const json = stringify(args === undefined ? {} : args);
+      if (typeof json !== "string") throw new TypeError("tools.call arguments must be JSON-serialisable");
+      const text = await new P((resolve, reject) => {
+        const id = ++seq;
+        pending.set(id, { resolve, reject });
+        if (!post("call", id, name, json)) {
+          pending.delete(id);
+          reject(new Error("tools.call could not reach the daemon"));
+        }
+      });
+      return parse(text);
     },
   });
+  const deliver = (id, ok, text) => {
+    const p = pending.get(id);
+    if (!p) return;
+    pending.delete(id);
+    if (ok === true) p.resolve(String(text)); else p.reject(new Error(String(text)));
+  };
+  const fail = (e) => {
+    let message;
+    try { message = e !== null && typeof e === "object" && typeof e.message === "string" ? e.message : String(e); }
+    catch { message = "the script threw a value that cannot be shown"; }
+    post("error", 0, String(message), "");
+  };
+  const done = (value) => {
+    let out;
+    try { out = stringify(value === undefined ? null : value); } catch (e) { fail(e); return; }
+    // A function, a symbol or a toJSON() that gives undefined: no value.
+    if (typeof out !== "string") out = "null";
+    post("done", 0, out, logs.join("\n"));
+  };
+  const start = (p) => { P.resolve(p).then(done, fail); };
   const consoleObj = Object.freeze({ log, info: log, warn: log, error: log });
   for (const k of Object.getOwnPropertyNames(g)) {
     if (k === "globalThis") continue;
@@ -122,42 +216,57 @@ const BOOTSTRAP = String.raw`(function (bridge, maxOut) {
   Object.freeze(Object.getPrototypeOf(async function* () {}));
   Object.defineProperty(g, "tools", { value: tools, enumerable: true });
   Object.defineProperty(g, "console", { value: consoleObj, enumerable: true });
-  const finish = (value) => ({ out: stringify(value === undefined ? null : value), logs: logs.join("\n") });
-  Object.defineProperty(g, "__finish", { value: finish });
+  return Object.freeze({ deliver, start });
 })`;
 
-const WORKER = String.raw`
+const WORKER = String.raw`"use strict";
 const { parentPort, workerData } = require("node:worker_threads");
 const vm = require("node:vm");
-const pending = new Map();
-let seq = 0;
+let api = null;
+// Called from inside the context: takes primitives only and returns nothing.
+const send = (kind, id, a, b) => {
+  const text = (v, d) => (typeof v === "string" ? v : d);
+  if (kind === "call" && typeof id === "number") {
+    parentPort.postMessage({ type: "call", id, name: text(a, ""), args: text(b, "") });
+  } else if (kind === "done") {
+    parentPort.postMessage({ type: "done", out: text(a, "null"), logs: text(b, "") });
+  } else if (kind === "error") {
+    parentPort.postMessage({ type: "error", message: text(a, "the script failed") });
+  }
+};
 parentPort.on("message", (m) => {
-  const p = pending.get(m.id);
-  if (!p) return;
-  pending.delete(m.id);
-  if (typeof m.json === "string") p.resolve(m.json); else p.reject(new Error(String(m.error)));
+  if (!api || m === null || typeof m !== "object" || typeof m.id !== "number") return;
+  const ok = typeof m.json === "string";
+  try { api.deliver(m.id, ok, ok ? m.json : String(m.error)); } catch {}
 });
-const bridge = (name, args) => new Promise((resolve, reject) => {
-  const id = ++seq;
-  pending.set(id, { resolve, reject });
-  parentPort.postMessage({ type: "call", id, name: String(name), args: String(args) });
-});
-const fail = (e) => parentPort.postMessage({ type: "error", message: e && e.message ? String(e.message) : String(e) });
+// Compile errors are this realm's own Errors. The time-limit error is not an
+// instance of this realm's Error, so it is told apart by the clock instead:
+// a value the snippet threw is never read here (it could be a Proxy).
+let syncStarted = 0;
+const fail = (e) => {
+  if (syncStarted && Date.now() - syncStarted >= workerData.syncTimeout) {
+    parentPort.postMessage({ type: "timeout" });
+    return;
+  }
+  parentPort.postMessage({
+    type: "error",
+    message: e instanceof Error ? String(e.message) : "the script threw before it started",
+  });
+};
 try {
   const ctx = vm.createContext(Object.create(null), {
     name: "run_tool_script",
     codeGeneration: { strings: false, wasm: false },
   });
-  vm.runInContext(workerData.bootstrap, ctx, { timeout: 1000 })(bridge, workerData.maxOut);
+  const boot = vm.runInContext(workerData.bootstrap, ctx, { timeout: 10000 })(send, workerData.maxOut);
+  const start = boot.start;
+  api = { deliver: boot.deliver };
   const script = new vm.Script(
-    "(async () => {\n" + workerData.code + "\n})().then(__finish)",
+    "(async () => {\n" + workerData.code + "\n})()",
     { filename: "script.js", lineOffset: -1 },
   );
-  const p = script.runInContext(ctx, { timeout: workerData.syncTimeout });
-  Promise.resolve(p).then(
-    (r) => parentPort.postMessage({ type: "done", out: String(r.out), logs: String(r.logs) }),
-    fail,
-  );
+  syncStarted = Date.now();
+  start(script.runInContext(ctx, { timeout: workerData.syncTimeout }));
 } catch (e) {
   fail(e);
 }
@@ -178,6 +287,7 @@ export async function runScript(
     depth: (callCtx.depth ?? 0) + 1,
   };
   let calls = 0;
+  const slots = new CallSlots(MAX_SCRIPT_IN_FLIGHT, MAX_NESTED_LONG_RUNNING);
   const worker = new Worker(WORKER, {
     eval: true,
     workerData: {
@@ -229,7 +339,20 @@ export async function runScript(
           );
           return;
         }
-        end(() => resolve({ result: JSON.parse(out), logs, calls }));
+        let result: unknown;
+        try {
+          result = JSON.parse(out);
+        } catch {
+          end(() =>
+            reject(new ScriptError("SCRIPT_ERROR", "script failed: its result is not valid JSON")),
+          );
+          return;
+        }
+        end(() => resolve({ result, logs, calls }));
+        return;
+      }
+      if (m.type === "timeout") {
+        end(() => reject(new ScriptError("SCRIPT_TIMEOUT", `script ran over ${timeoutMs} ms`)));
         return;
       }
       if (m.type === "error") {
@@ -257,15 +380,20 @@ export async function runScript(
         reply({ error: "tools.call arguments must be JSON-serialisable" });
         return;
       }
-      const run = () => deps.call(name, args, nested);
-      (scope ? requestScope.run(scope, run) : run()).then(
-        (env) => {
-          const json = JSON.stringify(env);
-          if (Buffer.byteLength(json) > MAX_SCRIPT_OUTPUT_BYTES * 4) {
-            reply({ error: `the result of ${name} is too large to hand to a script` });
-          } else reply({ json });
-        },
-        (e: Error) => reply({ error: e.message }),
+      // A person's approval of whatever started this script covered that
+      // call, not the calls the script makes: each one is checked on its own.
+      const run = () => runNotPreApproved(() => deps.call(name, args, nested));
+      const heavy = isHeavyTool(name, deps.tools?.());
+      slots.run(heavy, () =>
+        (scope ? requestScope.run(scope, run) : run()).then(
+          (env) => {
+            const json = JSON.stringify(env) ?? "null";
+            if (Buffer.byteLength(json) > MAX_SCRIPT_OUTPUT_BYTES * 4) {
+              reply({ error: `the result of ${name} is too large to hand to a script` });
+            } else reply({ json });
+          },
+          (e: unknown) => reply({ error: e instanceof Error ? e.message : String(e) }),
+        ),
       );
     });
   });

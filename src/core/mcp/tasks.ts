@@ -136,13 +136,24 @@ export function createTaskEngine(
       : { ...(profile !== undefined ? { profileId: profile } : {}) };
     // The spend policy waits for a person's approval inside a job (instead of
     // failing the call) and shows the job as awaiting approval meanwhile.
+    // Several calls inside one job (a batch, a script) can wait at once: the
+    // job reads as running again only when the last of them is answered.
+    const waitingFor: string[] = [];
     const policyJob = {
       id: execution.id,
       awaiting: (waiting: boolean, message: string | null) => {
+        if (waiting) waitingFor.push(message ?? "awaiting approval");
+        else {
+          const at = message === null ? -1 : waitingFor.lastIndexOf(message);
+          waitingFor.splice(at >= 0 ? at : 0, 1);
+        }
         try {
           if (execution.signal?.aborted) return;
-          execution.setPhase?.(waiting ? "awaiting_approval" : "running");
-          execution.mergeCheckpoint({ progress_message: message });
+          const still = waitingFor.length > 0;
+          execution.setPhase?.(still ? "awaiting_approval" : "running");
+          execution.mergeCheckpoint({
+            progress_message: still ? (waitingFor[waitingFor.length - 1] ?? null) : null,
+          });
         } catch {
           // best effort, like progress
         }

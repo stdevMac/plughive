@@ -16,8 +16,10 @@ import { PolicyError } from "../../../src/core/policy/errors.js";
 import { PolicyGate } from "../../../src/core/policy/gate.js";
 import {
   PolicyFileError,
+  defaultPolicy,
   policyPath,
   readPolicy,
+  rulesFor,
   writePolicy,
 } from "../../../src/core/policy/policy.js";
 import {
@@ -462,7 +464,7 @@ describe("spend policy gate", () => {
           return { ok: true };
         },
         ...extra,
-      }) as RegisteredTool;
+      }) as unknown as RegisteredTool;
 
     beforeEach(() => {
       ran = [];
@@ -925,6 +927,153 @@ describe("spend policy gate", () => {
       ).toBe("wf_free");
       expect(ran).toEqual(["wf_free"]);
     });
+  });
+
+  describe("R4-M2: paid calls of unknown cost under a cap", () => {
+    const paidTool = (name: string, gateOpen: Promise<void>, ran: string[]): RegisteredTool =>
+      ({
+        name,
+        packId: "p",
+        origin: "native",
+        description: "",
+        inputSchema: {},
+        tags: ["paid"],
+        input: z.object({ n: z.number().optional() }),
+        run: async () => {
+          ran.push(name);
+          await gateOpen;
+          return { cost_usd: 1 };
+        },
+      }) as unknown as RegisteredTool;
+
+    it("run one at a time, so a cap with room for one is not passed by many", async () => {
+      policy({ caps: [{ scope: "global", period: "daily", limit_usd: 1, mode: "block" }] });
+      const ran: string[] = [];
+      let open!: () => void;
+      const gateOpen = new Promise<void>((r) => {
+        open = r;
+      });
+      const registry = new ToolRegistry({ gate, usage: ledger });
+      registry.registerPack("p", [paidTool("fal_run", gateOpen, ran)]);
+      const all = Promise.all([1, 2, 3].map((n) => registry.call("fal_run", { n })));
+      await new Promise((r) => setTimeout(r, 20));
+      expect(ran).toEqual(["fal_run"]);
+      open();
+      const out = await all;
+      expect(out.map((o) => (o.ok ? "ok" : o.error.code))).toEqual([
+        "ok",
+        "SPEND_BLOCKED",
+        "SPEND_BLOCKED",
+      ]);
+      expect(ran).toEqual(["fal_run"]);
+    });
+
+    it("run side by side when no cap applies", async () => {
+      const ran: string[] = [];
+      let open!: () => void;
+      const gateOpen = new Promise<void>((r) => {
+        open = r;
+      });
+      const registry = new ToolRegistry({ gate, usage: ledger });
+      registry.registerPack("p", [paidTool("fal_run", gateOpen, ran)]);
+      const all = Promise.all([1, 2].map((n) => registry.call("fal_run", { n })));
+      await new Promise((r) => setTimeout(r, 20));
+      expect(ran).toEqual(["fal_run", "fal_run"]);
+      open();
+      expect((await all).every((o) => o.ok)).toBe(true);
+    });
+
+    it("a nested paid call inside a locked one does not wait for itself", async () => {
+      policy({ caps: [{ scope: "global", period: "daily", limit_usd: 5, mode: "block" }] });
+      const ran: string[] = [];
+      const registry = new ToolRegistry({ gate, usage: ledger });
+      registry.registerPack("p", [
+        paidTool("inner", Promise.resolve(), ran),
+        {
+          ...paidTool("outer", Promise.resolve(), ran),
+          run: async () => {
+            ran.push("outer");
+            const env = await registry.call("inner", {});
+            return { inner: env.ok };
+          },
+        } as unknown as RegisteredTool,
+      ]);
+      const out = await registry.call("outer", {});
+      expect(out).toMatchObject({ ok: true, result: { inner: true } });
+      expect(ran).toEqual(["outer", "inner"]);
+    });
+
+    it("a call waiting for its turn stops when it is cancelled", async () => {
+      policy({ caps: [{ scope: "global", period: "daily", limit_usd: 5, mode: "block" }] });
+      const ran: string[] = [];
+      let open!: () => void;
+      const gateOpen = new Promise<void>((r) => {
+        open = r;
+      });
+      const registry = new ToolRegistry({ gate, usage: ledger });
+      registry.registerPack("p", [paidTool("fal_run", gateOpen, ran)]);
+      const first = registry.call("fal_run", { n: 1 });
+      const ac = new AbortController();
+      const second = registry.call("fal_run", { n: 2 }, { signal: ac.signal });
+      await new Promise((r) => setTimeout(r, 20));
+      ac.abort();
+      const out = await second;
+      expect(out.ok).toBe(false);
+      open();
+      expect((await first).ok).toBe(true);
+      expect(ran).toEqual(["fal_run"]);
+    });
+  });
+
+  describe("R4-M2: a job with several calls awaiting approval", () => {
+    it("reads as awaiting until the last of them is answered", async () => {
+      policy({ rules: { ask_before_destructive: true } });
+      const phases: string[] = [];
+      let waiting = 0;
+      const job = {
+        id: "job_multi",
+        awaiting: (w: boolean) => {
+          waiting += w ? 1 : -1;
+          phases.push(w ? "awaiting" : "running");
+        },
+      };
+      const registry = new ToolRegistry({ gate });
+      registry.registerPack("p", [
+        {
+          name: "wipe",
+          packId: "p",
+          origin: "native",
+          description: "",
+          inputSchema: {},
+          annotations: { destructiveHint: true },
+          input: z.object({ n: z.number() }),
+          run: async () => ({ ok: true }),
+        } as unknown as RegisteredTool,
+      ]);
+      const calls = runInPolicyJob(job, () =>
+        Promise.all([1, 2].map((n) => registry.call("wipe", { n }))),
+      );
+      await new Promise((r) => setTimeout(r, 50));
+      expect(waiting).toBe(2);
+      const pending = approvals.list({ status: "pending" });
+      expect(pending).toHaveLength(2);
+      for (const a of pending) approvals.decide(a.id, "approved", "t", TTL);
+      const out = await calls;
+      expect(out.every((o) => o.ok)).toBe(true);
+      // The gate pairs every "awaiting" with one "running", so a counting
+      // job (the task engine) can tell when the last one is answered.
+      expect(phases.filter((p) => p === "awaiting")).toHaveLength(2);
+      expect(waiting).toBe(0);
+    });
+  });
+
+  it("R4-L: a profile named like an Object.prototype key gets the global rules", () => {
+    const p = defaultPolicy();
+    p.profiles = { bot: { ask_before_sending: false } };
+    for (const name of ["__proto__", "constructor", "toString", "hasOwnProperty"]) {
+      expect(rulesFor(p, name)).toBe(p.rules);
+    }
+    expect(rulesFor(p, "bot").ask_before_sending).toBe(false);
   });
 
   it("writes policy.json readable by the owner only", () => {

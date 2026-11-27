@@ -18,6 +18,7 @@
 // FAIL CLOSED: while policy.json is invalid, every call that may cost money
 // (a non-zero or unknown estimate, a "paid" tool) and every destructive tool
 // is refused. Free calls go on.
+import { AsyncLocalStorage } from "node:async_hooks";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import type { CapabilityName } from "../capabilities/schemas.js";
 import { DEFAULT_PROFILE_ID, currentScope } from "../mcp/scope.js";
@@ -107,6 +108,21 @@ function capScopeKey(cap: Cap): string {
   return cap.scope === "global" ? "global" : `${cap.scope}:${cap.id}`;
 }
 
+/** Resolve when `p` does; reject early when `signal` aborts. */
+function waitOrAbort(p: Promise<void>, signal: AbortSignal | undefined): Promise<void> {
+  if (!signal) return p;
+  if (signal.aborted) return Promise.reject(new PolicyError("cancelled", "SPEND_BLOCKED"));
+  return new Promise<void>((resolve, reject) => {
+    const onAbort = () =>
+      reject(new PolicyError("cancelled while waiting for another paid call", "SPEND_BLOCKED"));
+    signal.addEventListener("abort", onAbort, { once: true });
+    p.then(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    });
+  });
+}
+
 function estimateFitsApproval(requested: number | null, approved: number | null): boolean {
   if (approved === null) return true;
   return requested !== null && requested <= approved;
@@ -152,6 +168,10 @@ export class PolicyGate {
   private readonly chatForms = new Map<string, string>();
   /** Profile -> start times of its recent sending calls (max_sends_per_hour). */
   private readonly sendTimes = new Map<string, number[]>();
+  /** Cap scope key -> the tail of the queue of paid calls waiting under it. */
+  private readonly capLocks = new Map<string, Promise<void>>();
+  /** Set inside a paid call that holds cap locks: nested paid calls do not lock again. */
+  private readonly holdsCapLocks = new AsyncLocalStorage<boolean>();
 
   constructor(private readonly opts: PolicyGateOptions) {
     this.cache = new PolicyCache(opts.home);
@@ -283,6 +303,49 @@ export class PolicyGate {
       r.add(key, amount);
     }
     return r;
+  }
+
+  /**
+   * A paid tool's cost is unknown until it ran and was recorded, so two of
+   * them checked at the same time could both pass a cap that has room for
+   * one. Paid calls under the same cap therefore run one at a time, from the
+   * cap check to the moment their cost is in the ledger. Resolves with a
+   * release function, or null when this call is already inside a locked one.
+   */
+  private async lockCaps(
+    keys: readonly string[],
+    signal: AbortSignal | undefined,
+  ): Promise<(() => void) | null> {
+    if (keys.length === 0 || this.holdsCapLocks.getStore() === true) return null;
+    const releases: (() => void)[] = [];
+    const releaseAll = () => {
+      for (const r of releases.splice(0)) r();
+    };
+    try {
+      for (const key of [...new Set(keys)].sort()) {
+        const prev = this.capLocks.get(key) ?? Promise.resolve();
+        let open!: () => void;
+        const mine = new Promise<void>((resolve) => {
+          open = resolve;
+        });
+        const tail = prev.then(() => mine);
+        this.capLocks.set(key, tail);
+        releases.push(() => {
+          // After the current microtasks: the registry writes this call's
+          // cost to the ledger right after the gate returns, and the next
+          // call must see it.
+          setImmediate(() => {
+            open();
+            if (this.capLocks.get(key) === tail) this.capLocks.delete(key);
+          });
+        });
+        await waitOrAbort(prev, signal);
+      }
+    } catch (e) {
+      releaseAll();
+      throw e;
+    }
+    return releaseAll;
   }
 
   // -------------------------------------------------------------------------
@@ -520,6 +583,61 @@ export class PolicyGate {
     if (preApproved && !paid && !alwaysAsk && !asksToSend && !asksDestructive) return run();
 
     const provider = this.opts.vendorOf?.(tool.name) ?? tool.packId;
+    const capKeys = paid ? capsFor(state.policy, { provider, profile }).map(capScopeKey) : [];
+    let unlock = await this.lockCaps(capKeys, signal);
+    try {
+      return await this.runToolChecked(tool, args, signal, {
+        run,
+        paid,
+        tagged,
+        alwaysAsk,
+        asksToSend,
+        asksDestructive,
+        preApproved,
+        state,
+        profile,
+        provider,
+        runCtx,
+        // Nobody waits behind a person's decision: the locks are let go while
+        // the call asks, and taken again before it runs.
+        beforeAsk: () => {
+          unlock?.();
+          unlock = null;
+        },
+        afterAsk: async () => {
+          unlock = await this.lockCaps(capKeys, signal);
+        },
+        locked: <R>(fn: () => Promise<R>) => (unlock ? this.holdsCapLocks.run(true, fn) : fn()),
+      });
+    } finally {
+      unlock?.();
+    }
+  }
+
+  private async runToolChecked<T>(
+    tool: GatedTool,
+    args: unknown,
+    signal: AbortSignal | undefined,
+    c: {
+      run: () => Promise<T>;
+      paid: boolean;
+      tagged: boolean;
+      alwaysAsk: boolean;
+      asksToSend: boolean;
+      asksDestructive: boolean;
+      preApproved: boolean;
+      state: PolicyState;
+      profile: string;
+      provider: string;
+      runCtx: ReturnType<typeof currentPolicyRun>;
+      beforeAsk: () => void;
+      afterAsk: () => Promise<void>;
+      locked: <R>(fn: () => Promise<R>) => Promise<R>;
+    },
+  ): Promise<T> {
+    const { run, paid, tagged, alwaysAsk, asksToSend, asksDestructive, preApproved } = c;
+    const { state, profile, provider, runCtx, locked } = c;
+    const rules = rulesFor(state.policy, profile);
     const checkBlockCaps = () => {
       for (const cap of capsFor(state.policy, { provider, profile })) {
         if (cap.mode !== "block") continue;
@@ -552,7 +670,8 @@ export class PolicyGate {
     } else if (asksDestructive) {
       askReason ??= `${tool.name} is destructive and the policy asks before destructive tools`;
     }
-    if (askReason === null) return run();
+    if (askReason === null) return locked(run);
+    c.beforeAsk();
     await this.ask(state, {
       kind: "tool",
       tool: tool.name,
@@ -564,8 +683,9 @@ export class PolicyGate {
       profile,
       ...(signal ? { signal } : {}),
     });
+    await c.afterAsk();
     if (paid) checkBlockCaps();
-    return paid ? runPreApproved(run) : run();
+    return paid ? locked(() => runPreApproved(run)) : locked(run);
   }
 
   // -------------------------------------------------------------------------
@@ -761,11 +881,13 @@ export class PolicyGate {
     }
     this.opts.logger?.info({ approval: pending.id, job: job.id }, "job awaiting approval");
     let decided: Approval;
-    job.awaiting(true, `awaiting approval: ${ref.url}`);
+    const waitingMessage = `awaiting approval: ${ref.url}`;
+    job.awaiting(true, waitingMessage);
     try {
       decided = await store.waitForDecision(pending.id, req.signal);
     } finally {
-      job.awaiting(false, null);
+      // The same message: the job counts its waiting calls by it.
+      job.awaiting(false, waitingMessage);
     }
     if (decided.status === "approved" && store.consume(decided.id)) return;
     const final = store.get(decided.id) ?? decided;

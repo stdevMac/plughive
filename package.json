@@ -1,6 +1,6 @@
 {
   "name": "plughive",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "A local MCP gateway: one endpoint for your agents, with your own provider keys.",
   "license": "Apache-2.0",
   "repository": {

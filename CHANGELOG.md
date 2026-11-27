@@ -4,6 +4,8 @@ All notable changes are listed here. Versions follow semantic versioning.
 
 ## Unreleased
 
+## 0.1.5
+
 ### Security
 
 - `run_tool_script` runs each script in its own Node process instead of a

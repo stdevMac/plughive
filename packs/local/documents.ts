@@ -18,7 +18,12 @@ import { type ArtifactKind, CapabilityError, type PackContext } from "plughive/p
 import { artifactIdProblem, assertSafePath, run, stderrTail } from "./lib/ffmpeg.js";
 import { binaryStatus, requireBinary } from "./lib/probe.js";
 import { HINTS, LocalBackendError, artifactOut, withWorkDir } from "./lib/util.js";
-import { scanZipDocument } from "./lib/zip-scan.js";
+import {
+  looksLikeXmlFile,
+  looksLikeZip,
+  scanXmlDocument,
+  scanZipDocument,
+} from "./lib/zip-scan.js";
 
 const TOOL_TIMEOUT_MS = 10 * 60_000;
 const MAX_TEXT_BYTES = 64 * 1024 * 1024;
@@ -145,6 +150,12 @@ function nameType(record: { meta: Record<string, unknown> | null }): DocType | n
 
 /** ZIP containers: checked (bomb bounds, external entities, file:// targets) before any tool opens them. */
 const ZIP_TYPES = new Set<DocType>(["docx", "xlsx", "pptx", "odt", "odp", "ods", "epub"]);
+/**
+ * Types LibreOffice may open that are not ZIPs. soffice runs without an input
+ * filter, so it recognises a flat ODF or Word 2003 XML file by its content
+ * whatever it is called: one that looks like XML gets the XML part checks.
+ */
+const XML_SNIFF_TYPES = new Set<DocType>(["doc", "rtf", "ppt", "xls", "txt", "csv"]);
 
 /** Copy the artifact into the work dir as `in.<ext>`. */
 export async function stageDocument(ctx: PackContext, work: string, id: string) {
@@ -165,14 +176,15 @@ export async function stageDocument(ctx: PackContext, work: string, id: string) 
   await rm(path, { force: true });
   await rename(copy.path, path);
   // Office/epub containers are ZIPs whose entries pandoc/LibreOffice open
-  // one by one: refuse bombs and external file references before that.
-  if (ZIP_TYPES.has(type)) {
-    try {
-      scanZipDocument(path);
-    } catch (e) {
-      await rm(path, { force: true });
-      throw e;
-    }
+  // one by one: refuse bombs and external file references before that. The
+  // bytes decide, not the declared type: LibreOffice sniffs the content, so
+  // a docx declared as .doc or .txt is still opened as a docx.
+  try {
+    if (ZIP_TYPES.has(type) || looksLikeZip(path)) scanZipDocument(path);
+    else if (XML_SNIFF_TYPES.has(type) && looksLikeXmlFile(path)) scanXmlDocument(path);
+  } catch (e) {
+    await rm(path, { force: true });
+    throw e;
   }
   return { path, type, record };
 }
@@ -512,73 +524,33 @@ export async function writeLoProfile(profileDir: string): Promise<void> {
 // remote fetches, this also removes file:, absolute and relative paths)
 // ---------------------------------------------------------------------------
 
+/** Inline raster images: the only data: URLs kept (no SVG, no HTML, no fonts). */
+const SAFE_DATA_IMAGE =
+  /^data:image\/(?:png|jpe?g|gif|webp|bmp|x-icon|vnd\.microsoft\.icon|avif|tiff)[;,]/i;
+
 /**
- * A URL is kept only when it is a fragment or inline data. Relative URLs are
- * dropped too: soffice resolves them against the input's folder, so
- * "/etc/passwd" or "../../x" would read a local file, and the uploaded
- * document is the only file in that folder anyway. Anything encoded (HTML
- * entities, CSS escapes) does not start with "data:" or "#" and is dropped.
+ * An image URL is kept only when it is a fragment or an inline raster image
+ * (data:image/png and friends; not SVG, which carries its own references).
+ * Relative URLs are dropped too: soffice resolves them against the input's
+ * folder, so "/etc/passwd" or "../../x" would read a local file. Anything
+ * encoded (HTML entities, CSS escapes) does not start with "data:image/" or
+ * "#" and is dropped.
  */
 export function safeHtmlUrl(u: string): boolean {
   const t = u.trim();
-  return t === "" || t.startsWith("#") || t.slice(0, 5).toLowerCase() === "data:";
+  return t === "" || t.startsWith("#") || SAFE_DATA_IMAGE.test(t);
 }
 
-// URL attributes rewritten to "#" when they are not a fragment or data: URL.
-// srcset is handled separately: it holds several candidates, not one URL.
-const ATTR_URL =
-  /\b(src|href|data|action|formaction|poster|background|lowsrc|dynsrc|longdesc|codebase|archive|classid|usemap|cite|xlink:href|ping|manifest|code)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi;
-const ATTR_SRCSET = /\bsrcset\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi;
-
-/**
- * Drop every `<!DOCTYPE ...>` and `<?...?>` processing instruction. In XHTML
- * (also read as "html" here) a DOCTYPE can name an external DTD — whose
- * entity declarations are XXE — and an `<?xml-stylesheet href="file://..."?>`
- * PI can pull a local file; neither is needed for conversion, so both are
- * removed whole, internal subset included.
- */
-function stripDoctypeAndPi(html: string): string {
-  let out = "";
-  let i = 0;
-  while (i < html.length) {
-    const lt = html.indexOf("<", i);
-    if (lt < 0) {
-      out += html.slice(i);
-      break;
-    }
-    out += html.slice(i, lt);
-    if (html.startsWith("<?", lt)) {
-      const end = html.indexOf("?>", lt + 2);
-      i = end < 0 ? html.length : end + 2;
-      continue;
-    }
-    if (/^<!doctype/i.test(html.slice(lt, lt + 9))) {
-      // Scan past a [...] internal subset so a ">" inside it does not end early.
-      let j = lt + 9;
-      let depth = 0;
-      while (j < html.length) {
-        const c = html[j] as string;
-        if (c === "[") depth++;
-        else if (c === "]") depth = Math.max(0, depth - 1);
-        else if (c === ">" && depth === 0) {
-          j++;
-          break;
-        }
-        j++;
-      }
-      i = j;
-      continue;
-    }
-    out += "<";
-    i = lt + 1;
-  }
-  return out;
+/** A URL outside an image source: only empty or a fragment. */
+function safeLinkUrl(u: string): boolean {
+  const t = u.trim();
+  return t === "" || t.startsWith("#");
 }
 
 /**
  * srcset holds "url descriptor" candidates separated by commas, and a data:
  * URL may itself contain commas, so the value is scanned candidate by
- * candidate: every URL must be a fragment or data: URL, otherwise the whole
+ * candidate: every URL must be a fragment or data: image, otherwise the whole
  * attribute is dropped (fail closed — a second candidate after a data: one
  * must not slip a file: URL past a check of the first token only).
  */
@@ -607,92 +579,349 @@ export function safeSrcset(value: string): boolean {
   return true;
 }
 
-const CSS_COMMENT = /\/\*[\s\S]*?\*\//g;
-const CSS_URL = /url\(\s*(?:"([^"]*)"|'([^']*)'|([^)]*))\)/gi;
-const CSS_IMPORT = /@import\s+(?:url\(\s*)?(?:"([^"]*)"|'([^']*)'|([^\s;)]+))[^;]*;?/gi;
-// image-set() and -webkit-image-set() also take quoted strings as URLs, not only url().
-const CSS_IMAGE_SET = /(-webkit-)?image-set\(([^)]*)\)/gi;
-const CSS_QUOTED = /"([^"]*)"|'([^']*)'/g;
+// ---------------------------------------------------------------------------
+// CSS
+// ---------------------------------------------------------------------------
 
-/** Keep only fragment/data: URLs in url()/@import/image-set(); comments are stripped first. */
-function sanitizeCssUrls(css: string): string {
-  let out = css.replace(CSS_COMMENT, " ");
-  out = out.replace(CSS_URL, (m, dq?: string, sq?: string, bare?: string) => {
-    const raw = (dq ?? sq ?? bare ?? "").trim();
-    return safeHtmlUrl(raw) ? m : "url(#)";
-  });
-  out = out.replace(CSS_IMPORT, (m, dq?: string, sq?: string, bare?: string) => {
-    const raw = (dq ?? sq ?? bare ?? "").trim();
-    return safeHtmlUrl(raw) ? m : "";
-  });
-  out = out.replace(CSS_IMAGE_SET, (m, _prefix: string, inner: string) => {
-    for (const q of inner.matchAll(CSS_QUOTED)) {
-      if (!safeHtmlUrl((q[1] ?? q[2] ?? "").trim())) return "url(#)";
+/** CSS functions that load a URL from a url() or a plain string argument. */
+const CSS_LOADING_FN = /(?:-webkit-)?(?:url|image-set|image|cross-fade|src)\(/gi;
+
+/** Index just past the CSS string starting at `i` (strings end at their quote or a newline). */
+function cssStringEnd(s: string, i: number): number {
+  const q = s[i];
+  let j = i + 1;
+  while (j < s.length && s[j] !== q && s[j] !== "\n") j++;
+  return Math.min(j + 1, s.length);
+}
+
+/** Index of the ")" closing a call whose arguments start at `i`, quote- and nesting-aware; end of input if none. */
+function cssCallEnd(s: string, i: number): number {
+  let depth = 1;
+  let j = i;
+  while (j < s.length) {
+    const c = s[j];
+    if (c === '"' || c === "'") {
+      j = cssStringEnd(s, j);
+      continue;
     }
-    return m;
-  });
-  return out;
+    if (c === "(") depth++;
+    else if (c === ")" && --depth === 0) return j;
+    j++;
+  }
+  return s.length;
+}
+
+/** Is the argument of url(...) a fragment or a raster data: image? */
+function safeCssUrlArg(arg: string): boolean {
+  const t = arg.trim();
+  const q = t[0];
+  if (q === '"' || q === "'") {
+    const end = cssStringEnd(t, 0);
+    if (t[end - 1] !== q || t.slice(end).trim() !== "") return false;
+    return safeHtmlUrl(t.slice(1, end - 1));
+  }
+  return !/[\s"'()]/.test(t) && safeHtmlUrl(t);
 }
 
 /**
- * Neutralise every remote or local-file reference in an HTML document:
- * URL attributes that are not a fragment or data: become "#" (srcset per
- * candidate, and dropped when any candidate is not), srcdoc is dropped
- * (its inline markup decodes entities when parsed, which this scan cannot
- * vouch for), DOCTYPE/processing instructions are removed, a <base> tag
- * (which would make relative URLs remote) and meta refresh are dropped,
- * and url()/@import/image-set in CSS only keep data: URLs.
+ * Rewrite every URL-loading CSS function: url() keeps only a fragment or a
+ * raster data: image; image-set(), image(), cross-fade() and src() take
+ * plain strings as URLs too, so the whole call becomes url(#) when any
+ * string or nested url() in it is unsafe. Arguments are scanned with quotes
+ * and nesting in mind, so an inner ")" (url(#a)) cannot end the scan early.
+ */
+function sanitizeCssFunctions(css: string): string {
+  let out = "";
+  let i = 0;
+  CSS_LOADING_FN.lastIndex = 0;
+  for (let m = CSS_LOADING_FN.exec(css); m !== null; m = CSS_LOADING_FN.exec(css)) {
+    if (m.index < i) continue;
+    const argStart = m.index + m[0].length;
+    const close = cssCallEnd(css, argStart);
+    const args = css.slice(argStart, close);
+    const isUrl = /^(?:-webkit-)?url\($/i.test(m[0]);
+    let safe: boolean;
+    if (isUrl) safe = safeCssUrlArg(args);
+    else {
+      safe = sanitizeCssFunctions(args) === args;
+      for (let j = 0; safe && j < args.length; j++) {
+        if (args[j] === '"' || args[j] === "'") {
+          const end = cssStringEnd(args, j);
+          if (!safeHtmlUrl(args.slice(j + 1, end - 1))) safe = false;
+          j = end - 1;
+        }
+      }
+    }
+    out += css.slice(i, m.index) + (safe ? css.slice(m.index, close + 1) : "url(#)");
+    i = close + 1;
+    CSS_LOADING_FN.lastIndex = i;
+  }
+  return out + css.slice(i);
+}
+
+/** Keep only fragment/data: image URLs in CSS; comments are stripped first, @import removed. */
+function sanitizeCssUrls(css: string): string {
+  let out = css.replace(/\/\*[\s\S]*?\*\//g, " ");
+  // An unterminated comment runs to the end.
+  const open = out.indexOf("/*");
+  if (open >= 0) out = out.slice(0, open);
+  out = sanitizeCssFunctions(out);
+  // @import loads another stylesheet: never needed for a conversion.
+  out = out.replace(/@import\b[^;]*;?/gi, "");
+  return out.replace(/@import/gi, "@x-import");
+}
+
+// ---------------------------------------------------------------------------
+// HTML: a small tokenizer that re-serialises the document canonically, so
+// quoting tricks cannot desynchronise this scan from the converter's parser
+// ---------------------------------------------------------------------------
+
+// URL attributes (matched on the local name: xlink:href is "href").
+// srcset/imagesrcset are handled separately: they hold several candidates.
+const URL_ATTRS = new Set([
+  "src",
+  "href",
+  "data",
+  "action",
+  "formaction",
+  "poster",
+  "background",
+  "lowsrc",
+  "dynsrc",
+  "longdesc",
+  "codebase",
+  "archive",
+  "classid",
+  "usemap",
+  "cite",
+  "ping",
+  "manifest",
+  "code",
+  "profile",
+  "icon",
+  "base",
+]);
+/** Attributes that load an image wherever they appear. */
+const IMAGE_ATTRS = new Set(["poster", "background", "lowsrc", "dynsrc"]);
+/** Elements whose src / href is an image. */
+const IMAGE_ELEMENTS = new Set(["img", "image", "input", "feimage"]);
+
+const isHtmlSpace = (c: string | undefined) =>
+  c === " " || c === "\t" || c === "\n" || c === "\r" || c === "\f";
+
+interface HtmlTag {
+  name: string;
+  attrs: Array<[string, string]>;
+  selfClosing: boolean;
+  /** Index just past the tag, or -1 when the input ends inside it. */
+  end: number;
+}
+
+/** Read a tag starting at index i (just past "<" or "</"), as the HTML spec tokenizes attributes. */
+function readHtmlTag(s: string, i: number): HtmlTag {
+  const n = s.length;
+  let j = i;
+  while (j < n && !isHtmlSpace(s[j]) && s[j] !== "/" && s[j] !== ">") j++;
+  const name = s.slice(i, j);
+  const attrs: Array<[string, string]> = [];
+  let selfClosing = false;
+  while (j < n) {
+    const c = s[j];
+    if (isHtmlSpace(c)) {
+      j++;
+      continue;
+    }
+    if (c === ">") return { name, attrs, selfClosing, end: j + 1 };
+    if (c === "/") {
+      j++;
+      selfClosing = s[j] === ">";
+      continue;
+    }
+    selfClosing = false;
+    const ns = j;
+    j++; // a leading "=" belongs to the name
+    while (j < n && !isHtmlSpace(s[j]) && s[j] !== "/" && s[j] !== ">" && s[j] !== "=") j++;
+    const attr = s.slice(ns, j);
+    while (j < n && isHtmlSpace(s[j])) j++;
+    let value = "";
+    if (s[j] === "=") {
+      j++;
+      while (j < n && isHtmlSpace(s[j])) j++;
+      const q = s[j];
+      if (q === '"' || q === "'") {
+        const e = s.indexOf(q, j + 1);
+        if (e < 0) return { name, attrs, selfClosing, end: -1 };
+        value = s.slice(j + 1, e);
+        j = e + 1;
+      } else {
+        const vs = j;
+        while (j < n && !isHtmlSpace(s[j]) && s[j] !== ">") j++;
+        value = s.slice(vs, j);
+      }
+    }
+    attrs.push([attr, value]);
+  }
+  return { name, attrs, selfClosing, end: -1 };
+}
+
+/** Index just past a `<!DOCTYPE ...>`, skipping a [...] internal subset. */
+function doctypeEnd(s: string, i: number): number {
+  let depth = 0;
+  for (let j = i; j < s.length; j++) {
+    const c = s[j];
+    if (c === "[") depth++;
+    else if (c === "]") depth = Math.max(0, depth - 1);
+    else if (c === ">" && depth === 0) return j + 1;
+  }
+  return s.length;
+}
+
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  colon: ":",
+  sol: "/",
+  bsol: "\\",
+  period: ".",
+  tab: "\t",
+  newline: "\n",
+  nbsp: "\u00a0",
+  lpar: "(",
+  rpar: ")",
+  num: "#",
+};
+
+/**
+ * Decode character references in an attribute value, as the parser would.
+ * Values are checked decoded and written back with every "&" escaped, so a
+ * reference this does not know stays literal text instead of decoding later.
+ */
+function decodeHtmlEntities(v: string): string {
+  return v.replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z][a-z0-9]*);?/gi, (m, ref: string) => {
+    if (ref[0] === "#") {
+      const cp =
+        ref[1] === "x" || ref[1] === "X" ? Number.parseInt(ref.slice(2), 16) : Number(ref.slice(1));
+      return cp > 0 && cp <= 0x10ffff && !(cp >= 0xd800 && cp <= 0xdfff)
+        ? String.fromCodePoint(cp)
+        : "\ufffd";
+    }
+    return NAMED_ENTITIES[ref.toLowerCase()] ?? m;
+  });
+}
+
+const escAttr = (v: string) => v.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+
+/** The sanitised form of one attribute, or null to drop it. */
+function sanitizeAttr(tag: string, name: string, raw: string): string | null {
+  const value = decodeHtmlEntities(raw);
+  const local = name.slice(name.lastIndexOf(":") + 1);
+  if (local === "srcdoc") return null;
+  if (local === "srcset" || local === "imagesrcset") return safeSrcset(value) ? value : null;
+  if (local === "style") {
+    // A CSS escape or a character reference can spell "url(" in ways a
+    // second parser may read differently: drop the whole declaration list.
+    return /[\\&]/.test(raw) || value.includes("\\") ? "" : sanitizeCssUrls(value);
+  }
+  const isUrl = URL_ATTRS.has(local) || (tag === "param" && local === "value");
+  if (isUrl) {
+    const image =
+      IMAGE_ATTRS.has(local) || (IMAGE_ELEMENTS.has(tag) && (local === "src" || local === "href"));
+    return (image ? safeHtmlUrl(value) : safeLinkUrl(value)) ? value : "#";
+  }
+  // Other attributes (fill="url(...)" in SVG and similar): CSS URLs only.
+  return value.includes("\\") ? "" : sanitizeCssUrls(value);
+}
+
+/** Escape text for output; CSS URLs in it are neutralised too (fail closed). */
+const textOut = (t: string) => sanitizeCssUrls(t.replace(/</g, "&lt;"));
+
+/**
+ * Neutralise every remote or local-file reference in an HTML document. The
+ * markup is tokenized and written back canonically (lowercase names,
+ * double-quoted values, text "<" escaped), so what LibreOffice parses is
+ * exactly what was checked:
+ *   - URL attributes become "#" unless they are a fragment, or a raster
+ *     data: image in an image source (img/input src, poster, srcset, ...);
+ *     srcset is checked per candidate and dropped when any is unsafe;
+ *   - srcdoc, <script>, <base>, every <meta http-equiv> (refresh and
+ *     friends) and <meta charset> are dropped (a UTF-8 charset is written
+ *     instead), as are comments, DOCTYPEs and processing instructions;
+ *   - CSS in <style>, style="" and other attributes only keeps fragment or
+ *     data: image URLs, and @import is removed; CSS carrying an escape, an
+ *     entity or markup is dropped whole.
  * Best-effort on untrusted markup, on top of the profile's dead proxy.
  */
 export function sanitizeHtmlRefs(html: string): string {
-  // 1. XML/XHTML declarations first: a DOCTYPE's external subset and
-  //    <?xml-stylesheet?> can name file:// resources.
-  let out = stripDoctypeAndPi(html);
-  // 2. <style> blocks and style="" attributes. A value carrying a backslash
-  //    or (in an attribute) an HTML entity can spell "url(" invisibly to the
-  //    scans below — CSS escapes and entities decode only when parsed — so
-  //    the whole CSS is dropped in that case. Fail closed.
-  out = out.replace(
-    /(<style\b[^>]*>)([\s\S]*?)(<\/style\s*>)/gi,
-    (m, open: string, css: string, close: string) =>
-      css.includes("\\") ? `${open}${close}` : `${open}${sanitizeCssUrls(css)}${close}`,
-  );
-  out = out.replace(
-    /\bstyle\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi,
-    (m, dq?: string, sq?: string, bare?: string) => {
-      const q = dq !== undefined ? '"' : sq !== undefined ? "'" : "";
-      const v = dq ?? sq ?? bare ?? "";
-      if (v.includes("\\") || v.includes("&")) return `style=${q}${q}`;
-      return `style=${q}${sanitizeCssUrls(v)}${q}`;
-    },
-  );
-  // 3. srcdoc: an inline document whose markup this attribute scan cannot
-  //    parse reliably — always drop the attribute.
-  out = out.replace(/\s+srcdoc(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?/gi, "");
-  // 4. URL attributes; srcset candidate by candidate.
-  out = out.replace(ATTR_SRCSET, (m, dq?: string, sq?: string, bare?: string) =>
-    safeSrcset(dq ?? sq ?? bare ?? "") ? m : "",
-  );
-  out = out.replace(ATTR_URL, (m, attr: string, dq?: string, sq?: string, bare?: string) => {
-    const raw = (dq ?? sq ?? bare ?? "").trim();
-    if (safeHtmlUrl(raw)) return m;
-    const q = dq !== undefined ? '"' : sq !== undefined ? "'" : "";
-    return `${attr}=${q}#${q}`;
-  });
-  // 5. A <base> tag redirects every relative URL: remove it entirely.
-  out = out.replace(/<base\b[^>]*>/gi, "");
-  // <meta http-equiv="refresh" content="0;url=..."> navigates on load.
-  out = out.replace(/<meta\b[^>]*http-equiv\s*=\s*["']?refresh["']?[^>]*>/gi, "");
-  // 6. url()/@import anywhere else (outside style contexts comments are not
-  //    stripped, so this pass stays best-effort there).
-  out = out.replace(CSS_URL, (m, dq?: string, sq?: string, bare?: string) => {
-    const raw = (dq ?? sq ?? bare ?? "").trim();
-    return safeHtmlUrl(raw) ? m : "url(#)";
-  });
-  out = out.replace(CSS_IMPORT, (m, dq?: string, sq?: string, bare?: string) => {
-    const raw = (dq ?? sq ?? bare ?? "").trim();
-    return safeHtmlUrl(raw) ? m : "";
-  });
+  const s = html.replace(/\0/g, "");
+  const n = s.length;
+  let out = '<meta charset="utf-8">';
+  let i = 0;
+  while (i < n) {
+    const lt = s.indexOf("<", i);
+    if (lt < 0) {
+      out += textOut(s.slice(i));
+      break;
+    }
+    out += textOut(s.slice(i, lt));
+    const next = s[lt + 1] ?? "";
+    if (s.startsWith("<!--", lt)) {
+      const e = s.indexOf("-->", lt + 4);
+      i = e < 0 ? n : e + 3;
+      continue;
+    }
+    if (s.slice(lt, lt + 9).toLowerCase() === "<!doctype") {
+      i = doctypeEnd(s, lt + 9);
+      continue;
+    }
+    if (next === "!" || next === "?" || (next === "/" && !/[A-Za-z]/.test(s[lt + 2] ?? ""))) {
+      // Declarations, processing instructions, bogus comments: dropped.
+      const e = next === "?" ? s.indexOf("?>", lt) : -1;
+      const g = s.indexOf(">", lt);
+      i = e >= 0 ? e + 2 : g < 0 ? n : g + 1;
+      continue;
+    }
+    if (!/[A-Za-z]/.test(next) && next !== "/") {
+      out += "&lt;";
+      i = lt + 1;
+      continue;
+    }
+    const closing = next === "/";
+    const tag = readHtmlTag(s, lt + (closing ? 2 : 1));
+    if (tag.end < 0) break; // the input ends inside a tag: drop it
+    i = tag.end;
+    const name = tag.name.toLowerCase();
+    if (!/^[a-z][a-z0-9:-]*$/.test(name)) continue;
+    if (closing) {
+      out += `</${name}>`;
+      continue;
+    }
+    if (name === "script") {
+      const e = s.toLowerCase().indexOf("</script", i);
+      const end = e < 0 ? -1 : readHtmlTag(s, e + 2).end;
+      i = end < 0 ? n : end;
+      continue;
+    }
+    if (name === "base") continue;
+    if (name === "meta" && tag.attrs.some(([a]) => /^(?:http-equiv|charset)$/i.test(a))) continue;
+    let attrs = "";
+    for (const [rawName, value] of tag.attrs) {
+      const attr = rawName.toLowerCase();
+      if (!/^[a-z0-9_:.-]+$/.test(attr)) continue;
+      const v = sanitizeAttr(name, attr, value);
+      if (v !== null) attrs += ` ${attr}="${escAttr(v)}"`;
+    }
+    out += `<${name}${attrs}${tag.selfClosing ? " /" : ""}>`;
+    if (name === "style" && !tag.selfClosing) {
+      // Raw text up to </style>: kept only when it is plain CSS.
+      const e = s.toLowerCase().indexOf("</style", i);
+      const css = s.slice(i, e < 0 ? n : e);
+      if (!/[\\<&]/.test(css)) out += sanitizeCssUrls(css);
+      i = e < 0 ? n : e;
+    }
+  }
   return out;
 }
 

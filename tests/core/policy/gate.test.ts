@@ -774,7 +774,9 @@ describe("spend policy gate", () => {
       expect(gate.decideInChat(id, true, "default", undefined)).toBe(false);
       expect(gate.decideInChat(id, true, "default", "made-up")).toBe(false);
       const token = gate.chatFormShown(id);
-      expect(gate.decideInChat(id, true, "default", `${token.slice(0, -1)}x`)).toBe(false);
+      // Change the last character (to one it is not, or the test fails 1 run in 64).
+      const wrong = `${token.slice(0, -1)}${token.endsWith("x") ? "y" : "x"}`;
+      expect(gate.decideInChat(id, true, "default", wrong)).toBe(false);
       // A form shown for another request does not answer this one.
       const other = gate.chatFormShown("apr_other");
       expect(gate.decideInChat(id, true, "default", other)).toBe(false);
@@ -1001,6 +1003,167 @@ describe("spend policy gate", () => {
       const out = await registry.call("outer", {});
       expect(out).toMatchObject({ ok: true, result: { inner: true } });
       expect(ran).toEqual(["outer", "inner"]);
+    });
+
+    // R5: paid calls made from inside other tools.
+    const codeTool = (
+      name: string,
+      packId: string,
+      body: () => Promise<unknown>,
+      tags: string[] = [],
+    ): RegisteredTool =>
+      ({
+        name,
+        packId,
+        origin: "native",
+        description: "",
+        inputSchema: {},
+        tags,
+        input: z.object({ n: z.number().optional() }),
+        run: body,
+      }) as unknown as RegisteredTool;
+    const paidIn = (name: string, packId: string, gateOpen: Promise<void>, ran: string[]) => ({
+      ...paidTool(name, gateOpen, ran),
+      packId,
+    });
+    const tick = () => new Promise((r) => setTimeout(r, 30));
+    const codes = (out: { ok: boolean; error?: { code: string } }[]) =>
+      out.map((o) => (o.ok ? "ok" : o.error?.code));
+
+    it("R5: a paid call inside an untagged code tool takes its own turn under the cap", async () => {
+      policy({ caps: [{ scope: "global", period: "daily", limit_usd: 1, mode: "block" }] });
+      const ran: string[] = [];
+      let open!: () => void;
+      const gateOpen = new Promise<void>((r) => {
+        open = r;
+      });
+      const registry = new ToolRegistry({ gate, usage: ledger });
+      registry.registerPack("p", [
+        paidTool("fal_run", gateOpen, ran),
+        codeTool("script_like", "p", async () => {
+          const env = await registry.call("fal_run", {});
+          return { inner: env.ok ? "ok" : env.error.code };
+        }),
+      ]);
+      const all = Promise.all([1, 2].map((n) => registry.call("script_like", { n })));
+      await tick();
+      expect(ran).toEqual(["fal_run"]);
+      open();
+      const out = await all;
+      expect(out.map((o) => (o.ok ? (o.result as { inner: string }).inner : "x"))).toEqual([
+        "ok",
+        "SPEND_BLOCKED",
+      ]);
+    });
+
+    it("R5: a paid call of another provider inside a paid tool still waits for that provider's cap", async () => {
+      policy({
+        caps: [
+          { scope: "provider", id: "a", period: "daily", limit_usd: 50, mode: "block" },
+          { scope: "provider", id: "b", period: "daily", limit_usd: 1, mode: "block" },
+        ],
+      });
+      const ran: string[] = [];
+      let open!: () => void;
+      const gateOpen = new Promise<void>((r) => {
+        open = r;
+      });
+      const registry = new ToolRegistry({ gate, usage: ledger });
+      registry.registerPack("a", [
+        codeTool(
+          "a_run",
+          "a",
+          async () => {
+            const env = await registry.call("b_run", { n: 9 });
+            return { inner: env.ok ? "ok" : env.error.code };
+          },
+          ["paid"],
+        ),
+      ]);
+      registry.registerPack("b", [paidIn("b_run", "b", gateOpen, ran)]);
+      const direct = registry.call("b_run", { n: 1 });
+      await tick();
+      const outer = registry.call("a_run", {});
+      await tick();
+      // The nested b_run waits for the direct one: b's cap has room for one.
+      expect(ran).toEqual(["b_run"]);
+      open();
+      expect((await direct).ok).toBe(true);
+      expect(await outer).toMatchObject({ ok: true, result: { inner: "SPEND_BLOCKED" } });
+      expect(ran).toEqual(["b_run"]);
+    });
+
+    it("R5: paid calls a paid tool runs side by side take turns under the cap", async () => {
+      policy({ caps: [{ scope: "global", period: "daily", limit_usd: 1, mode: "block" }] });
+      const ran: string[] = [];
+      let open!: () => void;
+      const gateOpen = new Promise<void>((r) => {
+        open = r;
+      });
+      const registry = new ToolRegistry({ gate, usage: ledger });
+      registry.registerPack("p", [
+        paidTool("fal_run", gateOpen, ran),
+        codeTool(
+          "fan_out",
+          "p",
+          async () => {
+            const out = await Promise.all([1, 2].map((n) => registry.call("fal_run", { n })));
+            return { inner: codes(out) };
+          },
+          ["paid"],
+        ),
+      ]);
+      const outer = registry.call("fan_out", {});
+      await tick();
+      expect(ran).toEqual(["fal_run"]);
+      open();
+      expect(await outer).toMatchObject({ ok: true, result: { inner: ["ok", "SPEND_BLOCKED"] } });
+    });
+
+    it("R5: two paid tools that each call the other's provider do not wait for each other forever", async () => {
+      policy({
+        caps: [
+          { scope: "provider", id: "a", period: "daily", limit_usd: 50, mode: "block" },
+          { scope: "provider", id: "b", period: "daily", limit_usd: 50, mode: "block" },
+        ],
+      });
+      let release!: () => void;
+      const bothIn = new Promise<void>((r) => {
+        release = r;
+      });
+      let entered = 0;
+      const registry = new ToolRegistry({ gate, usage: ledger });
+      const crossing = (name: string, pack: string, other: string) =>
+        codeTool(
+          name,
+          pack,
+          async () => {
+            entered += 1;
+            if (entered === 2) release();
+            await bothIn;
+            const env = await registry.call(other, {});
+            return { inner: env.ok ? "ok" : env.error.code };
+          },
+          ["paid"],
+        );
+      registry.registerPack("a", [
+        crossing("a_outer", "a", "b_inner"),
+        paidIn("a_inner", "a", Promise.resolve(), []),
+      ]);
+      registry.registerPack("b", [
+        crossing("b_outer", "b", "a_inner"),
+        paidIn("b_inner", "b", Promise.resolve(), []),
+      ]);
+      const out = await Promise.race([
+        Promise.all([registry.call("a_outer", {}), registry.call("b_outer", {})]),
+        new Promise<"hung">((r) => setTimeout(() => r("hung"), 5_000)),
+      ]);
+      expect(out).not.toBe("hung");
+      const inner = (out as { ok: boolean; result?: { inner: string } }[]).map(
+        (o) => o.result?.inner,
+      );
+      // One nested call runs; the one that would close the loop is refused.
+      expect(inner.sort()).toEqual(["SPEND_BLOCKED", "ok"]);
     });
 
     it("a call waiting for its turn stops when it is cancelled", async () => {

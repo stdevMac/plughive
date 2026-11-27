@@ -128,6 +128,55 @@ function estimateFitsApproval(requested: number | null, approved: number | null)
   return requested !== null && requested <= approved;
 }
 
+/**
+ * One paid call's hold on cap locks. A paid call made from inside it (through
+ * any code tool) is its child: it queues for each cap key behind the nearest
+ * ancestor that holds that key (siblings take turns there) or, for a key no
+ * ancestor holds, in the daemon-wide queue like any other call.
+ */
+interface CapHolder {
+  parent: CapHolder | null;
+  keys: Set<string>;
+  children: Set<CapHolder>;
+  /** Queues for this call's keys, used by the paid calls it makes. */
+  inner: Map<string, CapTurn[]>;
+  /** The queue this call is waiting in, if any. */
+  waiting: { queue: CapTurn[]; turn: CapTurn } | null;
+  done: boolean;
+}
+
+interface CapTurn {
+  holder: CapHolder;
+  go: () => void;
+}
+
+/** The calls ahead of `h` in the queue it waits in. */
+function aheadOf(h: CapHolder): CapHolder[] {
+  if (!h.waiting) return [];
+  const { queue, turn } = h.waiting;
+  return queue.slice(0, Math.max(0, queue.indexOf(turn))).map((t) => t.holder);
+}
+
+/**
+ * Whether `me` waiting where it now waits would never end: a call it waits
+ * for (directly, or through what that call and the calls it made wait for)
+ * is `me` itself or a call `me` runs inside.
+ */
+function closesWaitLoop(me: CapHolder): boolean {
+  const stuck = new Set<CapHolder>();
+  for (let h: CapHolder | null = me; h; h = h.parent) stuck.add(h);
+  const seen = new Set<CapHolder>();
+  const todo = aheadOf(me);
+  for (let h = todo.pop(); h; h = todo.pop()) {
+    if (h.done || seen.has(h)) continue;
+    if (stuck.has(h)) return true;
+    seen.add(h);
+    // `h` lets go only once it stops waiting and its own paid calls are done.
+    todo.push(...aheadOf(h), ...h.children);
+  }
+  return false;
+}
+
 class Reservation implements SpendReservation {
   private readonly amounts = new Map<string, number>();
 
@@ -168,10 +217,10 @@ export class PolicyGate {
   private readonly chatForms = new Map<string, string>();
   /** Profile -> start times of its recent sending calls (max_sends_per_hour). */
   private readonly sendTimes = new Map<string, number[]>();
-  /** Cap scope key -> the tail of the queue of paid calls waiting under it. */
-  private readonly capLocks = new Map<string, Promise<void>>();
-  /** Set inside a paid call that holds cap locks: nested paid calls do not lock again. */
-  private readonly holdsCapLocks = new AsyncLocalStorage<boolean>();
+  /** Cap scope key -> the paid calls holding or waiting for it, in order (top-level calls). */
+  private readonly capQueues = new Map<string, CapTurn[]>();
+  /** The paid call holding cap locks that the current code runs inside. */
+  private readonly capHolder = new AsyncLocalStorage<CapHolder>();
 
   constructor(private readonly opts: PolicyGateOptions) {
     this.cache = new PolicyCache(opts.home);
@@ -309,43 +358,89 @@ export class PolicyGate {
    * A paid tool's cost is unknown until it ran and was recorded, so two of
    * them checked at the same time could both pass a cap that has room for
    * one. Paid calls under the same cap therefore run one at a time, from the
-   * cap check to the moment their cost is in the ledger. Resolves with a
-   * release function, or null when this call is already inside a locked one.
+   * cap check to the moment their cost is in the ledger. A paid call made
+   * from inside another one takes its turn too: behind the other paid calls
+   * of the same outer call for keys the outer call holds, and in the shared
+   * queue for keys it does not hold. A nested call whose wait could never end
+   * (it waits for a call that waits for its own outer call) is refused.
+   * Resolves with the hold, or null when no cap applies.
    */
   private async lockCaps(
     keys: readonly string[],
     signal: AbortSignal | undefined,
-  ): Promise<(() => void) | null> {
-    if (keys.length === 0 || this.holdsCapLocks.getStore() === true) return null;
-    const releases: (() => void)[] = [];
-    const releaseAll = () => {
-      for (const r of releases.splice(0)) r();
+    tool: string,
+  ): Promise<{ holder: CapHolder; release: () => void } | null> {
+    if (keys.length === 0) return null;
+    const parent = this.capHolder.getStore() ?? null;
+    const me: CapHolder = {
+      parent,
+      keys: new Set(),
+      children: new Set(),
+      inner: new Map(),
+      waiting: null,
+      done: false,
+    };
+    parent?.children.add(me);
+    const taken: { queues: Map<string, CapTurn[]>; key: string; turn: CapTurn }[] = [];
+    const release = () => {
+      if (me.done) return;
+      me.done = true;
+      parent?.children.delete(me);
+      for (const { queues, key, turn } of taken.splice(0)) {
+        // After the current microtasks: the registry writes this call's
+        // cost to the ledger right after the gate returns, and the next
+        // call must see it.
+        setImmediate(() => {
+          const queue = queues.get(key);
+          if (!queue) return;
+          const at = queue.indexOf(turn);
+          if (at < 0) return;
+          queue.splice(at, 1);
+          if (queue.length === 0) queues.delete(key);
+          else if (at === 0) queue[0]?.go();
+        });
+      }
     };
     try {
       for (const key of [...new Set(keys)].sort()) {
-        const prev = this.capLocks.get(key) ?? Promise.resolve();
-        let open!: () => void;
-        const mine = new Promise<void>((resolve) => {
-          open = resolve;
+        let owner = parent;
+        // A finished outer call holds nothing any more: a call it left
+        // running queues with everyone else.
+        while (owner && (owner.done || !owner.keys.has(key))) owner = owner.parent;
+        const queues = owner ? owner.inner : this.capQueues;
+        let queue = queues.get(key);
+        if (!queue) {
+          queue = [];
+          queues.set(key, queue);
+        }
+        let go!: () => void;
+        const myTurn = new Promise<void>((resolve) => {
+          go = resolve;
         });
-        const tail = prev.then(() => mine);
-        this.capLocks.set(key, tail);
-        releases.push(() => {
-          // After the current microtasks: the registry writes this call's
-          // cost to the ledger right after the gate returns, and the next
-          // call must see it.
-          setImmediate(() => {
-            open();
-            if (this.capLocks.get(key) === tail) this.capLocks.delete(key);
-          });
-        });
-        await waitOrAbort(prev, signal);
+        const turn: CapTurn = { holder: me, go };
+        queue.push(turn);
+        taken.push({ queues, key, turn });
+        if (queue[0] !== turn) {
+          me.waiting = { queue, turn };
+          if (closesWaitLoop(me)) {
+            throw new PolicyError(
+              `${tool} not run: it would wait for a spending cap held by another paid call that is itself waiting for the call ${tool} runs inside. Try again when the other call is done.`,
+              "SPEND_BLOCKED",
+            );
+          }
+          try {
+            await waitOrAbort(myTurn, signal);
+          } finally {
+            me.waiting = null;
+          }
+        }
+        me.keys.add(key);
       }
     } catch (e) {
-      releaseAll();
+      release();
       throw e;
     }
-    return releaseAll;
+    return { holder: me, release };
   }
 
   // -------------------------------------------------------------------------
@@ -584,7 +679,7 @@ export class PolicyGate {
 
     const provider = this.opts.vendorOf?.(tool.name) ?? tool.packId;
     const capKeys = paid ? capsFor(state.policy, { provider, profile }).map(capScopeKey) : [];
-    let unlock = await this.lockCaps(capKeys, signal);
+    let hold = await this.lockCaps(capKeys, signal, tool.name);
     try {
       return await this.runToolChecked(tool, args, signal, {
         run,
@@ -601,16 +696,16 @@ export class PolicyGate {
         // Nobody waits behind a person's decision: the locks are let go while
         // the call asks, and taken again before it runs.
         beforeAsk: () => {
-          unlock?.();
-          unlock = null;
+          hold?.release();
+          hold = null;
         },
         afterAsk: async () => {
-          unlock = await this.lockCaps(capKeys, signal);
+          hold = await this.lockCaps(capKeys, signal, tool.name);
         },
-        locked: <R>(fn: () => Promise<R>) => (unlock ? this.holdsCapLocks.run(true, fn) : fn()),
+        locked: <R>(fn: () => Promise<R>) => (hold ? this.capHolder.run(hold.holder, fn) : fn()),
       });
     } finally {
-      unlock?.();
+      hold?.release();
     }
   }
 

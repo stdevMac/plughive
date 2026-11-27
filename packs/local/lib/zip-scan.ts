@@ -20,7 +20,15 @@
 //     file:// / UNC / out-of-package references. The hardened LibreOffice
 //     profile routes http(s)/ftp through a dead proxy, but file: is not
 //     proxied, so an external DTD or an external relationship pointing at a
-//     local file must never reach the converter.
+//     local file must never reach the converter;
+//   - Word fields that load files or other programs' data (INCLUDEPICTURE,
+//     INCLUDETEXT, INCLUDE, LINK, IMPORT, DDE, DDEAUTO, DATABASE), in
+//     fldSimple or in complex fields whose instruction is split across
+//     runs, are refused in every part, as are HYPERLINK fields to local
+//     files and ODF DDE links;
+//   - a package nested in a part (an embedded .xlsx, a .zip attachment) is
+//     scanned with the same rules and the same limits, up to two levels
+//     deep; deeper, unreadable or OLE-wrapped packages are refused.
 import { constants, closeSync, fstatSync, openSync, readSync } from "node:fs";
 import { basename } from "node:path";
 import { gunzipSync, inflateRawSync, constants as zlibConstants } from "node:zlib";
@@ -104,7 +112,21 @@ const NAMED_ENTITIES: Record<string, string> = {
  * spaces too). Lowercased for the prefix checks.
  */
 export function refValue(raw: string): string {
-  let v = raw.replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z]+);/gi, (m, ref: string) => {
+  let v = decodeEntities(raw);
+  for (let i = 0; i < 8 && /%[0-9a-f]{2}/i.test(v); i++) {
+    v = v.replace(/%([0-9a-f]{2})/gi, (_m, h: string) =>
+      String.fromCharCode(Number.parseInt(h, 16)),
+    );
+  }
+  return v
+    .normalize("NFKC")
+    .replace(/[\p{Cc}\p{Cf}\p{Z}\s]/gu, "")
+    .toLowerCase();
+}
+
+/** XML character and named entity references decoded, as a parser reads them. */
+function decodeEntities(raw: string): string {
+  return raw.replace(/&(#x[0-9a-f]+|#[0-9]+|[a-z]+);/gi, (m, ref: string) => {
     if (ref[0] === "#") {
       const code =
         ref[1] === "x" || ref[1] === "X"
@@ -116,15 +138,6 @@ export function refValue(raw: string): string {
     }
     return NAMED_ENTITIES[ref.toLowerCase()] ?? m;
   });
-  for (let i = 0; i < 8 && /%[0-9a-f]{2}/i.test(v); i++) {
-    v = v.replace(/%([0-9a-f]{2})/gi, (_m, h: string) =>
-      String.fromCharCode(Number.parseInt(h, 16)),
-    );
-  }
-  return v
-    .normalize("NFKC")
-    .replace(/[\p{Cc}\p{Cf}\p{Z}\s]/gu, "")
-    .toLowerCase();
 }
 
 /** Schemes that read local or package-relative resources without the proxy. */
@@ -290,6 +303,136 @@ interface XmlScanContext {
   /** Base names of every entry in the package, lowercased. */
   entryBases: ReadonlySet<string>;
   fail: (what: string) => never;
+  /** Word complex fields still open in this part (fldChar begin seen). */
+  fields?: Array<{ instr: string; inCode: boolean }>;
+}
+
+// ---------------------------------------------------------------------------
+// Word field codes and ODF DDE links
+// ---------------------------------------------------------------------------
+
+/**
+ * Word fields that load a file or another program's data when the document
+ * is opened or its fields are updated. They are refused outright: the
+ * target is a path (or a DDE topic) that the field syntax lets the author
+ * spell in many ways, so a target check would be easy to get wrong.
+ */
+const FETCHING_FIELDS = new Set([
+  "INCLUDEPICTURE",
+  "INCLUDETEXT",
+  "INCLUDE",
+  "LINK",
+  "IMPORT",
+  "DDE",
+  "DDEAUTO",
+  "DATABASE",
+]);
+
+/** ODF elements that hold a DDE link to another program or file. */
+const ODF_DDE = new Set(["dde-connection-decl", "dde-source", "dde-link"]);
+
+/** The arguments of a field instruction: quoted strings and bare words. */
+function fieldArgs(rest: string): string[] {
+  const out: string[] = [];
+  for (const m of rest.matchAll(/"([^"]*)"?|(\S+)/g)) out.push(m[1] ?? m[2] ?? "");
+  return out;
+}
+
+/** Why a Word field instruction ("INCLUDEPICTURE \"x\" \\d") is refused, or null. */
+function fieldProblem(instr: string): string | null {
+  // Format characters (zero-width joiners and the like) are dropped, so they
+  // cannot split the field name; any other space or control separates.
+  const v = instr.normalize("NFKC").replace(/\p{Cf}/gu, "");
+  const m = v.match(/^[\s\p{Z}\p{Cc}]*([\p{L}\p{N}]+)([\s\S]*)$/u);
+  if (!m) return null;
+  const kind = (m[1] as string).toUpperCase();
+  if (FETCHING_FIELDS.has(kind)) {
+    return `a Word ${kind} field, which loads a file or another program's data into the document (INCLUDEPICTURE, INCLUDETEXT, INCLUDE, LINK, IMPORT, DDE, DDEAUTO and DATABASE fields are refused)`;
+  }
+  if (kind === "HYPERLINK") {
+    for (const arg of fieldArgs(m[2] as string)) {
+      const t = refValue(arg);
+      if (
+        t.includes("file:") ||
+        LOCAL_SCHEMES.test(t) ||
+        t.startsWith("\\\\") ||
+        t.startsWith("//") ||
+        /^[a-z]:[\\/]/.test(t)
+      ) {
+        return "a Word HYPERLINK field to a local file or UNC path";
+      }
+    }
+  }
+  return null;
+}
+
+function checkField(ctx: XmlScanContext, instr: string): void {
+  const what = fieldProblem(instr);
+  if (what) ctx.fail(what);
+}
+
+/** fldSimple, fldChar and ODF DDE elements; instrText is read by the tokenizer. */
+function checkFieldTag(ctx: XmlScanContext, local: string, attrs: Array<[string, string]>): void {
+  if (ODF_DDE.has(local)) {
+    ctx.fail("an ODF DDE link (a live link to another program or file), which is refused");
+  }
+  const attr = (n: string) => {
+    for (const [k, v] of attrs) if (k.slice(k.lastIndexOf(":") + 1) === n) return v;
+    return undefined;
+  };
+  if (local === "fldSimple") {
+    checkField(ctx, decodeEntities(attr("instr") ?? ""));
+    return;
+  }
+  if (local !== "fldChar") return;
+  ctx.fields ??= [];
+  const stack = ctx.fields;
+  const type = refValue(attr("fldCharType") ?? "");
+  if (type === "begin") {
+    stack.push({ instr: "", inCode: true });
+  } else if (type === "separate") {
+    const top = stack[stack.length - 1];
+    if (top?.inCode) {
+      top.inCode = false;
+      checkField(ctx, top.instr);
+    }
+  } else if (type === "end") {
+    const top = stack.pop();
+    if (top?.inCode) checkField(ctx, top.instr);
+  }
+}
+
+/** Add instrText to the innermost open field (a split instruction is joined). */
+function addInstrText(ctx: XmlScanContext, text: string): void {
+  const top = ctx.fields?.[ctx.fields.length - 1];
+  if (top) top.instr += text;
+  else checkField(ctx, text);
+}
+
+/**
+ * The character data of an element, read at `start` and running to its
+ * first child or end tag: entities decoded, CDATA sections unwrapped, comments skipped.
+ */
+function readCharData(text: string, start: number): { value: string; next: number } {
+  let value = "";
+  let i = start;
+  const n = text.length;
+  while (i < n) {
+    const lt = text.indexOf("<", i);
+    const stop = lt < 0 ? n : lt;
+    value += decodeEntities(text.slice(i, stop));
+    i = stop;
+    if (lt < 0) break;
+    if (text.startsWith("<![CDATA[", lt)) {
+      const e = text.indexOf("]]>", lt + 9);
+      value += text.slice(lt + 9, e < 0 ? n : e);
+      i = e < 0 ? n : e + 3;
+    } else if (text.startsWith("<!--", lt)) {
+      const e = text.indexOf("-->", lt + 4);
+      i = e < 0 ? n : e + 3;
+    } else break;
+  }
+  return { value, next: i };
 }
 
 function checkAttrs(ctx: XmlScanContext, tag: string, attrs: Array<[string, string]>): void {
@@ -439,8 +582,17 @@ function scanXmlText(ctx: XmlScanContext, text: string): void {
     const tag = text.slice(lt + 1, j);
     const { attrs, end } = readAttrs(text, j, (k) => text[k] === ">");
     checkAttrs(ctx, tag, attrs);
+    const local = tag.slice(tag.lastIndexOf(":") + 1);
+    checkFieldTag(ctx, local, attrs);
     i = end + 1;
+    if ((local === "instrText" || local === "delInstrText") && text[end - 1] !== "/") {
+      const { value, next } = readCharData(text, i);
+      addInstrText(ctx, value);
+      i = next;
+    }
   }
+  // Fields left open at the end of the part are checked as they stand.
+  for (const f of ctx.fields ?? []) checkField(ctx, f.instr);
 }
 
 /** File names whose parts are always scanned as XML. */
@@ -547,255 +699,375 @@ export function scanXmlDocument(path: string): void {
   }
 }
 
+/** Random access to the bytes of a ZIP: the file itself, or an embedded part. */
+interface ZipSource {
+  size: number;
+  read(buf: Buffer, offset: number): void;
+}
+
+function bufferSource(data: Buffer): ZipSource {
+  return {
+    size: data.length,
+    read(buf, offset) {
+      if (offset < 0 || offset + buf.length > data.length) {
+        throw new ZipScanError("the file ends inside a ZIP structure");
+      }
+      data.copy(buf, 0, offset, offset + buf.length);
+    },
+  };
+}
+
+/**
+ * Limits shared by a document and every package nested inside it, so that
+ * nesting cannot multiply the entry, size or scan limits.
+ */
+interface ScanBudget {
+  entries: number;
+  uncompressed: number;
+  scanned: number;
+}
+
+/** How deep packages may nest inside a document (a ZIP in a ZIP in the document). */
+export const MAX_ZIP_NESTING = 2;
+/** The largest embedded part that is read whole to look for a package in it. */
+const MAX_EMBEDDED_PART = 64 * 1024 * 1024;
+
+const CFB_MAGIC = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+const PK_LOCAL = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
+const PK_EOCD = Buffer.from([0x50, 0x4b, 0x05, 0x06]);
+
+/**
+ * Do these bytes hold a ZIP a reader would open: a ZIP signature at the
+ * start, or a plausible end record at the end (a ZIP with data in front)?
+ * `head` is the start of the part; `tail` is its last bytes, starting at
+ * `tailStart` within a part of `size` bytes.
+ */
+function holdsZip(head: Buffer, tail: Buffer, tailStart: number): boolean {
+  if (head[0] === 0x50 && head[1] === 0x4b && [3, 5, 7].includes(head[2] as number)) return true;
+  for (const i of eocdCandidates(tail)) {
+    const cdSize = tail.readUInt32LE(i + 12);
+    const cdOffset = tail.readUInt32LE(i + 16);
+    if (cdOffset + cdSize <= tailStart + i) return true;
+  }
+  return false;
+}
+
 /**
  * Refuse a hostile ZIP-based document before pandoc/soffice open it.
  * Throws ZipScanError with an actionable message; returns quietly when the
  * container is within bounds and its XML parts carry no external references.
+ * Packages embedded in it (an .xlsx inside a .docx, a .zip attachment) are
+ * scanned the same way, up to MAX_ZIP_NESTING deep, within the same limits.
  */
 export function scanZipDocument(path: string): void {
   const label = `refusing to open ${basename(path)}`;
   const fd = openNoFollow(path, label);
+  try {
+    const source: ZipSource = {
+      size: fstatSync(fd).size,
+      read: (buf, offset) => readAt(fd, buf, offset),
+    };
+    scanZipSource(source, label, [], { entries: 0, uncompressed: 0, scanned: 0 });
+  } finally {
+    closeSync(fd);
+  }
+}
+
+function scanZipSource(
+  src: ZipSource,
+  baseLabel: string,
+  nesting: string[],
+  budget: ScanBudget,
+): void {
+  const label =
+    nesting.length === 0
+      ? baseLabel
+      : `${baseLabel} (in the embedded package ${nesting.map((n) => JSON.stringify(n.slice(0, 120))).join(" / ")})`;
   const corrupt = (what: string): never => {
     throw new ZipScanError(`${label}: ${what}`);
   };
-  try {
-    const size = fstatSync(fd).size;
-    if (size < 22) throw new ZipScanError(`${label}: too small to be a ZIP container`);
-    // End-of-central-directory record: in the last 64 KiB (+ its comment),
-    // and its comment must run exactly to the end of the file.
-    const window = Math.min(size, 22 + 65_535);
-    const tail = Buffer.alloc(window);
-    readAt(fd, tail, size - window);
-    const found = eocdCandidates(tail);
-    if (found.length === 0) corrupt("no ZIP end record, not a ZIP container");
-    if (found.length > 1) {
-      corrupt(
-        "the ZIP has more than one end record (one hidden in the archive comment), so readers would disagree on its entries",
-      );
-    }
-    const eocd = found[0] as number;
-    const eocdAbs = size - window + eocd;
-    const diskNo = tail.readUInt16LE(eocd + 4);
-    const cdDisk = tail.readUInt16LE(eocd + 6);
-    const countHere = tail.readUInt16LE(eocd + 8);
-    const count = tail.readUInt16LE(eocd + 10);
-    const cdSize = tail.readUInt32LE(eocd + 12);
-    const cdOffset = tail.readUInt32LE(eocd + 16);
-    if (count === 0xffff || cdSize === 0xffffffff || cdOffset === 0xffffffff) {
-      throw new ZipScanError(
-        `${label}: ZIP64 archives are refused (over 4 GiB or over 65535 entries)`,
-      );
-    }
-    if (diskNo !== 0 || cdDisk !== 0 || countHere !== count) {
-      corrupt("multi-disk (split) ZIP archives are refused");
-    }
-    // The central directory must end exactly where the end record starts:
-    // anything between them (a ZIP64 locator, hidden data) is refused.
-    if (cdOffset + cdSize !== eocdAbs) {
-      corrupt("the ZIP central directory is out of bounds (it does not end at the end record)");
-    }
-    const cd = Buffer.alloc(cdSize);
-    readAt(fd, cd, cdOffset);
-    const entries: Entry[] = [];
-    let p = 0;
-    let totalUncompressed = 0;
-    while (p < cd.length) {
-      if (p + 46 > cd.length || cd.readUInt32LE(p) !== SIG_CENTRAL) {
-        corrupt("the ZIP central directory is corrupt");
-      }
-      if (entries.length >= MAX_ZIP_ENTRIES) {
-        throw new ZipScanError(
-          `${label}: over ${MAX_ZIP_ENTRIES} ZIP entries; use a smaller document`,
-        );
-      }
-      const madeBy = cd.readUInt8(p + 5);
-      const flags = cd.readUInt16LE(p + 8);
-      const method = cd.readUInt16LE(p + 10);
-      const compressed = cd.readUInt32LE(p + 20);
-      const uncompressed = cd.readUInt32LE(p + 24);
-      const nameLen = cd.readUInt16LE(p + 28);
-      const extraLen = cd.readUInt16LE(p + 30);
-      const commentLen = cd.readUInt16LE(p + 32);
-      const externalAttrs = cd.readUInt32LE(p + 38);
-      const localOffset = cd.readUInt32LE(p + 42);
-      if (p + 46 + nameLen + extraLen + commentLen > cd.length) {
-        corrupt("the ZIP central directory is corrupt (an entry runs past its end)");
-      }
-      if (compressed === 0xffffffff || uncompressed === 0xffffffff || localOffset === 0xffffffff) {
-        throw new ZipScanError(`${label}: ZIP64 entries are refused`);
-      }
-      const name = cd.toString("utf8", p + 46, p + 46 + nameLen);
-      p += 46 + nameLen + extraLen + commentLen;
-      const shown = JSON.stringify(name.slice(0, 120));
-      const nameProblem = entryNameProblem(name);
-      if (nameProblem) {
-        throw new ZipScanError(
-          `${label}: the ZIP entry ${shown} ${nameProblem} (zip slip refused)`,
-        );
-      }
-      // Made on Unix (3) or macOS (19) with S_IFLNK in the mode bits.
-      if ((madeBy === 3 || madeBy === 19) && ((externalAttrs >>> 16) & 0o170000) === 0o120000) {
-        throw new ZipScanError(`${label}: the ZIP entry ${shown} is a symlink, which is refused`);
-      }
-      if (flags & 0x0001) {
-        throw new ZipScanError(
-          `${label}: the ZIP entry ${shown} is encrypted and cannot be checked`,
-        );
-      }
-      if (method !== 0 && method !== 8) {
-        throw new ZipScanError(
-          `${label}: the ZIP entry ${shown} uses compression method ${method}, only stored/deflate are allowed`,
-        );
-      }
-      if (compressed === 0 && uncompressed > 0) {
-        throw new ZipScanError(
-          `${label}: the ZIP entry ${shown} declares ${uncompressed} bytes from no data (a zip bomb header)`,
-        );
-      }
-      if (method === 0 && compressed !== uncompressed) {
-        corrupt(`the stored ZIP entry ${shown} declares different stored and real sizes`);
-      }
-      if (compressed > 0 && uncompressed / compressed > MAX_ZIP_ENTRY_RATIO) {
-        throw new ZipScanError(
-          `${label}: the ZIP entry ${shown} expands ${Math.round(uncompressed / compressed)}:1 (over the ${MAX_ZIP_ENTRY_RATIO}:1 limit) — a zip bomb; use a smaller document`,
-        );
-      }
-      totalUncompressed += uncompressed;
-      if (totalUncompressed > MAX_ZIP_TOTAL_UNCOMPRESSED) {
-        throw new ZipScanError(
-          `${label}: the ZIP entries declare over ${MAX_ZIP_TOTAL_UNCOMPRESSED} bytes uncompressed in total; use a smaller document`,
-        );
-      }
-      entries.push({ name, method, flags, compressed, uncompressed, localOffset });
-    }
-    if (entries.length !== count) {
-      corrupt(
-        `the ZIP end record lists ${count} entries but the central directory has ${entries.length}`,
-      );
-    }
-
-    // Local headers: each must match its central entry, and together they
-    // must tile the file up to the central directory with no gap or overlap,
-    // so a reader walking local headers sees exactly these entries.
-    const local = Buffer.alloc(30);
-    let cursor = 0;
-    for (const e of [...entries].sort((a, b) => a.localOffset - b.localOffset)) {
-      const shown = JSON.stringify(e.name.slice(0, 120));
-      if (e.localOffset !== cursor) {
-        corrupt(
-          `the ZIP has data outside its central directory (before ${shown}), or entries that overlap`,
-        );
-      }
-      if (e.localOffset + 30 > cdOffset) corrupt(`the local header of ${shown} is corrupt`);
-      readAt(fd, local, e.localOffset);
-      const localNameLen = local.readUInt16LE(26);
-      if (
-        local.readUInt32LE(0) !== SIG_LOCAL ||
-        local.readUInt16LE(8) !== e.method ||
-        e.localOffset + 30 + localNameLen > cdOffset
-      ) {
-        corrupt(`the local header of ${shown} is corrupt`);
-      }
-      const localName = Buffer.alloc(localNameLen);
-      readAt(fd, localName, e.localOffset + 30);
-      if (localName.toString("utf8") !== e.name) {
-        corrupt(`the local header of ${shown} names a different file than the central directory`);
-      }
-      e.dataStart = e.localOffset + 30 + localNameLen + local.readUInt16LE(28);
-      cursor = e.dataStart + e.compressed;
-      if (cursor > cdOffset) corrupt(`the data of ${shown} runs into the central directory`);
-      if (e.flags & 0x0008) {
-        // Data descriptor after the data: 12 bytes, or 16 with its signature.
-        const sig = Buffer.alloc(4);
-        if (cursor + 4 <= cdOffset) readAt(fd, sig, cursor);
-        cursor += sig.readUInt32LE(0) === SIG_DESCRIPTOR ? 16 : 12;
-      }
-    }
-    if (cursor !== cdOffset) corrupt("the ZIP has data outside its central directory");
-
-    const entryBases = new Set(
-      entries.map((e) => e.name.slice(e.name.lastIndexOf("/") + 1).toLowerCase()),
+  const size = src.size;
+  if (size < 22) throw new ZipScanError(`${label}: too small to be a ZIP container`);
+  // End-of-central-directory record: in the last 64 KiB (+ its comment),
+  // and its comment must run exactly to the end of the file.
+  const window = Math.min(size, 22 + 65_535);
+  const tail = Buffer.alloc(window);
+  src.read(tail, size - window);
+  const found = eocdCandidates(tail);
+  if (found.length === 0) corrupt("no ZIP end record, not a ZIP container");
+  if (found.length > 1) {
+    corrupt(
+      "the ZIP has more than one end record (one hidden in the archive comment), so readers would disagree on its entries",
     );
-    const inflate = (e: Entry, raw: Buffer, full: boolean): Buffer => {
-      if (e.method === 0) return raw;
+  }
+  const eocd = found[0] as number;
+  const eocdAbs = size - window + eocd;
+  const diskNo = tail.readUInt16LE(eocd + 4);
+  const cdDisk = tail.readUInt16LE(eocd + 6);
+  const countHere = tail.readUInt16LE(eocd + 8);
+  const count = tail.readUInt16LE(eocd + 10);
+  const cdSize = tail.readUInt32LE(eocd + 12);
+  const cdOffset = tail.readUInt32LE(eocd + 16);
+  if (count === 0xffff || cdSize === 0xffffffff || cdOffset === 0xffffffff) {
+    throw new ZipScanError(
+      `${label}: ZIP64 archives are refused (over 4 GiB or over 65535 entries)`,
+    );
+  }
+  if (diskNo !== 0 || cdDisk !== 0 || countHere !== count) {
+    corrupt("multi-disk (split) ZIP archives are refused");
+  }
+  // The central directory must end exactly where the end record starts:
+  // anything between them (a ZIP64 locator, hidden data) is refused.
+  if (cdOffset + cdSize !== eocdAbs) {
+    corrupt("the ZIP central directory is out of bounds (it does not end at the end record)");
+  }
+  const cd = Buffer.alloc(cdSize);
+  src.read(cd, cdOffset);
+  const entries: Entry[] = [];
+  let p = 0;
+  while (p < cd.length) {
+    if (p + 46 > cd.length || cd.readUInt32LE(p) !== SIG_CENTRAL) {
+      corrupt("the ZIP central directory is corrupt");
+    }
+    budget.entries++;
+    if (budget.entries > MAX_ZIP_ENTRIES) {
+      throw new ZipScanError(
+        `${label}: over ${MAX_ZIP_ENTRIES} ZIP entries (counting embedded packages); use a smaller document`,
+      );
+    }
+    const madeBy = cd.readUInt8(p + 5);
+    const flags = cd.readUInt16LE(p + 8);
+    const method = cd.readUInt16LE(p + 10);
+    const compressed = cd.readUInt32LE(p + 20);
+    const uncompressed = cd.readUInt32LE(p + 24);
+    const nameLen = cd.readUInt16LE(p + 28);
+    const extraLen = cd.readUInt16LE(p + 30);
+    const commentLen = cd.readUInt16LE(p + 32);
+    const externalAttrs = cd.readUInt32LE(p + 38);
+    const localOffset = cd.readUInt32LE(p + 42);
+    if (p + 46 + nameLen + extraLen + commentLen > cd.length) {
+      corrupt("the ZIP central directory is corrupt (an entry runs past its end)");
+    }
+    if (compressed === 0xffffffff || uncompressed === 0xffffffff || localOffset === 0xffffffff) {
+      throw new ZipScanError(`${label}: ZIP64 entries are refused`);
+    }
+    const name = cd.toString("utf8", p + 46, p + 46 + nameLen);
+    p += 46 + nameLen + extraLen + commentLen;
+    const shown = JSON.stringify(name.slice(0, 120));
+    const nameProblem = entryNameProblem(name);
+    if (nameProblem) {
+      throw new ZipScanError(`${label}: the ZIP entry ${shown} ${nameProblem} (zip slip refused)`);
+    }
+    // Made on Unix (3) or macOS (19) with S_IFLNK in the mode bits.
+    if ((madeBy === 3 || madeBy === 19) && ((externalAttrs >>> 16) & 0o170000) === 0o120000) {
+      throw new ZipScanError(`${label}: the ZIP entry ${shown} is a symlink, which is refused`);
+    }
+    if (flags & 0x0001) {
+      throw new ZipScanError(`${label}: the ZIP entry ${shown} is encrypted and cannot be checked`);
+    }
+    if (method !== 0 && method !== 8) {
+      throw new ZipScanError(
+        `${label}: the ZIP entry ${shown} uses compression method ${method}, only stored/deflate are allowed`,
+      );
+    }
+    if (compressed === 0 && uncompressed > 0) {
+      throw new ZipScanError(
+        `${label}: the ZIP entry ${shown} declares ${uncompressed} bytes from no data (a zip bomb header)`,
+      );
+    }
+    if (method === 0 && compressed !== uncompressed) {
+      corrupt(`the stored ZIP entry ${shown} declares different stored and real sizes`);
+    }
+    if (compressed > 0 && uncompressed / compressed > MAX_ZIP_ENTRY_RATIO) {
+      throw new ZipScanError(
+        `${label}: the ZIP entry ${shown} expands ${Math.round(uncompressed / compressed)}:1 (over the ${MAX_ZIP_ENTRY_RATIO}:1 limit) — a zip bomb; use a smaller document`,
+      );
+    }
+    budget.uncompressed += uncompressed;
+    if (budget.uncompressed > MAX_ZIP_TOTAL_UNCOMPRESSED) {
+      throw new ZipScanError(
+        `${label}: the ZIP entries declare over ${MAX_ZIP_TOTAL_UNCOMPRESSED} bytes uncompressed in total (counting embedded packages); use a smaller document`,
+      );
+    }
+    entries.push({ name, method, flags, compressed, uncompressed, localOffset });
+  }
+  if (entries.length !== count) {
+    corrupt(
+      `the ZIP end record lists ${count} entries but the central directory has ${entries.length}`,
+    );
+  }
+
+  // Local headers: each must match its central entry, and together they
+  // must tile the file up to the central directory with no gap or overlap,
+  // so a reader walking local headers sees exactly these entries.
+  const local = Buffer.alloc(30);
+  let cursor = 0;
+  for (const e of [...entries].sort((a, b) => a.localOffset - b.localOffset)) {
+    const shown = JSON.stringify(e.name.slice(0, 120));
+    if (e.localOffset !== cursor) {
+      corrupt(
+        `the ZIP has data outside its central directory (before ${shown}), or entries that overlap`,
+      );
+    }
+    if (e.localOffset + 30 > cdOffset) corrupt(`the local header of ${shown} is corrupt`);
+    src.read(local, e.localOffset);
+    const localNameLen = local.readUInt16LE(26);
+    if (
+      local.readUInt32LE(0) !== SIG_LOCAL ||
+      local.readUInt16LE(8) !== e.method ||
+      e.localOffset + 30 + localNameLen > cdOffset
+    ) {
+      corrupt(`the local header of ${shown} is corrupt`);
+    }
+    const localName = Buffer.alloc(localNameLen);
+    src.read(localName, e.localOffset + 30);
+    if (localName.toString("utf8") !== e.name) {
+      corrupt(`the local header of ${shown} names a different file than the central directory`);
+    }
+    e.dataStart = e.localOffset + 30 + localNameLen + local.readUInt16LE(28);
+    cursor = e.dataStart + e.compressed;
+    if (cursor > cdOffset) corrupt(`the data of ${shown} runs into the central directory`);
+    if (e.flags & 0x0008) {
+      // Data descriptor after the data: 12 bytes, or 16 with its signature.
+      const sig = Buffer.alloc(4);
+      if (cursor + 4 <= cdOffset) src.read(sig, cursor);
+      cursor += sig.readUInt32LE(0) === SIG_DESCRIPTOR ? 16 : 12;
+    }
+  }
+  if (cursor !== cdOffset) corrupt("the ZIP has data outside its central directory");
+
+  const entryBases = new Set(
+    entries.map((e) => e.name.slice(e.name.lastIndexOf("/") + 1).toLowerCase()),
+  );
+  const inflate = (e: Entry, raw: Buffer, full: boolean): Buffer => {
+    if (e.method === 0) return raw;
+    try {
+      return full
+        ? inflateRawSync(raw, { maxOutputLength: e.uncompressed + 1 })
+        : inflateRawSync(raw, {
+            finishFlush: zlibConstants.Z_SYNC_FLUSH,
+            maxOutputLength: 8 * 1024 * 1024,
+          });
+    } catch {
+      throw new ZipScanError(
+        `${label}: the ZIP entry ${JSON.stringify(e.name.slice(0, 120))} inflates past its declared size or is corrupt`,
+      );
+    }
+  };
+  const readWhole = (e: Entry): Buffer => {
+    const raw = Buffer.alloc(e.compressed);
+    src.read(raw, e.dataStart as number);
+    const data = inflate(e, raw, true);
+    if (data.length > e.uncompressed) {
+      throw new ZipScanError(
+        `${label}: the ZIP entry ${JSON.stringify(e.name.slice(0, 120))} inflates past its declared size`,
+      );
+    }
+    return data;
+  };
+
+  // A package inside a part (an embedded .xlsx, a .zip attachment, an ODF
+  // document) is opened by the converter too: scan it with the same rules,
+  // the same budget and one level deeper. An OLE object (a compound file)
+  // with a ZIP inside cannot be read by this scan, so it is refused.
+  const checkEmbedded = (e: Entry, data: Buffer): void => {
+    const shown = JSON.stringify(e.name.slice(0, 120));
+    const tailStart = Math.max(0, data.length - (22 + 65_535));
+    if (holdsZip(data.subarray(0, 4), data.subarray(tailStart), tailStart)) {
+      if (nesting.length >= MAX_ZIP_NESTING) {
+        throw new ZipScanError(
+          `${label}: the ZIP entry ${shown} is a package nested more than ${MAX_ZIP_NESTING} deep inside the document, which is refused`,
+        );
+      }
+      scanZipSource(bufferSource(data), baseLabel, [...nesting, e.name], budget);
+      return;
+    }
+    if (
+      data.subarray(0, 8).equals(CFB_MAGIC) &&
+      (data.includes(PK_LOCAL) || data.includes(PK_EOCD))
+    ) {
+      throw new ZipScanError(
+        `${label}: the ZIP entry ${shown} is an OLE object with a ZIP package inside, which the scan cannot read; embedded OLE packages are refused`,
+      );
+    }
+  };
+
+  // XML parts (by name or by content): inflate with a hard cap and refuse
+  // external references. Other parts are looked into for nested packages.
+  for (const e of entries) {
+    const shown = JSON.stringify(e.name.slice(0, 120));
+    if (DTD_NAME.test(e.name)) {
+      throw new ZipScanError(
+        `${label}: the ZIP entry ${shown} is a DTD, which can declare entities; DTDs inside documents are refused`,
+      );
+    }
+    const dataStart = e.dataStart as number;
+    let xml = XML_NAME.test(e.name);
+    let gz = false;
+    let head: Buffer = Buffer.alloc(0);
+    if (!xml && e.compressed > 0) {
+      const raw = Buffer.alloc(Math.min(e.compressed, SNIFF_COMPRESSED));
+      src.read(raw, dataStart);
+      head = inflate(e, raw, e.compressed <= SNIFF_COMPRESSED).subarray(0, SNIFF_BYTES);
+      gz = head[0] === 0x1f && head[1] === 0x8b;
+      // Nothing out of the first bytes of a non-empty part: scan it whole.
+      xml = gz || looksLikeXml(head) || (head.length === 0 && e.uncompressed > 0);
+    }
+    if (!xml) {
+      if (e.compressed === 0) continue;
+      if (e.uncompressed > MAX_EMBEDDED_PART) {
+        // Too big to read whole: a stored part's start and end can still be
+        // read in place; a compressed one cannot be checked, so it is refused.
+        const tooBig = `${label}: the ZIP entry ${shown} is over the ${MAX_EMBEDDED_PART} byte limit for checking embedded content; use a smaller document`;
+        if (e.method !== 0) throw new ZipScanError(tooBig);
+        const w = Math.min(e.compressed, 22 + 65_535);
+        const end = Buffer.alloc(w);
+        src.read(end, dataStart + e.compressed - w);
+        if (holdsZip(head, end, e.compressed - w) || head.subarray(0, 8).equals(CFB_MAGIC)) {
+          throw new ZipScanError(tooBig);
+        }
+        continue;
+      }
+      checkEmbedded(e, readWhole(e));
+      continue;
+    }
+    if (e.uncompressed > MAX_XML_PART_UNCOMPRESSED || e.compressed > MAX_XML_PART_COMPRESSED) {
+      throw new ZipScanError(
+        `${label}: the XML entry ${shown} is over the ${MAX_XML_PART_UNCOMPRESSED} byte scan limit; use a smaller document`,
+      );
+    }
+    budget.scanned += e.uncompressed;
+    if (budget.scanned > MAX_XML_SCAN_TOTAL) {
+      throw new ZipScanError(
+        `${label}: the XML entries are over the scan limit; use a smaller document`,
+      );
+    }
+    let data: Buffer = readWhole(e);
+    if (gz) {
+      // A gzipped part (an .svgz image): look inside it too.
       try {
-        return full
-          ? inflateRawSync(raw, { maxOutputLength: e.uncompressed + 1 })
-          : inflateRawSync(raw, {
-              finishFlush: zlibConstants.Z_SYNC_FLUSH,
-              maxOutputLength: 8 * 1024 * 1024,
-            });
+        data = gunzipSync(data, { maxOutputLength: MAX_XML_PART_UNCOMPRESSED });
       } catch {
         throw new ZipScanError(
-          `${label}: the ZIP entry ${JSON.stringify(e.name.slice(0, 120))} inflates past its declared size or is corrupt`,
+          `${label}: the gzipped ZIP entry ${shown} is corrupt or over the ${MAX_XML_PART_UNCOMPRESSED} byte scan limit`,
         );
       }
-    };
-
-    // XML parts (by name or by content): inflate with a hard cap and refuse
-    // external references.
-    let scannedTotal = 0;
-    for (const e of entries) {
-      const shown = JSON.stringify(e.name.slice(0, 120));
-      if (DTD_NAME.test(e.name)) {
-        throw new ZipScanError(
-          `${label}: the ZIP entry ${shown} is a DTD, which can declare entities; DTDs inside documents are refused`,
-        );
-      }
-      const dataStart = e.dataStart as number;
-      let xml = XML_NAME.test(e.name);
-      let gz = false;
-      if (!xml && e.compressed > 0) {
-        const raw = Buffer.alloc(Math.min(e.compressed, SNIFF_COMPRESSED));
-        readAt(fd, raw, dataStart);
-        const head = inflate(e, raw, e.compressed <= SNIFF_COMPRESSED).subarray(0, SNIFF_BYTES);
-        gz = head[0] === 0x1f && head[1] === 0x8b;
-        // Nothing out of the first bytes of a non-empty part: scan it whole.
-        xml = gz || looksLikeXml(head) || (head.length === 0 && e.uncompressed > 0);
-      }
-      if (!xml) continue;
-      if (e.uncompressed > MAX_XML_PART_UNCOMPRESSED || e.compressed > MAX_XML_PART_COMPRESSED) {
-        throw new ZipScanError(
-          `${label}: the XML entry ${shown} is over the ${MAX_XML_PART_UNCOMPRESSED} byte scan limit; use a smaller document`,
-        );
-      }
-      scannedTotal += e.uncompressed;
-      if (scannedTotal > MAX_XML_SCAN_TOTAL) {
+      budget.scanned += data.length;
+      if (budget.scanned > MAX_XML_SCAN_TOTAL) {
         throw new ZipScanError(
           `${label}: the XML entries are over the scan limit; use a smaller document`,
         );
       }
-      const raw = Buffer.alloc(e.compressed);
-      readAt(fd, raw, dataStart);
-      let data = inflate(e, raw, true);
-      if (data.length > e.uncompressed) {
-        throw new ZipScanError(`${label}: the ZIP entry ${shown} inflates past its declared size`);
+      if (!looksLikeXml(data.subarray(0, SNIFF_BYTES))) {
+        checkEmbedded(e, data);
+        continue;
       }
-      if (gz) {
-        // A gzipped part (an .svgz image): look inside it too.
-        try {
-          data = gunzipSync(data, { maxOutputLength: MAX_XML_PART_UNCOMPRESSED });
-        } catch {
-          throw new ZipScanError(
-            `${label}: the gzipped ZIP entry ${shown} is corrupt or over the ${MAX_XML_PART_UNCOMPRESSED} byte scan limit`,
-          );
-        }
-        scannedTotal += data.length;
-        if (scannedTotal > MAX_XML_SCAN_TOTAL) {
-          throw new ZipScanError(
-            `${label}: the XML entries are over the scan limit; use a smaller document`,
-          );
-        }
-        if (!looksLikeXml(data.subarray(0, SNIFF_BYTES))) continue;
-      }
-      const slash = e.name.lastIndexOf("/");
-      scanDecoded(data, slash < 0 ? "" : e.name.slice(0, slash), entryBases, (what) => {
-        throw new ZipScanError(
-          `${label}: the ZIP entry ${shown} contains ${what}; external entities and local-file references are refused before the document is opened`,
-        );
-      });
     }
-  } finally {
-    closeSync(fd);
+    const slash = e.name.lastIndexOf("/");
+    scanDecoded(data, slash < 0 ? "" : e.name.slice(0, slash), entryBases, (what) => {
+      throw new ZipScanError(
+        `${label}: the ZIP entry ${shown} contains ${what}; external entities, local-file references and fields that load files are refused before the document is opened`,
+      );
+    });
   }
 }
